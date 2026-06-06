@@ -1,9 +1,9 @@
 {
-  "name": "context-explorer",
+  "name": "depthfinder",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Local-only, read-only Context Explorer for the home-center repo. Visualizes Markdown / prompt / memory / eval surfaces. Binds 127.0.0.1 only. Zero runtime dependencies.",
+  "description": "Depthfinder: local-only, read-only visualizer for the home-center repo. Visualizes Markdown / prompt / memory / eval surfaces. Binds 127.0.0.1 only. Zero runtime dependencies.",
   "scripts": {
     "start": "node server.mjs",
     "map": "node scripts/context-map.mjs",

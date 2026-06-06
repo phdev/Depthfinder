@@ -1,4 +1,4 @@
-# Context Explorer
+# Depthfinder
 
 Private, local-only, **read-only** visualizer for how a repo (built for
 [`home-center`](https://github.com/phdev/home-center)) uses its Markdown /

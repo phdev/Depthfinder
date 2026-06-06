@@ -288,7 +288,7 @@ export async function runGate() {
     at: new Date().toISOString(),
     passed: fixtures.every((f) => f.passed),
     fixtures,
-    note: "Deterministic offline replay. Report + goldens written to tools/context-explorer/.cache only.",
+    note: "Deterministic offline replay. Report + goldens written to .cache only (never the analyzed repo).",
   };
   writeFileSync(GATE_CACHE, JSON.stringify(result, null, 2));
   return redactDeep(result);

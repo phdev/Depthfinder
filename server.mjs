@@ -1,4 +1,4 @@
-// Context Explorer — local-only HTTP server.
+// Depthfinder — local-only HTTP server.
 //
 // Built-in http only, ZERO dependencies. Binds 127.0.0.1 ONLY by default.
 // No auth by design. Opt into LAN exposure explicitly with `--lan`, `LAN=1`,
@@ -230,7 +230,7 @@ async function handle(req, res) {
 const exposed = HOST !== "127.0.0.1" && HOST !== "localhost";
 createServer(handle).listen(PORT, HOST, () => {
   console.log(
-    `Context Explorer → http://${HOST === "0.0.0.0" ? "127.0.0.1" : HOST}:${PORT}`,
+    `Depthfinder → http://${HOST === "0.0.0.0" ? "127.0.0.1" : HOST}:${PORT}`,
   );
   if (!exposed) {
     console.log("  bound to 127.0.0.1 only (loopback).");
