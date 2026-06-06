@@ -1,0 +1,40 @@
+# Architectural rules for home-center and the tests / gates that protect them.
+#
+# Consumed (read-only) by tools/context-explorer to build the eval-coverage
+# matrix (rule × protecting artifact × in-CI). Authored file — safe to edit.
+#
+# Each rule:
+#   id          stable key
+#   description what the rule guarantees
+#   protects    test files (run by `npm test`) or job ids (e.g. agentci:gate)
+#   asserts     optional: a specific behavior a protecting test must assert
+
+version: 1
+
+rules:
+  - id: enhance_not_decide
+    description: OpenClaw and household memory may enhance copy, ordering, and summaries, but must never decide card visibility, reminder timing, or flag truth. Enhancement must degrade to deterministic copy.
+    severity: critical
+    protects:
+      - src/__tests__/fallback.integration.test.js
+      - src/ai/openclaw.test.js
+
+  - id: visibility_is_derived_only
+    description: Card visibility is driven only by DerivedState; components never compute "should I show?". Adding a card means editing src/cards/registry.js.
+    severity: critical
+    protects:
+      - src/cards/registry.test.js
+      - src/state/deriveState.test.js
+
+  - id: reminder_timing_deterministic
+    description: Reminder timing (bedtime window, 16:30, 18:00 thresholds) is deterministic arithmetic, not an LLM call.
+    severity: high
+    asserts: bedtimeReminderActive flips on a fixed minutes-before-bedtime boundary
+    protects:
+      - src/state/deriveState.test.js
+
+  - id: deterministic_slice_replayable
+    description: A recorded AgentCI slice replays identically — same raw input yields the same derived state and card selection, with agent output unable to change decisions.
+    severity: high
+    protects:
+      - agentci:gate

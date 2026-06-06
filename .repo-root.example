@@ -1,0 +1,3 @@
+# Absolute path to the repo this tool analyzes (read-only).
+# Copy to `.repo-root` (gitignored, machine-specific). Or set $REPO_ROOT instead.
+/Users/you/home-center

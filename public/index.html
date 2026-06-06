@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Context Explorer — home-center</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="dot"></span>
+        <h1>Context Explorer</h1>
+        <span class="repo" id="repoRoot">home-center</span>
+      </div>
+      <nav class="tabs" id="tabs">
+        <button class="tab active" data-panel="summary">0 · Summary</button>
+        <button class="tab" data-panel="graph">1 · Context graph</button>
+        <button class="tab" data-panel="tokens">2 · Token budget</button>
+        <button class="tab" data-panel="coverage">3 · Eval coverage</button>
+        <button class="tab" data-panel="drift">4 · Drift</button>
+      </nav>
+      <div class="local-badge" title="Server binds 127.0.0.1 only">🔒 local-only</div>
+    </header>
+
+    <!-- ── Panel 0: Summary / triage ────────────────────────────────────── -->
+    <section class="panel active" id="panel-summary">
+      <div class="placeholder" id="summaryBody">Loading…</div>
+    </section>
+
+    <!-- ── Panel 1: Context graph ───────────────────────────────────────── -->
+    <section class="panel" id="panel-graph">
+      <div class="panel-grid">
+        <aside class="sidebar">
+          <div class="controls">
+            <div class="row">
+              <button id="refreshMap" class="btn">↻ Refresh</button>
+              <select id="layoutPreset" class="select" title="Focus">
+                <option value="full">Full graph</option>
+                <option value="boundary">Boundary focus</option>
+                <option value="loaded">Loaded context only</option>
+                <option value="docs">Docs &amp; prompts</option>
+              </select>
+            </div>
+            <input id="search" class="search" placeholder="Search nodes…" />
+          </div>
+
+          <div class="budget" id="budget"></div>
+
+          <div class="legend">
+            <h3>Node types</h3>
+            <div id="typeFilters" class="filters"></div>
+            <h3>Load behavior</h3>
+            <div id="loadFilters" class="filters"></div>
+            <h3>Edges</h3>
+            <div id="edgeLegend" class="filters"></div>
+          </div>
+
+          <div class="findings" id="findings"></div>
+        </aside>
+
+        <div class="canvas-wrap">
+          <div id="cy"></div>
+          <div class="detail" id="detail">
+            <div class="detail-empty">Tap a node to inspect it.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Panel 2: Token budget ────────────────────────────────────────── -->
+    <section class="panel" id="panel-tokens">
+      <div class="placeholder" id="tokensBody">Loading…</div>
+    </section>
+
+    <!-- ── Panel 3: Eval coverage ───────────────────────────────────────── -->
+    <section class="panel" id="panel-coverage">
+      <div class="placeholder" id="coverageBody">Loading…</div>
+    </section>
+
+    <!-- ── Panel 4: Drift ───────────────────────────────────────────────── -->
+    <section class="panel" id="panel-drift">
+      <div class="placeholder" id="driftBody">Loading…</div>
+    </section>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.2/cytoscape.min.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>
