@@ -848,43 +848,104 @@ async function loadDrift() {
 }
 
 // ── Panel 0: summary / triage ───────────────────────────────────────────────
-const SEV = {
-  high: { cls: "bad", icon: "🔴" },
-  medium: { cls: "warn", icon: "🟡" },
-  low: { cls: "off", icon: "⚪" },
-};
+const SEV_CLASS = { high: "critical", medium: "warn", low: "low" };
+const STATUS_CARD = { good: "good", warn: "warn", bad: "critical", muted: "neutral" };
+
+// pick a sonar-themed icon for a health metric by its meaning
+function metricIcon(label, status) {
+  const l = label.toLowerCase();
+  if (l.includes("dangling")) return { cls: "chain", glyph: "⌁" };
+  if (l.includes("gate")) return { cls: "shield", glyph: status === "bad" ? "✕" : "✓" };
+  if (l.includes("drift")) return { cls: "clock", glyph: "◷" };
+  if (l.includes("rules")) return { cls: "triangle", glyph: "!" };
+  if (status === "good") return { cls: "check", glyph: "✓" };
+  if (status === "bad") return { cls: "gauge", glyph: "!" };
+  return { cls: "triangle", glyph: "!" };
+}
+
+// "10,834 / 4,000" → big value + small budget; else a single styled value
+function metricValue(label, value) {
+  if (label.toLowerCase().includes("budget")) {
+    const m = String(value).match(/^(.+?)\s*\/\s*(.+)$/);
+    if (m) return `<strong>${escapeHtml(m[1].trim())}</strong><small>/ ${escapeHtml(m[2].trim())}</small>`;
+  }
+  let v = String(value);
+  v = /^(pass|fail)$/i.test(v) ? v.toUpperCase() : v.charAt(0).toUpperCase() + v.slice(1);
+  return `<strong>${escapeHtml(v)}</strong>`;
+}
+
+function healthyIcon(text) {
+  const t = text.toLowerCase();
+  if (t.includes("local-only") || t.includes("leakage") || t.includes("memory"))
+    return { cls: "lock", glyph: "▣" };
+  return { cls: "", glyph: "✓" };
+}
+
 function renderSummary(d) {
   const body = $("#summaryBody");
   body.className = "summary-body";
+
   const health = d.health
-    .map(
-      (h) =>
-        `<button class="health-card ${h.status}" data-tab="${h.tab}"><div class="hl">${h.label}</div><div class="hv">${escapeHtml(h.value)}</div></button>`,
-    )
+    .map((h) => {
+      const ic = metricIcon(h.label, h.status);
+      const cls = STATUS_CARD[h.status] || "neutral";
+      return `<button class="metric-card ${cls}" data-tab="${h.tab}">
+        <span class="metric-label">${escapeHtml(h.label)}</span>
+        <span class="icon ${ic.cls}">${ic.glyph}</span>
+        ${metricValue(h.label, h.value)}
+      </button>`;
+    })
     .join("");
+
   const issues = d.issues
     .map(
-      (it) =>
-        `<div class="issue ${SEV[it.severity].cls}"><div class="issue-sev">${SEV[it.severity].icon}</div>
-        <div class="issue-main">
-          <div class="issue-title">${escapeHtml(it.title)} <button class="issue-link" data-tab="${it.tab}">→ Tab ${it.tab}</button></div>
-          <div class="issue-detail muted">${escapeHtml(it.detail)}</div>
-          ${it.action ? `<div class="issue-action">↳ ${escapeHtml(it.action)}</div>` : ""}
-        </div></div>`,
+      (it, i) =>
+        `<a class="issue-card ${SEV_CLASS[it.severity] || "low"}" data-tab="${it.tab}" href="#">
+        <span class="rank">${i + 1}</span>
+        <span class="issue-copy">
+          <strong>${escapeHtml(it.title)}</strong>
+          <small>${escapeHtml(it.detail)}</small>
+          ${it.action ? `<small class="action">↳ ${escapeHtml(it.action)}</small>` : ""}
+        </span>
+        <span class="tab-chip">Tab ${it.tab} <b>›</b></span>
+      </a>`,
     )
     .join("");
+
+  const healthy = d.healthy
+    .map((h) => {
+      const ic = healthyIcon(h);
+      return `<div class="healthy-row"><span class="healthy-icon ${ic.cls}">${ic.glyph}</span><span class="healthy-text">${escapeHtml(h)}</span><b>›</b></div>`;
+    })
+    .join("");
+
   body.innerHTML = `
-    <div class="sum-head"><div><h2>Summary</h2>
-      <div class="muted">highest-priority items across all panels · ${new Date(d.generatedAt).toLocaleString()}</div></div>
-      <button class="btn" id="refreshSummary">↻ Refresh</button></div>
-    <div class="health-strip">${health}</div>
-    <div class="sum-counts">
-      <span class="cov-chip bad">${d.counts.high} high</span>
-      <span class="cov-chip warn">${d.counts.medium} medium</span>
-      <span class="cov-chip off">${d.counts.low} low</span></div>
-    <div class="issues">${issues || '<div class="muted">No issues — all clear.</div>'}</div>
-    <div class="healthy"><h3>Healthy</h3><ul>${d.healthy.map((h) => `<li>${escapeHtml(h)}</li>`).join("")}</ul></div>`;
-  body.querySelectorAll("[data-tab]").forEach((b) => (b.onclick = () => activate(TAB_PANEL[b.dataset.tab])));
+    <div class="ocean-glow" aria-hidden="true"></div>
+    <div class="sonar-field" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+    <section class="hero">
+      <p class="eyebrow">Repo context sonar</p>
+      <div class="hero-row"><h2>Summary</h2>
+        <button class="refresh" id="refreshSummary" aria-label="Refresh">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v6h-6"/><path d="M19 12a7 7 0 1 1-2.05-4.95L20 10"/></svg>
+        </button></div>
+      <p class="updated">Updated ${new Date(d.generatedAt).toLocaleString()}</p>
+    </section>
+    <section class="health-strip">${health}</section>
+    <section class="priority-section">
+      <div class="section-title critical-title"><span class="section-icon">!</span><h3>What to fix first</h3></div>
+      ${issues || '<div class="muted">No issues — all clear.</div>'}
+    </section>
+    <section class="healthy-section">
+      <div class="section-title good-title"><span class="section-icon">✓</span><h3>Healthy</h3></div>
+      <div class="healthy-list">${healthy}</div>
+    </section>`;
+
+  body.querySelectorAll("[data-tab]").forEach((b) =>
+    b.addEventListener("click", (e) => {
+      e.preventDefault();
+      activate(TAB_PANEL[b.dataset.tab]);
+    }),
+  );
   $("#refreshSummary").onclick = () => loadSummary();
 }
 async function loadSummary() {
