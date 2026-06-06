@@ -59,7 +59,14 @@ export async function generateSummary() {
       );
   }
 
-  // ── coverage ──
+  // ── coverage ── (friendly subject lines so issue titles read cleanly)
+  const RULE_SUBJECT = {
+    deterministic_slice_replayable: "AgentCI gate",
+    enhance_not_decide: "Enhance-not-decide rule",
+    visibility_is_derived_only: "Derived-only visibility rule",
+    reminder_timing_deterministic: "Reminder-timing rule",
+  };
+  const subj = (id) => RULE_SUBJECT[id] || id;
   for (const r of coverage.rules) {
     if (r.status === "not-in-ci") {
       const gateNote =
@@ -68,7 +75,7 @@ export async function generateSummary() {
           : "";
       add(
         r.severity === "critical" || r.severity === "high" ? "high" : "medium",
-        `${r.id} is not enforced in CI`,
+        `${subj(r.id)} isn't enforced in CI`,
         `Protected by ${r.protects.map((p) => p.artifact).join(", ")} — runs in no workflow.${gateNote}`,
         3,
         "Add the gate/eval to a workflow (it's offline and fast).",
@@ -76,7 +83,7 @@ export async function generateSummary() {
     } else if (r.status === "missing-artifact") {
       add(
         "high",
-        `${r.id} has a missing protecting test`,
+        `${subj(r.id)} is missing a protecting test`,
         `${r.protects.filter((p) => !p.exists).map((p) => p.artifact).join(", ")} not found.`,
         3,
         "Restore the test or fix the path in context/rules.yaml.",

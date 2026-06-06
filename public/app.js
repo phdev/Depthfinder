@@ -905,7 +905,6 @@ function renderSummary(d) {
         <span class="issue-copy">
           <strong>${escapeHtml(it.title)}</strong>
           <small>${escapeHtml(it.detail)}</small>
-          ${it.action ? `<small class="action">↳ ${escapeHtml(it.action)}</small>` : ""}
         </span>
         <span class="tab-chip">Tab ${it.tab} <b>›</b></span>
       </a>`,

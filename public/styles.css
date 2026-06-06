@@ -23,6 +23,7 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh; /* track iOS Safari toolbar so bottom content isn't cut off */
   overflow: hidden;
 }
 
@@ -31,7 +32,8 @@ body {
   display: flex;
   align-items: center;
   gap: 1.5rem;
-  padding: 0.55rem 1rem;
+  /* clear the iOS status bar / dynamic island */
+  padding: max(0.55rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) 0.55rem max(1rem, env(safe-area-inset-left));
   background: var(--bg2);
   border-bottom: 1px solid var(--line);
 }
@@ -315,10 +317,9 @@ table.matrix th { background: var(--bg3); position: sticky; top: 0; }
 .refresh:hover { border-color: var(--teal); color: #d4f1fc; }
 .refresh svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
-.health-strip { position: relative; z-index: 1; display: flex; align-items: stretch; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px 0 22px; }
-.health-strip::-webkit-scrollbar { display: none; }
-.metric-card { position: relative; min-width: 84px; height: 134px; flex: 1 0 84px; display: grid; justify-items: center;
-  align-content: start; gap: 8px; padding: 16px 8px 12px; border: 1px solid var(--s-line); border-radius: 18px; cursor: pointer;
+.health-strip { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; padding: 2px 0 22px; }
+.metric-card { position: relative; min-width: 0; height: 130px; display: grid; justify-items: center; overflow: hidden;
+  align-content: start; gap: 7px; padding: 14px 4px 12px; border: 1px solid var(--s-line); border-radius: 16px; cursor: pointer;
   background: linear-gradient(180deg, rgba(17, 45, 66, .72), rgba(5, 18, 30, .72)); box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
   text-align: center; color: var(--s-neutral); }
 .metric-card:hover { border-color: rgba(68, 232, 245, .4); }
@@ -327,10 +328,10 @@ table.matrix th { background: var(--bg3); position: sticky; top: 0; }
 .metric-card.good { color: var(--s-good); }
 .metric-card.warn { color: var(--s-warn); }
 .metric-card.neutral { color: var(--s-neutral); }
-.metric-label { min-height: 32px; color: #a5b7c8; font-size: 12.5px; line-height: 1.25; }
-.metric-card strong { color: #eef8ff; font-size: 19px; letter-spacing: -.04em; }
-.metric-card small { margin-top: -6px; color: #aec0cf; font-size: 16px; }
-.metric-card .icon { display: grid; place-items: center; width: 32px; height: 32px; font-weight: 800; font-size: 16px; }
+.metric-label { min-height: 30px; color: #a5b7c8; font-size: clamp(10px, 2.9vw, 12.5px); line-height: 1.2; }
+.metric-card strong { color: #eef8ff; font-size: clamp(13px, 3.7vw, 19px); letter-spacing: -.04em; }
+.metric-card small { margin-top: -2px; color: #aec0cf; font-size: clamp(11px, 3vw, 16px); }
+.metric-card .icon { display: grid; place-items: center; width: 30px; height: 30px; font-weight: 800; font-size: 15px; }
 .metric-card .check, .metric-card .shield { border: 2px solid currentColor; border-radius: 50%; }
 .metric-card .triangle { clip-path: polygon(50% 0, 100% 100%, 0 100%); background: currentColor; color: #092033; padding-top: 9px; width: 30px; height: 30px; }
 .metric-card .gauge { border: 4px solid currentColor; border-bottom-color: transparent; border-radius: 50%; }
@@ -373,7 +374,8 @@ table.matrix th { background: var(--bg3); position: sticky; top: 0; }
 .healthy-row b { color: #9eb4c5; font-size: 26px; font-weight: 300; }
 
 @media (max-width: 760px) {
-  .summary-body { max-width: none; }
+  .summary-body { max-width: none; padding-left: 12px; padding-right: 12px; }
   .hero h2 { font-size: 34px; }
-  .metric-card { min-width: 80px; }
+  .health-strip { gap: 5px; }
+  .metric-card { min-width: 0; border-radius: 14px; }
 }
