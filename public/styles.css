@@ -54,9 +54,30 @@ body {
 }
 .tab:hover { color: var(--fg); background: var(--bg3); }
 .tab.active { color: var(--fg); background: var(--bg3); border-color: var(--line); }
+.t-num { color: var(--fg-dim); }
+.t-num::after { content: "·"; margin: 0 0.3rem; opacity: 0.5; }
+.tab.active .t-num { color: var(--accent); }
+.t-short { display: none; }
 .local-badge {
   font-size: 0.72rem; color: var(--good);
   border: 1px solid #1f3d28; background: #11231a; border-radius: 6px; padding: 2px 8px;
+}
+
+/* mobile: brand + badge on row 1, tabs get their own full-width scrollable
+   row with short labels so 3 & 4 are no longer clipped */
+@media (max-width: 720px) {
+  .topbar { flex-wrap: wrap; gap: 0.45rem; padding: 0.5rem 0.7rem; }
+  .brand h1 { font-size: 0.92rem; }
+  .brand .repo { display: none; }
+  .local-badge { order: 2; }
+  .tabs {
+    order: 3; width: 100%; margin-left: 0; overflow-x: auto;
+    gap: 0.3rem; padding-bottom: 2px; -webkit-overflow-scrolling: touch;
+  }
+  .tab { flex: 0 0 auto; white-space: nowrap; padding: 0.4rem 0.55rem; }
+  .t-full { display: none; }
+  .t-short { display: inline; }
+  .t-num::after { margin: 0 0.2rem; }
 }
 
 /* ── panels ── */

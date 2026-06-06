@@ -44,8 +44,7 @@ export const INSTRUCTIONS = {
       ],
     },
   ],
-  thenRun:
-    "Then click Run drift, or: cd tools/context-explorer && npm run drift:refresh",
+  thenRun: "Then click Run drift, or run: npm run drift:refresh",
 };
 
 function onPath(name) {
