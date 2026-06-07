@@ -282,8 +282,19 @@ a { color: inherit; text-decoration: none; }
   .quad-title { font-size: 14px; }
   .quad-value { font-size: 26px; }
   .quad .icon-circle { width: 38px; height: 38px; }
-  .thead, .trow { grid-template-columns: 28px 1.5fr 64px 56px; }
-  .thead > :last-child, .trow > :last-child { display: none; }
+  /* hotspot rows: drop chevron + shrink icon so the title stops wrapping */
+  .row { grid-template-columns: 36px 1fr auto; gap: 12px; padding: 16px; }
+  .full-row .row { grid-template-columns: 36px 1fr; }
+  .row .chev { display: none; }
+  .row .icon-circle { width: 36px; height: 36px; }
+  .row-title { font-size: 16px; }
+  .row-meta { font-size: 13.5px; }
+  .badge { padding: 6px 10px; font-size: 13px; }
+  /* contributors table: hide bars but KEEP the over-budget marker (compact) */
+  .thead, .trow { grid-template-columns: 24px 1.5fr 54px 48px auto; gap: 6px; }
+  .bar { display: none; }
+  .ob-full { display: none; }
+  .over-badge { padding: 4px 6px; font-size: 11px; }
   .sankey-card { height: auto; padding: 18px; }
 }
 

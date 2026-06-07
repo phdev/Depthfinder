@@ -593,7 +593,7 @@ function renderTokens(d) {
   const rows = d.contributors
     .map(
       (c, i) =>
-        `<div class="trow"><div>${i + 1}</div><div class="tname">${svgIcon(c.icon)}<span>${escapeHtml(c.name)}</span></div><div>${ktok(c.tokens)}</div><div>${(c.pct * 100).toFixed(1)}%</div><div>${c.over ? '<span class="over-badge">OVER BUDGET ⚠</span>' : `<div class="bar"><span style="width:${Math.round((c.pct / maxPct) * 100)}%"></span></div>`}</div></div>`,
+        `<div class="trow"><div>${i + 1}</div><div class="tname">${svgIcon(c.icon)}<span>${escapeHtml(c.name)}</span></div><div>${ktok(c.tokens)}</div><div>${(c.pct * 100).toFixed(1)}%</div><div>${c.over ? '<span class="over-badge"><span class="ob-full">OVER BUDGET </span>⚠</span>' : `<div class="bar"><span style="width:${Math.round((c.pct / maxPct) * 100)}%"></span></div>`}</div></div>`,
     )
     .join("");
   body.innerHTML = `
