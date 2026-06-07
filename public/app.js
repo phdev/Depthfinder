@@ -65,7 +65,20 @@ const fmt = (n) => (n ?? 0).toLocaleString();
 
 // ── tabs ────────────────────────────────────────────────────────────────────
 const loaded = {};
+// URL-friendly hash names mirror the visible tab labels (Context, Evals)
+// even though internal panel ids are "graph" and "coverage".
+const PANEL_TO_HASH = { summary: "summary", graph: "context", tokens: "tokens", coverage: "evals", drift: "drift" };
+const HASH_TO_PANEL = Object.fromEntries(Object.entries(PANEL_TO_HASH).map(([p, h]) => [h, p]));
+const VALID_PANELS = new Set(Object.keys(PANEL_TO_HASH));
+function panelFromHash() {
+  const h = (location.hash || "").replace(/^#/, "").toLowerCase();
+  return HASH_TO_PANEL[h] || (VALID_PANELS.has(h) ? h : null);
+}
+// activate() is pure: toggles classes + lazy-loads. History is owned by the
+// tab-click handler (pushes a new entry) and the initial-load normalizer
+// (replaces). hashchange (back/forward) just re-runs activate().
 function activate(panel) {
+  if (!VALID_PANELS.has(panel)) panel = "summary";
   for (const t of document.querySelectorAll(".tab"))
     t.classList.toggle("active", t.dataset.panel === panel);
   for (const p of document.querySelectorAll(".panel"))
@@ -83,7 +96,19 @@ function activate(panel) {
 const TAB_PANEL = { 0: "summary", 1: "graph", 2: "tokens", 3: "coverage", 4: "drift" };
 $("#tabs").addEventListener("click", (e) => {
   const t = e.target.closest(".tab");
-  if (t) activate(t.dataset.panel);
+  if (!t) return;
+  const want = "#" + PANEL_TO_HASH[t.dataset.panel];
+  if (location.hash === want) activate(t.dataset.panel); // re-click same tab
+  else location.hash = want; // pushes history; hashchange listener activates
+});
+window.addEventListener("hashchange", () => {
+  const p = panelFromHash();
+  if (p) activate(p);
+  else {
+    // unknown hash (e.g. #foo) — normalize without polluting history
+    history.replaceState(null, "", "#summary");
+    activate("summary");
+  }
 });
 
 // ── graph state ─────────────────────────────────────────────────────────────
@@ -948,4 +973,10 @@ window.addEventListener("resize", () => {
   }, 150);
 });
 
-activate("summary");
+// Initial load: normalize URL to the canonical hash (no extra history entry).
+{
+  const start = panelFromHash() || "summary";
+  const canonical = "#" + PANEL_TO_HASH[start];
+  if (location.hash !== canonical) history.replaceState(null, "", canonical);
+  activate(start);
+}
