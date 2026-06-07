@@ -156,7 +156,7 @@ async function handle(req, res) {
     if (method === "GET" && path === "/api/tokens") {
       const r = await panelData(
         "./scripts/token-budget.mjs",
-        ["readTokens", "writeTokens", "generateTokens"],
+        ["generateCurrents", "readTokens"],
         "tokens.json",
         "tokens",
       );
@@ -186,7 +186,7 @@ async function handle(req, res) {
     if (method === "POST" && path === "/api/refresh/tokens") {
       const r = await panelData(
         "./scripts/token-budget.mjs",
-        ["writeTokens", "generateTokens"],
+        ["generateCurrents", "writeTokens"],
         "tokens.json",
         "tokens",
       );

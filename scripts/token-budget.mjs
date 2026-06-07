@@ -19,6 +19,7 @@ import {
   tokchars,
 } from "../lib/repo.mjs";
 import { redactDeep } from "../lib/redact.mjs";
+import { generateMap } from "./context-map.mjs";
 
 const CACHE = join(CACHE_DIR, "tokens.json");
 const PACK_TMP = join(CACHE_DIR, "repomix-output.xml");
@@ -210,6 +211,70 @@ export function readTokens() {
     } catch {}
   }
   return writeTokens();
+}
+
+// ── Token Currents (monochrome redesign) — map-based, fast, no repomix ──
+// Token weight by context-surface category, grouped into purpose destinations.
+export function generateCurrents() {
+  const map = generateMap();
+  const m = map.summary;
+  const sumType = (t) => map.nodes.filter((n) => n.type === t).reduce((s, n) => s + (n.tokens || 0), 0);
+  const sumLoad = (l) => map.nodes.filter((n) => n.load === l).reduce((s, n) => s + (n.tokens || 0), 0);
+  const sizeOf = (rels) => rels.reduce((s, rel) => s + tokchars(readRepoText(rel) || ""), 0);
+
+  const claudeMd = map.nodes.find((n) => n.id === "CLAUDE.md")?.tokens || 0;
+  const readFirst = sumLoad("read-first");
+  const productPrompts = sumType("product_prompt") + sumType("dev_agent_prompt");
+  // memory + evals/CI are token-zeroed in the map (synthetic / privacy) — size only
+  const memory = sizeOf(walk("memory/household", { exts: [".json", ".jsonl", ".md"] }));
+  const evalsCI =
+    sizeOf(walk("openclaw/eval/queries", { exts: [".json"] })) +
+    sizeOf(walk(".github/workflows", { exts: [".yml", ".yaml"] }));
+  const codeModules = sumType("code_module");
+
+  const sources = [
+    { name: "CLAUDE.md", tokens: claudeMd, icon: "doc" },
+    { name: "Read-first docs", tokens: readFirst, icon: "book" },
+    { name: "Product prompts", tokens: productPrompts, icon: "chat" },
+    { name: "Memory", tokens: memory, icon: "grid" },
+    { name: "Evals / CI", tokens: evalsCI, icon: "ci" },
+    { name: "Code modules", tokens: codeModules, icon: "code" },
+  ];
+  // destinations = purpose grouping of the same context tokens (flows conserve)
+  const destinations = [
+    { name: "Always-loaded context", tokens: claudeMd + readFirst, icon: "db" },
+    { name: "Runtime decisions", tokens: productPrompts + memory, icon: "flow" },
+    { name: "Protection layer", tokens: evalsCI, icon: "shield" },
+    { name: "Agent output", tokens: codeModules, icon: "spark" },
+  ];
+  const destTotal = destinations.reduce((s, d) => s + d.tokens, 0) || 1;
+  for (const d of destinations) d.pct = d.tokens / destTotal;
+
+  const repoTotal = m.totalTokens || 1;
+  const contributors = sources
+    .slice()
+    .sort((a, b) => b.tokens - a.tokens)
+    .map((s) => ({
+      name: s.name,
+      tokens: s.tokens,
+      pct: s.tokens / repoTotal,
+      over: s.name === "CLAUDE.md" && claudeMd > BUDGETS.claudeMd,
+      icon: s.icon,
+    }));
+
+  return redactDeep({
+    generatedAt: new Date().toISOString(),
+    metrics: {
+      nodes: m.nodeCount,
+      edges: m.edgeCount,
+      totalTokens: m.totalTokens,
+      dangling: m.danglingCount,
+      duplicates: m.duplicatePairs,
+    },
+    sources,
+    destinations,
+    contributors,
+  });
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

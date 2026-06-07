@@ -202,6 +202,76 @@ export async function generateSummary() {
   const memPop = map.nodes.filter((n) => n.type === "memory_store" && n.meta?.populated).length;
   healthy.push(memPop ? `${memPop} memory stores populated` : "all memory stores empty (no leakage risk)");
 
+  // ── project health (monochrome redesign) — all bound to live map data ──
+  const ktok = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k` : String(n));
+  const deg = {};
+  for (const e of map.edges) {
+    deg[e.source] = (deg[e.source] || 0) + 1;
+    deg[e.target] = (deg[e.target] || 0) + 1;
+  }
+  const SURFACE = new Set(["doc", "product_prompt", "dev_agent_prompt", "memory_store", "agent_instruction"]);
+  const unconnectedSurfaces = map.nodes.filter((n) => SURFACE.has(n.type) && !deg[n.id]).length;
+  const promptSurfaces = map.nodes.filter((n) => ["product_prompt", "dev_agent_prompt"].includes(n.type)).length;
+  const STRUCT = new Set(["decides", "enhances", "protected_by", "gated_in_ci"]);
+  const crossLayerLinks = map.edges.filter((e) => STRUCT.has(e.type)).length;
+  const nodeEdgeRatio = map.summary.nodeCount ? map.summary.edgeCount / map.summary.nodeCount : 0;
+  const claudeEdges = deg["CLAUDE.md"] || 0;
+  const dupEdges = map.edges.filter((e) => e.type === "duplicates");
+  const dupBlocks = dupEdges.reduce((s, e) => s + (e.meta?.sharedBlocks || 1), 0);
+  const dupNodes = new Set();
+  dupEdges.forEach((e) => (dupNodes.add(e.source), dupNodes.add(e.target)));
+
+  const critical = [
+    { icon: "doc", title: "CLAUDE.md", meta: `Always-loaded · ${ktok(cm.tokens)} tokens · ${claudeEdges} edges`, badge: "High", tab: 2 },
+    { icon: "chat", title: "Prompt stack", meta: `${promptSurfaces} prompt surfaces · overlapping responsibilities`, badge: "High", tab: 1 },
+    { icon: "link", title: "Layer mixing", meta: `${crossLayerLinks} cross-layer links · tangled boundaries`, badge: "High", tab: 1 },
+  ];
+  const medium = [
+    {
+      icon: "doc",
+      title: "Doc duplication",
+      meta: dupBlocks ? `${dupBlocks} duplicate block${dupBlocks > 1 ? "s" : ""} · across ${dupNodes.size} nodes` : "None detected",
+      badge: "Medium",
+      tab: 1,
+    },
+    {
+      icon: "trash",
+      title: "Stale / low-value surfaces",
+      meta: drift.status === "ok" ? "See drift report" : "Not verified — run drift to detect",
+      badge: "Medium",
+      tab: 4,
+    },
+  ];
+
+  // composite score (0–100) from real signals; not a fabricated constant
+  let score = 100;
+  if (cm.over) score -= 20;
+  score -= (coverage.ci.gaps?.length || 0) * 4;
+  score -= Math.min(10, map.summary.danglingCount);
+  score -= Math.min(12, Math.round(unconnectedSurfaces / 2));
+  score -= crossLayerLinks > 20 ? 8 : crossLayerLinks > 10 ? 5 : 0;
+  score -= Math.min(6, dupBlocks * 2);
+  if (drift.status !== "ok") score -= 2;
+  score = Math.max(0, Math.min(100, Math.round(score)));
+
+  const projectHealth = {
+    score,
+    metrics: {
+      criticalHotspots: critical.length,
+      hotspots: medium.length,
+      unconnectedSurfaces,
+      nodeEdgeRatio: Number(nodeEdgeRatio.toFixed(2)),
+    },
+    critical,
+    medium,
+    unconnected: {
+      title: "Unconnected surfaces",
+      meta: `${unconnectedSurfaces} surfaces not referenced, loaded, or tested`,
+      badge: String(unconnectedSurfaces),
+      tab: 1,
+    },
+  };
+
   return redactDeep({
     generatedAt: new Date().toISOString(),
     counts: {
@@ -209,6 +279,7 @@ export async function generateSummary() {
       medium: issues.filter((i) => i.severity === "medium").length,
       low: issues.filter((i) => i.severity === "low").length,
     },
+    projectHealth,
     health,
     issues,
     healthy,

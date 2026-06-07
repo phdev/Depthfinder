@@ -9,19 +9,19 @@
   <body>
     <header class="topbar">
       <div class="brand">
-        <img class="brand-mark" src="/assets/sonar-logo.svg" alt="" />
-        <h1>Depthfinder</h1>
-        <span class="repo" id="repoRoot">home-center</span>
+        <img class="logo" src="/assets/depthfinder-logo.svg" alt="Depthfinder" />
+        <div class="brand-name">Depthfinder</div>
+        <div class="pill"><span class="pill-dot"></span>local-only</div>
       </div>
-      <nav class="tabs" id="tabs">
-        <button class="tab active" data-panel="summary"><span class="t-num">0</span><span class="t-full">Summary</span><span class="t-short">Summary</span></button>
-        <button class="tab" data-panel="graph"><span class="t-num">1</span><span class="t-full">Context</span><span class="t-short">Context</span></button>
-        <button class="tab" data-panel="tokens"><span class="t-num">2</span><span class="t-full">Token budget</span><span class="t-short">Tokens</span></button>
-        <button class="tab" data-panel="coverage"><span class="t-num">3</span><span class="t-full">Evals</span><span class="t-short">Evals</span></button>
-        <button class="tab" data-panel="drift"><span class="t-num">4</span><span class="t-full">Drift</span><span class="t-short">Drift</span></button>
-      </nav>
-      <div class="local-badge" title="Server binds 127.0.0.1 only">🔒 local-only</div>
+      <button class="refresh-btn" id="globalRefresh" aria-label="Refresh" title="Refresh this panel">↻</button>
     </header>
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-panel="summary"><span class="t-num">0</span><span class="t-full">Summary</span><span class="t-short">Summary</span></button>
+      <button class="tab" data-panel="graph"><span class="t-num">1</span><span class="t-full">Context</span><span class="t-short">Context</span></button>
+      <button class="tab" data-panel="tokens"><span class="t-num">2</span><span class="t-full">Tokens</span><span class="t-short">Tokens</span></button>
+      <button class="tab" data-panel="coverage"><span class="t-num">3</span><span class="t-full">Evals</span><span class="t-short">Evals</span></button>
+      <button class="tab" data-panel="drift"><span class="t-num">4</span><span class="t-full">Drift</span><span class="t-short">Drift</span></button>
+    </nav>
 
     <!-- ── Panel 0: Summary / triage ────────────────────────────────────── -->
     <section class="panel active" id="panel-summary">

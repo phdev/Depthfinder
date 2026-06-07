@@ -434,7 +434,8 @@ async function loadGraph() {
     return;
   }
   window.__map = map;
-  $("#repoRoot").textContent = (map.repoRoot || "").split("/").pop() || "repo";
+  const rr = $("#repoRoot");
+  if (rr) rr.textContent = (map.repoRoot || "").split("/").pop() || "repo";
 
   if (typeof cytoscape === "undefined") {
     $("#cy").innerHTML =
@@ -507,103 +508,120 @@ function notBuiltHtml(stage, what) {
   return `<div class="placeholder"><div class="notbuilt"><h2>${what}</h2>
     <p class="muted">This panel is built in <b>stage ${stage}</b>. The endpoint is wired and responding; the view lands next.</p></div></div>`;
 }
-function calloutCard(title, c, note) {
-  const denom = Math.max(c.tokens, c.budget);
-  const fill = (c.tokens / denom) * 100;
-  const mark = (c.budget / denom) * 100;
-  return el("div", { class: `callout ${c.over ? "over" : "ok"}` }, [
-    el("div", { class: "callout-h", html: `<span>${title}</span><span class="status">${c.over ? "OVER" : "OK"}</span>` }),
-    el("div", { class: "callout-n", html: `${fmt(c.tokens)} <small>/ ${fmt(c.budget)} tok</small>` }),
-    el("div", { class: `bar ${c.over ? "over" : "ok"}` }, [
-      el("i", { style: `width:${fill}%` }),
-      el("span", { class: "budget-mark", style: `left:${mark}%` }),
-    ]),
-    el("div", { class: "callout-note", text: note }),
-  ]);
+// ── monochrome icon set (inline SVG, stroked) ──
+const ICONS = {
+  shield: '<path d="M12 3l9 5v8l-9 5-9-5V8l9-5z"/><path d="M12 8v5"/><path d="M12 17h.01"/>',
+  target: '<circle cx="12" cy="12" r="9" stroke-dasharray="3 3"/><circle cx="12" cy="12" r="2"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/>',
+  network: '<circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 7v5M12 12l-6 5M12 12l6 5"/>',
+  doc: '<path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/>',
+  chat: '<path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-4-.98L3 20l1.2-4.4A8.5 8.5 0 1 1 21 11.5z"/><path d="M8 11h.01M12 11h.01M16 11h.01"/>',
+  trash: '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 16H6L5 6"/><path d="M10 11v6M14 11v6"/>',
+  list: '<path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/>',
+  lines: '<path d="M5 7h14M7 12h10M5 17h14"/>',
+  triangle: '<path d="M12 3l10 18H2z"/><path d="M12 9v5M12 18h.01"/>',
+  layers: '<path d="M12 2l9 5-9 5-9-5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>',
+  book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 0 4 19.5z"/>',
+  grid: '<path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/><rect x="7" y="7" width="10" height="10" rx="3"/>',
+  ci: '<path d="M4 17l6-6-6-6M12 19h8"/>',
+  code: '<path d="M8 18l-6-6 6-6M16 6l6 6-6 6"/>',
+  db: '<ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v6c0 1.7 3.1 3 7 3s7-1.3 7-3V5"/><path d="M5 11v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/>',
+  flow: '<circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 7v5M12 12l-6 5M12 12l6 5"/>',
+  spark: '<path d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4L12 2z"/>',
+};
+const svgIcon = (name) => `<svg class="icon" viewBox="0 0 24 24">${ICONS[name] || ICONS.doc}</svg>`;
+const ktok = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k` : String(n));
+
+// stacked sankey for phones: sources list + destinations list, bar ∝ tokens
+function buildSankeyStacked(cont, sources, destinations) {
+  const max = Math.max(1, ...sources.map((s) => s.tokens), ...destinations.map((d) => d.tokens));
+  const line = (x, withPct) =>
+    `<div class="sline">${svgIcon(x.icon)}<span class="sl-name">${escapeHtml(x.name)}</span><span class="sl-val">${ktok(x.tokens)}${withPct && x.pct != null ? ` · ${(x.pct * 100).toFixed(0)}%` : ""}</span><span class="sl-bar"><i style="width:${Math.round((x.tokens / max) * 100)}%"></i></span></div>`;
+  cont.innerHTML = `<div class="sstack"><div class="sl-head">Sources</div>${sources
+    .map((s) => line(s, false))
+    .join("")}<div class="sl-head" style="margin-top:14px">Destinations</div>${destinations.map((d) => line(d, true)).join("")}</div>`;
 }
 
-function renderTokTree(container, nodes, total, depth) {
-  for (const n of nodes) {
-    const isDir = n.isDir && n.children && n.children.length;
-    const pct = total ? (n.tokens / total) * 100 : 0;
-    const row = el("div", { class: "tok-row" + (isDir ? " dir" : "") });
-    row.style.paddingLeft = depth * 14 + 8 + "px";
-    const caret = el("span", { class: "caret", text: isDir ? "▸" : "" });
-    const name = el("span", { class: "tok-name", text: n.name + (n.isDir ? "/" : "") });
-    const bar = el("span", { class: "tokbar" }, [el("i", { style: `width:${Math.max(0.5, pct)}%` })]);
-    const num = el("span", { class: "tok-num", html: `${fmt(n.tokens)} <small>${pct.toFixed(1)}%</small>` });
-    row.append(caret, name, bar, num);
-    container.append(row);
-    if (isDir) {
-      const kids = el("div", { class: "tok-kids collapsed" });
-      renderTokTree(kids, n.children, total, depth + 1);
-      container.append(kids);
-      row.onclick = (e) => {
-        e.stopPropagation();
-        const open = !kids.classList.toggle("collapsed");
-        caret.textContent = open ? "▾" : "▸";
-      };
-    }
-  }
+// monochrome sankey: left sources → right destinations, band thickness ∝ tokens
+function buildSankey(sources, destinations) {
+  const cont = $("#sankey");
+  if (!cont) return;
+  const W = cont.clientWidth || 900;
+  if (W < 560) return buildSankeyStacked(cont, sources, destinations);
+  const H = cont.clientHeight || 400;
+  const LW = Math.min(270, Math.max(150, W * 0.42));
+  const RW = Math.min(290, Math.max(150, W * 0.42));
+  const rightX = W - RW;
+  const sGap = sources.length > 1 ? (H - 50) / (sources.length - 1) : 0;
+  const dGap = destinations.length > 1 ? (H - 50) / (destinations.length - 1) : 0;
+  const maxTok = Math.max(1, ...sources.map((s) => s.tokens));
+  const SRC2DEST = [0, 0, 1, 1, 2, 3]; // source → its purpose destination
+  let html = "";
+  sources.forEach((s, i) => {
+    const di = SRC2DEST[i] ?? 0;
+    const x1 = LW;
+    const y1 = i * sGap + 25;
+    const y2 = di * dGap + 25;
+    const dx = rightX - x1;
+    const dy = y2 - y1;
+    const len = Math.hypot(dx, dy);
+    const ang = (Math.atan2(dy, dx) * 180) / Math.PI;
+    const w = s.tokens / maxTok;
+    const th = Math.max(5, Math.min(26, w * 26));
+    html += `<div class="sflow" style="left:${x1}px;top:${y1 - th / 2}px;width:${len}px;height:${th}px;transform:rotate(${ang}deg);opacity:${(0.32 + 0.55 * w).toFixed(2)}"></div>`;
+  });
+  sources.forEach((s, i) => {
+    html += `<div class="snode" style="left:0;top:${i * sGap}px;width:${LW}px">${svgIcon(s.icon)}<span class="sname">${escapeHtml(s.name)}</span><span class="sval">${ktok(s.tokens)}</span></div>`;
+  });
+  destinations.forEach((dn, j) => {
+    html += `<div class="snode" style="right:0;top:${j * dGap}px;width:${RW}px">${svgIcon(dn.icon)}<span class="sname">${escapeHtml(dn.name)}</span><span class="sval">${ktok(dn.tokens)} (${(dn.pct * 100).toFixed(1)}%)</span></div>`;
+  });
+  cont.innerHTML = html;
 }
 
 function renderTokens(d) {
+  if (d.status === "not-built") {
+    $("#tokensBody").innerHTML = notBuiltHtml("b", "Token Currents");
+    return;
+  }
   const body = $("#tokensBody");
-  body.className = "tokens-body";
-  body.innerHTML = "";
-  body.append(
-    el("div", { class: "tok-head" }, [
-      el("div", {}, [
-        el("h2", { text: "Token budget" }),
-        el("div", { class: "muted", html: `source: ${d.source} · ${fmt(d.totals.totalTokens)} tokens · ${d.totals.fileCount} files` }),
-      ]),
-      el("button", { class: "btn", id: "refreshTokens", text: "↻ Recompute" }),
-    ]),
-  );
-
-  const cm = d.callouts.claudeMd;
-  const rf = d.callouts.readFirst;
-  body.append(
-    el("div", { class: "callouts" }, [
-      calloutCard("CLAUDE.md — always loaded", cm, cm.over ? `${cm.ratio.toFixed(1)}× over the ${fmt(cm.budget)}-token budget` : "within budget"),
-      calloutCard("Read-first bundle (gbrain docs)", rf, rf.over ? "over budget" : `within the ${fmt(rf.budget)}-token budget`),
-    ]),
-  );
-
-  // read-first breakdown
-  const rfList = el("div", { class: "rf-list" }, [el("div", { class: "muted", text: "Read-first bundle breakdown:" })]);
-  for (const f of rf.files)
-    rfList.append(el("div", { class: "rf-row", html: `<span>${f.path}</span><b>${fmt(f.tokens)}</b>` }));
-  body.append(rfList);
-
-  // tree
-  const tree = el("div", { class: "tok-tree" }, [el("h3", { text: "Token cost by path (click a folder to drill in)" })]);
-  const treeRows = el("div", { class: "tok-rows" });
-  renderTokTree(treeRows, d.tree.children, d.totals.totalTokens, 0);
-  tree.append(treeRows);
-  body.append(tree);
-
-  $("#refreshTokens").onclick = async () => {
-    const btn = $("#refreshTokens");
-    btn.disabled = true;
-    btn.textContent = "↻ recomputing… (~10s)";
-    try {
-      const res = await (await fetch("/api/refresh/tokens", { method: "POST" })).json();
-      renderTokens(res.data || res);
-    } catch {
-      btn.disabled = false;
-      btn.textContent = "↻ Recompute";
-    }
-  };
+  body.className = "page";
+  const m = d.metrics;
+  const metric = (ic, val, label) =>
+    `<div class="card metric-card">${svgIcon(ic)}<div><div class="metric-value">${val}</div><div class="metric-label">${label}</div></div></div>`;
+  const maxPct = Math.max(...d.contributors.map((c) => c.pct), 0.0001);
+  const rows = d.contributors
+    .map(
+      (c, i) =>
+        `<div class="trow"><div>${i + 1}</div><div class="tname">${svgIcon(c.icon)}<span>${escapeHtml(c.name)}</span></div><div>${ktok(c.tokens)}</div><div>${(c.pct * 100).toFixed(1)}%</div><div>${c.over ? '<span class="over-badge">OVER BUDGET ⚠</span>' : `<div class="bar"><span style="width:${Math.round((c.pct / maxPct) * 100)}%"></span></div>`}</div></div>`,
+    )
+    .join("");
+  body.innerHTML = `
+    <h1 class="page-title">Token Currents</h1>
+    <p class="page-subtitle">Where context weight comes from.</p>
+    <section class="metrics">
+      ${metric("network", fmt(m.nodes), "Nodes")}
+      ${metric("link", fmt(m.edges), "Edges")}
+      ${metric("lines", fmt(m.totalTokens), "Total tok")}
+      ${metric("triangle", fmt(m.dangling), "Dangling")}
+      ${metric("layers", fmt(m.duplicates), "Duplicates")}
+    </section>
+    <section class="controls">
+      <div class="control-group"><label>View</label><div class="segment"><span class="selected">Tokens</span><span>Nodes</span></div></div>
+      <div class="control-group"><label>Audience</label><div class="segment"><span class="selected">All</span><span>User</span><span>Tool</span><span>System</span></div></div>
+    </section>
+    <section class="card sankey-card"><div class="sankey" id="sankey"></div></section>
+    <section class="card table-card">
+      <div class="thead"><div></div><div>Top contributors</div><div>Tokens</div><div>% of total</div><div></div></div>
+      ${rows}
+      <div class="center-link">View all contributors →</div>
+    </section>`;
+  buildSankey(d.sources, d.destinations);
+  window.__tokensData = d;
 }
 
 async function loadTokens() {
-  const r = await (await fetch("/api/tokens")).json();
-  if (r.status === "not-built") {
-    $("#tokensBody").innerHTML = notBuiltHtml("b", "Token budget");
-    return;
-  }
-  renderTokens(r);
+  renderTokens(await (await fetch("/api/tokens")).json());
 }
 const yn = (v) => (v ? '<span class="tick">✓</span>' : '<span class="cross">✗</span>');
 const covChip = (t, c) => `<span class="cov-chip ${c}">${t}</span>`;
@@ -848,111 +866,86 @@ async function loadDrift() {
 }
 
 // ── Panel 0: summary / triage ───────────────────────────────────────────────
-const SEV_CLASS = { high: "critical", medium: "warn", low: "low" };
-const STATUS_CARD = { good: "good", warn: "warn", bad: "critical", muted: "neutral" };
-
-// pick a sonar-themed icon for a health metric by its meaning
-function metricIcon(label, status) {
-  const l = label.toLowerCase();
-  if (l.includes("dangling")) return { cls: "chain", glyph: "⌁" };
-  if (l.includes("gate")) return { cls: "shield", glyph: status === "bad" ? "✕" : "✓" };
-  if (l.includes("drift")) return { cls: "clock", glyph: "◷" };
-  if (l.includes("rules")) return { cls: "triangle", glyph: "!" };
-  if (status === "good") return { cls: "check", glyph: "✓" };
-  if (status === "bad") return { cls: "gauge", glyph: "!" };
-  return { cls: "triangle", glyph: "!" };
-}
-
-// "10,834 / 4,000" → big value + small budget; else a single styled value
-function metricValue(label, value) {
-  if (label.toLowerCase().includes("budget")) {
-    const m = String(value).match(/^(.+?)\s*\/\s*(.+)$/);
-    if (m) return `<strong>${escapeHtml(m[1].trim())}</strong><small>/ ${escapeHtml(m[2].trim())}</small>`;
-  }
-  let v = String(value);
-  v = /^(pass|fail)$/i.test(v) ? v.toUpperCase() : v.charAt(0).toUpperCase() + v.slice(1);
-  return `<strong>${escapeHtml(v)}</strong>`;
-}
-
-function healthyIcon(text) {
-  const t = text.toLowerCase();
-  if (t.includes("local-only") || t.includes("leakage") || t.includes("memory"))
-    return { cls: "lock", glyph: "▣" };
-  return { cls: "", glyph: "✓" };
-}
-
 function renderSummary(d) {
   const body = $("#summaryBody");
-  body.className = "summary-body";
-
-  const health = d.health
-    .map((h) => {
-      const ic = metricIcon(h.label, h.status);
-      const cls = STATUS_CARD[h.status] || "neutral";
-      return `<button class="metric-card ${cls}" data-tab="${h.tab}">
-        <span class="metric-label">${escapeHtml(h.label)}</span>
-        <span class="icon ${ic.cls}">${ic.glyph}</span>
-        ${metricValue(h.label, h.value)}
-      </button>`;
-    })
-    .join("");
-
-  const issues = d.issues
-    .map(
-      (it, i) =>
-        `<a class="issue-card ${SEV_CLASS[it.severity] || "low"}" data-tab="${it.tab}" href="#">
-        <span class="rank">${i + 1}</span>
-        <span class="issue-copy">
-          <strong>${escapeHtml(it.title)}</strong>
-          <small>${escapeHtml(it.detail)}</small>
-        </span>
-        <span class="tab-chip">Tab ${it.tab} <b>›</b></span>
-      </a>`,
-    )
-    .join("");
-
-  const healthy = d.healthy
-    .map((h) => {
-      const ic = healthyIcon(h);
-      return `<div class="healthy-row"><span class="healthy-icon ${ic.cls}">${ic.glyph}</span><span class="healthy-text">${escapeHtml(h)}</span><b>›</b></div>`;
-    })
-    .join("");
+  body.className = "page";
+  const ph = d.projectHealth;
+  if (!ph) {
+    body.innerHTML = `<p class="page-subtitle">Summary unavailable.</p>`;
+    return;
+  }
+  const quad = (ic, title, val) =>
+    `<div class="quad"><div class="icon-circle">${svgIcon(ic)}</div><div><div class="quad-title">${title}</div><div class="quad-value">${val}</div></div></div>`;
+  const row = (it) =>
+    `<div class="row" data-tab="${it.tab}"><div class="icon-circle">${svgIcon(it.icon)}</div><div><div class="row-title">${escapeHtml(it.title)}</div><div class="row-meta">${escapeHtml(it.meta)}</div></div><span class="badge">${escapeHtml(it.badge)}</span><span class="chev">›</span></div>`;
 
   body.innerHTML = `
-    <div class="ocean-glow" aria-hidden="true"></div>
-    <div class="sonar-field" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
-    <section class="hero">
-      <p class="eyebrow">Repo context sonar</p>
-      <div class="hero-row"><h2>Summary</h2>
-        <button class="refresh" id="refreshSummary" aria-label="Refresh">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v6h-6"/><path d="M19 12a7 7 0 1 1-2.05-4.95L20 10"/></svg>
-        </button></div>
-      <p class="updated">Updated ${new Date(d.generatedAt).toLocaleString()}</p>
+    <section class="card health-card">
+      <div class="score-block">
+        <div class="score">${ph.score}</div>
+        <div class="score-denom">/100</div>
+        <div class="score-label">Project Health</div>
+      </div>
+      <div class="quadrants">
+        ${quad("shield", "Critical hotspots", ph.metrics.criticalHotspots)}
+        ${quad("target", "Hotspots", ph.metrics.hotspots)}
+        ${quad("link", "Unconnected surfaces", ph.metrics.unconnectedSurfaces)}
+        ${quad("network", "Node / edge ratio", ph.metrics.nodeEdgeRatio)}
+      </div>
     </section>
-    <section class="health-strip">${health}</section>
-    <section class="priority-section">
-      <div class="section-title critical-title"><span class="section-icon">!</span><h3>What to fix first</h3></div>
-      ${issues || '<div class="muted">No issues — all clear.</div>'}
+    <section class="sections-grid">
+      <div>
+        <h2 class="section-title">Critical hotspots <span>(High impact)</span></h2>
+        <div class="card list-card">${ph.critical.map(row).join("")}</div>
+      </div>
+      <div>
+        <h2 class="section-title">Hotspots <span>(Medium impact)</span></h2>
+        <div class="card list-card">${ph.medium.map(row).join("")}</div>
+        <h2 class="section-title" style="margin-top:30px">Unconnected surfaces</h2>
+        <div class="card list-card">${row(ph.unconnected)}</div>
+      </div>
     </section>
-    <section class="healthy-section">
-      <div class="section-title good-title"><span class="section-icon">✓</span><h3>Healthy</h3></div>
-      <div class="healthy-list">${healthy}</div>
+    <section class="card list-card full-row">
+      <div class="row" data-tab="1"><div class="icon-circle">${svgIcon("list")}</div><div><div class="row-title">View all signals</div></div><span class="chev">›</span></div>
     </section>`;
 
-  body.querySelectorAll("[data-tab]").forEach((b) =>
-    b.addEventListener("click", (e) => {
-      e.preventDefault();
-      activate(TAB_PANEL[b.dataset.tab]);
-    }),
-  );
-  $("#refreshSummary").onclick = () => loadSummary();
+  body.querySelectorAll("[data-tab]").forEach((b) => (b.onclick = () => activate(TAB_PANEL[b.dataset.tab])));
 }
 async function loadSummary() {
   try {
     renderSummary(await (await fetch("/api/summary")).json());
   } catch (e) {
-    $("#summaryBody").innerHTML = `<div class="cdn-warn">Failed to load summary: ${e}</div>`;
+    $("#summaryBody").innerHTML = `<p class="page-subtitle">Failed to load summary: ${e}</p>`;
   }
 }
+
+// global refresh ↻ — reloads whichever panel is active
+$("#globalRefresh")?.addEventListener("click", async () => {
+  const panel = document.querySelector(".tab.active")?.dataset.panel || "summary";
+  const btn = $("#globalRefresh");
+  btn.classList.add("spin");
+  try {
+    if (panel === "summary") await loadSummary();
+    else if (panel === "graph") {
+      await fetch("/api/refresh/map", { method: "POST" });
+      await loadGraph();
+    } else if (panel === "tokens") await loadTokens();
+    else if (panel === "coverage") await loadCoverage();
+    else if (panel === "drift") await loadDrift();
+  } finally {
+    btn.classList.remove("spin");
+  }
+});
+
+// keep the sankey + graph laid out on resize
+let __rszTimer;
+window.addEventListener("resize", () => {
+  clearTimeout(__rszTimer);
+  __rszTimer = setTimeout(() => {
+    if (document.querySelector(".tab.active")?.dataset.panel === "tokens" && window.__tokensData)
+      buildSankey(window.__tokensData.sources, window.__tokensData.destinations);
+    if (window.__cy) window.__cy.resize();
+  }, 150);
+});
 
 activate("summary");
