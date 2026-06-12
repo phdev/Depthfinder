@@ -1,0 +1,5 @@
+# Force LF everywhere — the golden card test byte-compares CLI stdout (always
+# \n) against a checked-in file; CRLF checkout on Windows runners would break
+# it, and the CLI's own sources should run identically on every OS.
+* text=auto eol=lf
+tests/golden/* -text

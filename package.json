@@ -38,7 +38,7 @@
     "tokens": "node scripts/token-budget.mjs",
     "coverage": "node scripts/coverage.mjs",
     "drift:refresh": "node scripts/drift-refresh.mjs",
-    "test": "node --test \"tests/*.test.mjs\"",
+    "test": "node --test",
     "bench": "node scripts/bench.mjs",
     "corpus": "node scripts/corpus.mjs",
     "snapshot:update": "node tests/helpers/update-golden.mjs"
