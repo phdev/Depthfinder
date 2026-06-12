@@ -20,8 +20,8 @@ import {
   walk,
   readRepoText,
   repoExists,
-  tokchars,
 } from "../lib/repo.mjs";
+import { tokchars } from "../lib/text.mjs";
 import { redactDeep } from "../lib/redact.mjs";
 
 // ── Architectural facts (the deterministic boundary the graph must depict) ──

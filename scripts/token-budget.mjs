@@ -16,8 +16,8 @@ import {
   ensureCache,
   readRepoText,
   walk,
-  tokchars,
 } from "../lib/repo.mjs";
+import { tokchars } from "../lib/text.mjs";
 import { redactDeep } from "../lib/redact.mjs";
 import { generateMap } from "./context-map.mjs";
 
