@@ -24,7 +24,9 @@ export function renderCard(model) {
     L.push(`      └ ${f.evidence.summary}`);
     const why = consequence(f);
     if (why) L.push(`      └ ${why}`);
-    if (f.evidence.actual) L.push(`      └ actual: ${f.evidence.actual}`);
+    // skip the actual line when the consequence already carries it (count)
+    if (f.evidence.actual && !(why && why.includes(f.evidence.actual)))
+      L.push(`      └ actual: ${f.evidence.actual}`);
     L.push("");
   }
 

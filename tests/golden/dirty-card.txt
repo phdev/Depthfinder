@@ -1,0 +1,21 @@
+
+  Scanning CLAUDE.md against 7 tracked files…
+
+  ✗ CLAUDE.md:5  "Auth flows live in `src/auth/oauth.ts` (legacy token: «redacted»)."
+      └ no such tracked file — deleted at fccd7c9, 1 commit ago
+      └ an agent following this reference will find nothing at src/auth/oauth.ts, and guess
+
+  ✗ CLAUDE.md:7  "Wake word handled by `openWakeWord`."
+      └ not in any package.json (checked 1 manifest)
+      └ an agent will write code against openWakeWord, which isn't installed
+
+  ✗ CLAUDE.md:9  "Model routing uses 4 tiers (see `router/config.js`)."
+      └ router/config.js defines 3 tiers, not 4
+      └ an agent reasoning about "4 tiers" will plan against a structure that has 3 in `router/config.js`
+
+  Context Honesty   57 · 7 checkable claims · 1 unchecked
+  ~21 tokens describe code that no longer exists.
+
+  Your agent reads all of this as ground truth, every call.
+  npx depthfinder --json for full results
+

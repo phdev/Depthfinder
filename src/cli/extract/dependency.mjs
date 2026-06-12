@@ -24,16 +24,19 @@ const PHRASE = /\b(uses|depends on|built with|powered by|handled by)\s+(`([^`]+)
 // Names accepted as dependency claims must be unambiguously package-shaped.
 // Plain hyphenated words appear constantly in prose as repo/tool/concept
 // names (home-center, context-rot) — the self-scan false-accused them, so:
-//   backticked + phrase  -> any valid npm name        (author's intent clear)
+//   backticked + phrase  -> any name shape, mixed case allowed (the author
+//                           wrote "handled by `X`" — intent is unambiguous;
+//                           legacy npm names like openWakeWord have caps)
 //   undelimited + phrase -> must contain @ or . chars (package-ish)
 //   backtick alone       -> @scoped names only        (unambiguous npm shape)
+const PHRASED_NAME = /^(@[\w.-]+\/)?[A-Za-z0-9][\w.-]*$/; // case-tolerant
 function validName(name, { delimited, phrase }) {
   if (!name || name.length < 3) return false;
-  if (!NPM_NAME.test(name)) return false;
   if (FILE_EXT.test(name)) return false;
   if (name.includes("/") && !name.startsWith("@")) return false; // path-like
   if (STOPLIST.has(name.toLowerCase())) return false;
-  if (phrase && delimited) return true;
+  if (phrase && delimited) return PHRASED_NAME.test(name);
+  if (!NPM_NAME.test(name)) return false;
   if (phrase && !delimited) return /[@.]/.test(name);
   return name.startsWith("@"); // backtick alone
 }
