@@ -1,15 +1,47 @@
 {
   "name": "depthfinder",
-  "private": true,
   "version": "0.1.0",
+  "description": "Keep your AI context honest. Zero-config scan of CLAUDE.md / AGENTS.md / .cursorrules against your actual repo — deterministic, no model calls, nothing leaves your machine.",
   "type": "module",
-  "description": "Depthfinder: local-only, read-only visualizer for the home-center repo. Visualizes Markdown / prompt / memory / eval surfaces. Binds 127.0.0.1 only. Zero runtime dependencies.",
+  "license": "MIT",
+  "bin": {
+    "depthfinder": "bin/depthfinder.mjs"
+  },
+  "files": [
+    "bin/",
+    "src/cli/",
+    "lib/text.mjs",
+    "lib/redact.mjs",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/phdev/Depthfinder.git"
+  },
+  "keywords": [
+    "ai",
+    "context",
+    "claude-md",
+    "agents-md",
+    "cursorrules",
+    "lint",
+    "agent",
+    "context-rot"
+  ],
   "scripts": {
     "start": "node server.mjs",
     "map": "node scripts/context-map.mjs",
     "tokens": "node scripts/token-budget.mjs",
     "coverage": "node scripts/coverage.mjs",
-    "drift:refresh": "node scripts/drift-refresh.mjs"
+    "drift:refresh": "node scripts/drift-refresh.mjs",
+    "test": "node --test tests/",
+    "bench": "node scripts/bench.mjs",
+    "corpus": "node scripts/corpus.mjs",
+    "snapshot:update": "node tests/helpers/update-golden.mjs"
   },
   "dependencies": {},
   "devDependencies": {}
