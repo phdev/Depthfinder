@@ -1,87 +1,92 @@
 # Depthfinder
 
-Private, local-only, **read-only** visualizer for how a repo (built for
-[`home-center`](https://github.com/phdev/home-center)) uses its Markdown /
-prompt / memory / eval surfaces. Five tabs:
+**Keep your AI context honest.**
 
-0. **Summary** — live triage board: severity-ranked issues across all panels,
-   each deep-linked to the tab that proves it, plus a health strip.
-1. **Context graph** — typed graph of every context surface (nodes + edges +
-   per-node token counts), with the deterministic boundary
-   (`derivations` *decides*, `openclaw` *enhances*, tests *protect*), plus
-   dangling-path and duplicate-block detection.
-2. **Token budget** — repomix (o200k_base) token cost by path; CLAUDE.md
-   (always-loaded, ≤ 4k target) and the read-first bundle (≤ 22k) vs budget.
-3. **Eval coverage** — rule × protecting-artifact × in-CI matrix from
-   `context/rules.yaml` + `openclaw/eval/results/` + workflow parsing, a **real
-   offline AgentCI gate** run button, and live eval-tier availability.
-4. **Drift** — cached Packmind context-evaluator result; manual, opt-in refresh
-   only, because it sends file contents to an AI provider.
+Your agent reads `CLAUDE.md`, `AGENTS.md`, and `.cursorrules` as ground
+truth — and those files rot. Paths go dead, dependency claims go stale,
+counts drift. Depthfinder scans the claims your context files make and
+verifies them against the repo itself.
 
-Zero runtime dependencies (Node built-ins only). The graph uses Cytoscape from
-a CDN at page load (browser-side only).
+```
+$ npx depthfinder
 
-## Setup
+  Scanning CLAUDE.md against 1,204 tracked files…
 
-This tool lives in its own repo and reads a *separate* repo read-only. Point it
-at that repo once:
+  ✗ CLAUDE.md:67  "auth flows live in `src/auth/oauth.ts`"
+      └ no such tracked file — deleted at a1b3f2e, 38 commits ago
+      └ an agent following this reference will find nothing at src/auth/oauth.ts, and guess
 
-```bash
-cp .repo-root.example .repo-root
-# edit .repo-root → the absolute path of the repo to analyze, e.g.
-#   /Users/you/home-center
+  ✗ CLAUDE.md:41  "wake word handled by `openWakeWord`"
+      └ not in any package.json (checked 3 manifests)
+      └ an agent will write code against openWakeWord, which isn't installed
+
+  ✗ CLAUDE.md:23  "model routing uses 4 tiers (see `router/config.js`)"
+      └ router/config.js defines 3 tiers, not 4
+      └ an agent reasoning about "4 tiers" will plan against a structure that has 3
+
+  Context Honesty   64 · 22 checkable claims · 3 unchecked
+  ~4,210 tokens describe code that no longer exists.
+
+  Your agent reads all of this as ground truth, every call.
 ```
 
-`.repo-root` is gitignored (machine-specific). Alternatively set `REPO_ROOT` in
-the environment, which takes precedence.
+Zero config. Sub-5 seconds. **No model calls — nothing leaves your
+machine.** Deterministic checks only: if Depthfinder can't decide a claim
+safely, it says `unknown` — it never guesses and never accuses.
 
 ## Run
 
 ```bash
-npm start                 # → http://127.0.0.1:4317  (loopback only)
+npx depthfinder            # scan the repo you're in
+npx depthfinder ~/proj     # scan another repo
+npx depthfinder --json     # machine-readable claims + score (stdout)
+npx depthfinder --out dir  # also write claims.json (atomic; the ONLY write)
 ```
 
-`REPO_ROOT=/path/to/repo npm start` overrides the analyzed repo; `PORT=...`
-overrides the port.
+Requires **Node ≥ 20** and **git** (evidence comes from git history;
+shallow clones degrade gracefully). The default run writes **nothing** to
+the scanned repo.
 
-### Phone / LAN access (opt-in)
+### Exit codes
 
-The server binds **`127.0.0.1` only** by default. To reach it from another
-device on your network (e.g. your phone), opt in explicitly:
+| Code | Meaning |
+|------|---------|
+| 0 | ran (findings or not — the scan is advisory) |
+| 1 | internal error |
+| 2 | usage error · not a git repo · git missing · bad `--out` |
+| 3 | no context files found |
+
+### What it checks
+
+| Oracle | Claim shape | Verified against |
+|--------|-------------|------------------|
+| path | `` `src/auth/oauth.ts` `` (delimited) | `git ls-files` |
+| dependency | "handled by `` `pkg` ``" | every package.json (workspaces, all 4 dep fields) |
+| symbol | "exports `` `startEngine` ``" | ESM/TS export forms |
+| count | "4 tiers (see `` `router/config.js` ``)" | literal cardinality |
+
+Scanned conventions: root `CLAUDE.md` / `AGENTS.md` / `.cursorrules`,
+`.cursor/rules/**/*.mdc`, nested `CLAUDE.md` / `AGENTS.md` (tracked).
+Secrets matching common token patterns are redacted from all output.
+
+## Dashboard (in-repo tooling, not part of the npm package)
+
+The repo also contains a local-only web visualizer (five tabs: Summary,
+Context graph, Token Currents, Evals, Drift) used to analyze a single repo
+in depth. `npm start` → `http://127.0.0.1:4317` (loopback only; `LAN=1` to
+opt into LAN). See `CLAUDE.md` for its architecture and invariants.
+
+## Development
 
 ```bash
-LAN=1 npm start           # also listens on 0.0.0.0; prints your LAN URL
+npm test               # 35 tests: precision gate, golden card, boundary…
+npm run bench          # per-phase timings + local 5s tripwire
+npm run corpus         # manual external-repo run (pre-tag ritual)
+npm run snapshot:update  # re-approve the golden card after render changes
 ```
 
-This serves the (redacted, unauthenticated) tool to **every device on your
-network** — only do it on a trusted LAN, and the phone must be on the same
-WiFi. For internet access, prefer a Cloudflare Tunnel over LAN exposure.
+The hard ship gate: **zero false accusations** on the labeled fixture
+corpus, on every push, on every OS lane. A missed lie is acceptable; a
+false accusation is fatal.
 
-## Refresh / regenerate
-
-```bash
-npm run map               # regenerate the context graph → .cache/context-map.json
-npm run tokens            # recompute the token budget (runs repomix)
-npm run coverage          # rescan the eval-coverage matrix
-npm run drift:refresh     # MANUAL Packmind run — sends repo contents to an AI agent
-```
-
-Endpoints: `GET /api/{summary,map,tokens,coverage,drift}`,
-`POST /api/refresh/{map,tokens,coverage,drift}`, `POST /api/run/gate`.
-
-## Security
-
-- Binds `127.0.0.1` only unless `LAN=1` / `--lan` / `HOST=` is set. No auth, no DB.
-- Secret/token/key patterns are redacted from every payload before it reaches
-  the browser.
-- `memory/household/*` contents are **never** rendered — only `populated` and a
-  count.
-- The only thing that sends analyzed-repo contents off-machine is the explicit,
-  opt-in `npm run drift:refresh`.
-
-## What it writes
-
-**Read-only against the analyzed repo.** Everything this tool writes stays in
-its own repo: this dir, its `.cache/` (generated artifacts, gitignored), and the
-authored `context/rules.yaml`. The AgentCI gate run redirects its report and
-golden snapshots into `.cache/` so the analyzed repo is never touched.
+MIT © Peter Howell

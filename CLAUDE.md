@@ -2,10 +2,64 @@
 
 ## What this is
 
-Depthfinder is a private, local-only, **read-only** visualizer for how a target
-repo (built for `home-center`) uses its context surfaces — Markdown docs,
-prompts, memory stores, evals, and CI. Zero runtime dependencies (Node
-built-ins only); the graph view loads Cytoscape from a CDN in the browser.
+Depthfinder is two things in one repo:
+
+1. **The product — `npx depthfinder` (V1.0 Replay CLI):** a zero-config,
+   deterministic scanner that extracts checkable claims from AI context
+   files (CLAUDE.md, AGENTS.md, .cursorrules, .cursor/rules/**.mdc, nested
+   CLAUDE/AGENTS.md), verifies them against the repo, and renders an
+   agent-failure replay card for the top-3 false claims. Published to npm;
+   tarball = `bin/` + `src/cli/` + `lib/text.mjs` + `lib/redact.mjs` only.
+2. **The dashboard (in-repo tooling, unpublished):** a local-only web
+   visualizer for one repo's context surfaces.
+
+Zero runtime dependencies everywhere (Node ≥20 built-ins; the dashboard's
+graph view loads Cytoscape from a CDN in the browser).
+
+## CLI architecture (V1.0)
+
+```
+cwd ─▶ git root ─▶ ls-files Set ─▶ discover (5 conventions)
+   ─▶ ingest (7A policy: BOM/size/EACCES skip+warn, 1k line cap)
+   ─▶ extract (4 oracles, conservative grammars)
+   ─▶ evaluate (unknown-never-false predicates)
+   ─▶ score (+<5 suppression) ─▶ top-3 ─▶ lazy git evidence ─▶ render
+```
+
+- `bin/depthfinder.mjs` — orchestration, parseArgs, exit codes (0 ran /
+  1 internal / 2 usage·no-git / 3 no context files), stream discipline
+  (stdout = card|JSON only; diagnostics → stderr), redaction at both
+  output seams via `lib/redact.mjs`.
+- `src/cli/extract/{path,dependency,symbol,count}.mjs` — grammars are
+  deliberately conservative; the dependency grammar's guards exist because
+  the self-scan false-accused `its`/`home-center`/`--lan` on day one.
+- `src/cli/evaluate.mjs` — monorepo-aware deps (nearest+workspaces, 4
+  fields), ESM/TS symbol forms with unknown escapes (`export *`, default
+  expressions, CJS), literal-cardinality counts with uncertainty escapes.
+- `src/cli/templates.mjs` — the ONLY inferential sentence per finding;
+  templates are data with an exact-match test (cut-rule in header).
+- Default run **writes nothing** to the scanned repo; `--out` is the sole
+  write path (atomic tmp+rename).
+
+## CLI invariants (do not break)
+
+1. **Unknown-never-false.** A false accusation is fatal to an honesty
+   tool. Ship gate: zero false verdicts on clean-fixture and zero
+   unlabeled false verdicts on dirty-fixture — enforced per-push in CI.
+2. **The golden card is the contract.** `tests/golden/dirty-card.txt`
+   byte-locks the render; intentional changes go through
+   `npm run snapshot:update` and review of the diff.
+3. **The CLI module graph never imports `lib/repo.mjs`** (import-time path
+   resolution) — enforced by the boundary test.
+4. **Pre-tag ritual:** `npm run corpus` against real external repos +
+   hand-verification of every false verdict, before any release tag.
+
+## Tests / bench
+
+`npm test` — 35 tests (node:test; hermetic git fixtures with pinned
+dates → deterministic SHAs). `npm run bench` — per-phase timings + local
+5s tripwire (never in CI). CI: 3 OS × node 20/22; publish on `v*` tags
+(needs `NPM_TOKEN` secret).
 
 Five tabs, each with a hash route for deep-linking:
 
