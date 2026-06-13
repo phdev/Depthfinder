@@ -105,6 +105,7 @@ npx depthfinder --no-history # don't record this run / show a "since last run" d
 npx depthfinder --no-follow # don't follow "read first" links into repo docs
 npx depthfinder --docs     # opt in to the wider-docs scan (Doc Honesty)
 npx depthfinder --burn     # run your agent against the top false claim (opt-in; calls a model)
+npx depthfinder --version  # print the version and exit (-v); --help (-h) for usage
 ```
 
 By default, when a context file links repo docs under a "read first" /

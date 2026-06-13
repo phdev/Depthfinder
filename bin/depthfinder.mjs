@@ -64,7 +64,9 @@ const USAGE = `usage: depthfinder [path] [--json] [--out <dir>] [--no-follow] [-
               model. Override the agent with --burn-agent "<cmd>".
   --burn-agent <cmd>  the agent command for --burn (default: claude, else codex)
   --no-history do not record this run / show a "since last run" delta (the
-              record lives in your cache dir, never in the scanned repo)`;
+              record lives in your cache dir, never in the scanned repo)
+  -v, --version  print the depthfinder version and exit
+  -h, --help     print this usage and exit`;
 
 main();
 
@@ -81,11 +83,24 @@ function main() {
         burn: { type: "boolean" },
         "burn-agent": { type: "string" },
         "no-history": { type: "boolean" },
+        version: { type: "boolean", short: "v" },
+        help: { type: "boolean", short: "h" },
       },
     });
   } catch (e) {
     process.stderr.write(`depthfinder: ${e.message}\n${USAGE}\n`);
     process.exit(2);
+  }
+
+  // --version / --help are explicit informational requests: print to stdout
+  // (the convention for `tool --version | …`) and exit 0 before any repo work.
+  if (args.values.version) {
+    process.stdout.write(`${VERSION}\n`);
+    process.exit(0);
+  }
+  if (args.values.help) {
+    process.stdout.write(`${USAGE}\n`);
+    process.exit(0);
   }
 
   try {

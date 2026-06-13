@@ -23,6 +23,22 @@ test("exit 2: usage error on unknown flag", () => {
   assert.match(r.stderr, /usage/);
 });
 
+test("--version / --help: informational, stdout only, exit 0 (no repo needed)", () => {
+  const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+  for (const flag of ["--version", "-v"]) {
+    const r = runCli(process.cwd(), [flag]);
+    assert.equal(r.code, 0, `${flag} exits 0`);
+    assert.equal(r.stdout, `${pkg.version}\n`, `${flag} prints the package version to stdout`);
+    assert.equal(r.stderr, "", `${flag} writes nothing to stderr (8A)`);
+  }
+  for (const flag of ["--help", "-h"]) {
+    const r = runCli(process.cwd(), [flag]);
+    assert.equal(r.code, 0, `${flag} exits 0`);
+    assert.match(r.stdout, /^usage: depthfinder/, `${flag} prints usage to stdout`);
+    assert.equal(r.stderr, "", `${flag} writes nothing to stderr (8A)`);
+  }
+});
+
 test("exit 3: repo with no context files", () => {
   const root = makeRepo({ "src/a.js": "x\n" });
   try {
