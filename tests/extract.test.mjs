@@ -23,6 +23,11 @@ test("path oracle: extraction table", () => {
     ["bare prose path src/auth/oauth.ts is undelimited", []],
     ["first segment not a repo dir: `vendor/x/y.js`", []],
     ["single segment `README.md` is not a path claim", []],
+    // real-corpus FP class (home-center June-6 scan): ./-prefixed and
+    // parent-relative candidates never match the git index verbatim.
+    ["Build output goes to `./dist`.", []],
+    ["entry point is `./src/index.js`", ["src/index.js"]], // ./ stripped, claim kept
+    ["compare against `../sibling/file.js`", []],
   ];
   for (const [text, expected] of cases) {
     const got = extractPathClaims("CLAUDE.md", [L(text)], ctx).map((c) => c.predicate.args.path);
@@ -52,6 +57,9 @@ test("dependency oracle: extraction table (the self-scan FP class)", () => {
     ["powered by magic", []], // undelimited plain word: ignored
     ["see `claims.json` for output", []], // file-ext name
     ["run `npm` to install", []], // stoplist
+    // real-corpus FP class (home-center June-6 scan): env-var config knobs
+    ["speech mode uses `SPEECH_CANDIDATE_COOLDOWN_SECONDS`, not the wake cooldown", []],
+    ["uses `MAX_RETRIES` for backoff", []],
   ];
   for (const [text, expected] of cases) {
     const got = extractDependencyClaims("CLAUDE.md", [L(text)]).map((c) => c.predicate.args.name);

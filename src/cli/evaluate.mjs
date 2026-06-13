@@ -6,6 +6,7 @@
 // is acceptable.
 import { existsSync, readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
+import { checkIgnored } from "./git.mjs";
 
 const SYMBOL_FILE_CAP = 2000; // repo-wide search caps (design doc)
 const SYMBOL_WALL_MS = 1000;
@@ -16,10 +17,24 @@ export function evaluateClaims(claims, ctx) {
   const pkg = loadPackageManifests(ctx);
   const polyglot = POLYGLOT_MANIFESTS.some((f) => ctx.index.has(f));
 
+  // Paths missing from BOTH index and disk split two ways: deliberately
+  // gitignored (logs, local config, build output — machine-local state the
+  // author knows about) vs genuinely dangling. One batch check-ignore
+  // decides. Real-corpus FPs: home-center's `voice-service/logs/*` and
+  // `email-triage/config.yaml` are gitignored runtime files, not doc lies.
+  const misses = [];
+  for (const c of claims) {
+    if (c.predicate.type !== "file_exists") continue;
+    const p = c.predicate.args.path;
+    if (!ctx.index.has(p) && !existsSync(join(ctx.root, p))) misses.push(p);
+  }
+  const ignored = misses.length ? checkIgnored(ctx.root, misses) : new Set();
+  if (ignored === null) ctx.warn("git check-ignore failed — missing paths reported as unchecked");
+
   for (const claim of claims) {
     const { type, args } = claim.predicate;
     let r;
-    if (type === "file_exists") r = evalPath(args, ctx);
+    if (type === "file_exists") r = evalPath(args, ctx, ignored);
     else if (type === "declared_dependency") r = evalDependency(args, ctx, pkg, polyglot);
     else if (type === "symbol_exported") r = evalSymbol(args, ctx);
     else if (type === "count_matches") r = evalCount(args, ctx);
@@ -33,10 +48,14 @@ export function evaluateClaims(claims, ctx) {
 }
 
 // ── path ────────────────────────────────────────────────────────────────
-function evalPath({ path }, ctx) {
+function evalPath({ path }, ctx, ignored) {
   if (ctx.index.has(path)) return { verdict: "true", summary: "tracked file exists" };
   if (existsSync(join(ctx.root, path)))
     return { verdict: "unknown", summary: "present on disk but untracked (gitignored or not yet added)" };
+  if (ignored === null)
+    return { verdict: "unknown", summary: "missing, and gitignore status undecidable" };
+  if (ignored.has(path))
+    return { verdict: "unknown", summary: "gitignored — machine-local state (logs/config/build output), absent here" };
   return { verdict: "false", summary: "no such tracked file" };
 }
 

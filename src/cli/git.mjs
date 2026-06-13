@@ -18,9 +18,10 @@ export class NotARepoError extends Error {
   }
 }
 
-function run(args, cwd) {
+function run(args, cwd, input) {
   const res = spawnSync("git", args, {
     cwd,
+    input,
     encoding: "utf8",
     maxBuffer: 256 * 1024 * 1024,
     windowsHide: true,
@@ -44,6 +45,16 @@ export function lsFiles(root) {
   const out = new Set();
   for (const p of res.stdout.split("\0")) if (p) out.add(p);
   return out;
+}
+
+// Which of these paths does gitignore deliberately exclude? One batch spawn
+// for all index-and-disk misses (status 0 = some matched, 1 = none). Returns
+// null when git can't answer (fatal status) — callers must treat null as
+// undecidable, never as "not ignored": a glitch must not become an accusation.
+export function checkIgnored(root, paths) {
+  const res = run(["check-ignore", "--stdin", "-z"], root, paths.join("\0"));
+  if (res.status !== 0 && res.status !== 1) return null;
+  return new Set(res.stdout.split("\0").filter(Boolean));
 }
 
 export function isShallow(root) {

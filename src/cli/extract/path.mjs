@@ -14,9 +14,17 @@ const NO_EXT = /^[\w.-]+(\/[\w.-]+)+$/;
 export function extractPathClaims(file, lines, ctx) {
   const claims = [];
   const seen = new Set();
-  const consider = (candidate, line, pattern, confidence) => {
-    if (isSchemePrefixed(candidate)) return;
+  const consider = (raw, line, pattern, confidence) => {
+    if (isSchemePrefixed(raw)) return;
+    // Authors write repo-root paths as `./x/y`, but the git index never
+    // carries the ./ prefix — normalize before any matching. What survives
+    // must still be multi-segment and in-repo: `./dist` collapses to one
+    // bare segment and `../x` points outside; neither is a checkable claim.
+    // (Real-corpus FP: home-center June-6 scan false-accused `./dist`.)
+    const candidate = raw.startsWith("./") ? raw.slice(2) : raw;
+    if (!candidate.includes("/")) return;
     const seg = firstSegment(candidate);
+    if (seg === "." || seg === "..") return;
     if (isHostLike(seg)) return;
     if (!ctx.dirExists(seg)) return; // first segment must be a repo dir
     const key = `${line.n}:${candidate}`;

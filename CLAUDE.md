@@ -32,10 +32,14 @@ cwd ─▶ git root ─▶ ls-files Set ─▶ discover (5 conventions)
   output seams via `lib/redact.mjs`.
 - `src/cli/extract/{path,dependency,symbol,count}.mjs` — grammars are
   deliberately conservative; the dependency grammar's guards exist because
-  the self-scan false-accused `its`/`home-center`/`--lan` on day one.
+  the self-scan false-accused `its`/`home-center`/`--lan` on day one, and
+  the first real-corpus run (home-center June-6 snapshot) added `./`-prefix
+  normalization (path) and SCREAMING_SNAKE env-var rejection (dependency).
 - `src/cli/evaluate.mjs` — monorepo-aware deps (nearest+workspaces, 4
   fields), ESM/TS symbol forms with unknown escapes (`export *`, default
-  expressions, CJS), literal-cardinality counts with uncertainty escapes.
+  expressions, CJS), literal-cardinality counts with uncertainty escapes,
+  and gitignored-but-absent paths → unknown (logs/local config/build output
+  are machine-local state, not doc lies; batch `git check-ignore`).
 - `src/cli/templates.mjs` — the ONLY inferential sentence per finding;
   templates are data with an exact-match test (cut-rule in header).
 - Default run **writes nothing** to the scanned repo; `--out` is the sole
@@ -56,7 +60,7 @@ cwd ─▶ git root ─▶ ls-files Set ─▶ discover (5 conventions)
 
 ## Tests / bench
 
-`npm test` — 35 tests (node:test; hermetic git fixtures with pinned
+`npm test` — 37 tests (node:test; hermetic git fixtures with pinned
 dates → deterministic SHAs). `npm run bench` — per-phase timings + local
 5s tripwire (never in CI). CI: 3 OS × node 20/22; publish on `v*` tags
 (needs `NPM_TOKEN` secret).

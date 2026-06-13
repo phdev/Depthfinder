@@ -39,6 +39,24 @@ test("path: tracked=true, missing=false, untracked-on-disk=unknown", () => {
   }
 });
 
+test("path: gitignored-and-absent = unknown, never false (real-corpus class)", () => {
+  const root = makeRepo({
+    ".gitignore": "voice-service/logs/\n",
+    "voice-service/app.js": "x\n",
+    "CLAUDE.md": "# t\n",
+  });
+  try {
+    const log = claimOf("path", "file_exists", { path: "voice-service/logs/run.jsonl" });
+    const gone = claimOf("path", "file_exists", { path: "voice-service/gone.js" });
+    evaluateClaims([log, gone], ctxFor(root));
+    assert.equal(log.verdict, "unknown", "ignored runtime artifact is machine-local state, not a lie");
+    assert.match(log.evidence.summary, /gitignored/);
+    assert.equal(gone.verdict, "false", "non-ignored missing path still reads false");
+  } finally {
+    cleanup(root);
+  }
+});
+
 test("dependency: all four fields + workspace manifests count", () => {
   const root = makeRepo({
     "package.json": JSON.stringify({

@@ -30,11 +30,17 @@ const PHRASE = /\b(uses|depends on|built with|powered by|handled by)\s+(`([^`]+)
 //   undelimited + phrase -> must contain @ or . chars (package-ish)
 //   backtick alone       -> @scoped names only        (unambiguous npm shape)
 const PHRASED_NAME = /^(@[\w.-]+\/)?[A-Za-z0-9][\w.-]*$/; // case-tolerant
+// SCREAMING_SNAKE names are env vars / config knobs, never npm packages
+// (the registry has been lowercase-only since 2014; legacy mixed-case names
+// like openWakeWord still pass). Real-corpus FP: "speech mode uses
+// `SPEECH_CANDIDATE_COOLDOWN_SECONDS`" became a dependency accusation.
+const ENV_VAR = /^[A-Z][A-Z0-9_]*$/;
 function validName(name, { delimited, phrase }) {
   if (!name || name.length < 3) return false;
   if (FILE_EXT.test(name)) return false;
   if (name.includes("/") && !name.startsWith("@")) return false; // path-like
   if (STOPLIST.has(name.toLowerCase())) return false;
+  if (ENV_VAR.test(name)) return false;
   if (phrase && delimited) return PHRASED_NAME.test(name);
   if (!NPM_NAME.test(name)) return false;
   if (phrase && !delimited) return /[@.]/.test(name);
