@@ -10,6 +10,16 @@ import { readContextFile, MAX_LINE_CHARS } from "../src/cli/ingest.mjs";
 import { computeScore, deadTokens, MIN_DEFINITE_FOR_SCORE } from "../src/cli/score.mjs";
 import { selectFindings } from "../src/cli/select.mjs";
 import { TEMPLATES, consequence } from "../src/cli/templates.mjs";
+import { verificationDetours } from "../src/cli/burn.mjs";
+
+test("verificationDetours: counts dedup'd verification steps in agent output", () => {
+  assert.deepEqual(
+    verificationDetours("I'd grep for it, then find the file and grep again to confirm."),
+    ["grep", "find", "confirm"],
+    "first-seen order, deduped",
+  );
+  assert.deepEqual(verificationDetours("Open src/x.ts and edit the export."), [], "no detour = took the bait");
+});
 import { tokchars } from "../lib/text.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));

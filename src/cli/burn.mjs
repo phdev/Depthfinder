@@ -41,6 +41,21 @@ export function resolveAgent({ agentCmd, env = process.env } = {}) {
   return null;
 }
 
+// Verification detours the burned agent proposed to route around the rotten
+// line — grep/find/etc. When a capable agent CATCHES the stale line it doesn't
+// crash, it pays this tax instead (extra steps + re-derivation). Counting them
+// makes the rot tax visible even when the demo doesn't end in a confident
+// failure. Pure; deduped, in first-seen order.
+const DETOUR = /\b(grep|rg|ripgrep|find|ls|locate|glob|search(?:ing|es)?|verify|confirm|double-check|cross-check)\b/gi;
+export function verificationDetours(text) {
+  const seen = [];
+  for (const m of (text || "").matchAll(DETOUR)) {
+    const t = m[0].toLowerCase();
+    if (!seen.includes(t)) seen.push(t);
+  }
+  return seen;
+}
+
 // The question an agent would answer using a rotten claim of this kind.
 function question(finding) {
   switch (finding.oracle) {

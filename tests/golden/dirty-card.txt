@@ -16,6 +16,7 @@
   Context Honesty   57 · 7 checkable claims · 1 unchecked
   Weight   ~77 tokens load every turn
   2 false claims · 1 stale · ~21 tokens describe code that no longer exists
+  → the rot tax: your agent acts on those false lines, or stops trusting the file and re-derives ~77 tokens by hand.
 
   Your agent reads all of this as ground truth, every call.
   npx depthfinder --json for full results

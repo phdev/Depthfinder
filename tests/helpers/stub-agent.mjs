@@ -8,4 +8,9 @@ const prompt = process.argv[process.argv.length - 1] || "";
 // claim's subject), not an incidental path earlier in the sentence.
 const all = [...prompt.matchAll(/`([^`]+)`/g)];
 const ref = all.length ? all[all.length - 1][1] : "the referenced module";
-process.stdout.write(`To do that, use ${ref} and start from the main export there.\n`);
+// DEPTHFINDER_STUB_DETOUR=1 makes the stub "catch" the lie and propose checks,
+// exercising the verification-detour tax path.
+const detour = process.env.DEPTHFINDER_STUB_DETOUR
+  ? " That file may be stale though — I'd grep and find to confirm it exists before editing."
+  : "";
+process.stdout.write(`To do that, use ${ref} and start from the main export there.${detour}\n`);

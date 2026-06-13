@@ -39,7 +39,7 @@ import { renderCard } from "../src/cli/render.mjs";
 import { buildPayload, writeOut } from "../src/cli/claims.mjs";
 import { firstSegment, resolveRelPosix } from "../src/cli/paths.mjs";
 import { directiveLinks } from "../src/cli/follow.mjs";
-import { resolveAgent, runBurn } from "../src/cli/burn.mjs";
+import { resolveAgent, runBurn, verificationDetours } from "../src/cli/burn.mjs";
 
 const USAGE = `usage: depthfinder [path] [--json] [--out <dir>] [--no-follow] [--docs]
 
@@ -277,6 +277,7 @@ function run({ values, positionals }) {
         );
         f.burn = runBurn(f, { agent });
         if (f.burn.error) warn(`--burn: ${f.burn.error}`);
+        else f.burn.detours = verificationDetours(f.burn.output); // the tax, when it catches the lie
       }
     }
   }

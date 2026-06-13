@@ -72,6 +72,15 @@ existed in git history (deleted/renamed — the doc rotted); **false** = no such
 history (fabricated or never true). Both count against honesty identically; the
 split is evidence, not forgiveness.
 
+When `false > 0` the card adds the **rot tax** line (deterministic, no model
+call): a false line costs the agent either way — it acts on the lie, or it
+stops trusting the file and re-derives the whole Weight by hand. The tax is
+not the false tokens; it's every token the agent can no longer take on faith.
+Under `--burn`, the finding names whichever happened: the agent took the bait
+(wrong turn) or it caught the lie but paid a **verification detour**
+(`verificationDetours()` counts the grep/find/verify steps it proposed) — both
+are the tax, surfaced as "the detour is the tax, every session."
+
 - `bin/depthfinder.mjs` — orchestration, parseArgs, exit codes (0 ran /
   1 internal / 2 usage·no-git / 3 no context files), stream discipline
   (stdout = card|JSON only; diagnostics → stderr), redaction at both
@@ -128,7 +137,7 @@ split is evidence, not forgiveness.
 
 ## Tests / bench
 
-`npm test` — 48 tests (node:test; hermetic git fixtures with pinned
+`npm test` — 51 tests (node:test; hermetic git fixtures with pinned
 dates → deterministic SHAs; `--burn` tested via a stub agent, never a real
 model call). `npm run bench` — per-phase timings + local
 5s tripwire (never in CI). CI: 3 OS × node 20/22; publish on `v*` tags

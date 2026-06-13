@@ -30,10 +30,16 @@ export function renderCard(model) {
     L.push(`  ✗ ${f.source.file}:${f.source.line}  "${truncate(f.text, 88)}"`);
     L.push(`      └ ${f.evidence.summary}`);
     if (f.burn && !f.burn.error) {
-      // The moment, undeniable: a real agent's words, then the contradiction.
+      // The moment, undeniable: a real agent's words, then the cost. Either it
+      // took the bait (wrong turn) or it caught the lie and paid the detour
+      // tax — both are the rot tax, and we name whichever happened.
       L.push(`      ▶ ${f.burn.agent} answered (your context, no repo to check):`);
       for (const ln of wrapText(f.burn.output, 60)) L.push(`           ${ln}`);
-      L.push(`      └ stated as fact — from a line your repo already contradicts.`);
+      const d = f.burn.detours ?? [];
+      if (d.length)
+        L.push(`      └ it caught the lie — but only after proposing ${d.length} check${d.length === 1 ? "" : "s"} (${d.slice(0, 4).join(", ")}) to route around your line. That detour is the tax, every session.`);
+      else
+        L.push(`      └ stated as fact, from a line your repo already contradicts. The tax is the wrong turn it just took.`);
     } else {
       if (f.burn?.error) L.push(`      ▶ burn skipped: ${f.burn.error}`);
       const why = consequence(f);
@@ -74,6 +80,12 @@ export function renderCard(model) {
   L.push(
     `  ${fab} false claim${fab === 1 ? "" : "s"} · ${score.staleCount} stale · ~${nf.format(dead)} tokens describe code that no longer exists`,
   );
+  // The rot tax (deterministic, no model call): a false line costs the agent
+  // either way — it acts on the lie, or it stops trusting the file and
+  // re-derives the whole Weight by hand. The cost isn't the false tokens, it's
+  // every token the agent can no longer take on faith.
+  if (score.falseCount > 0)
+    L.push(`  → the rot tax: your agent acts on those false lines, or stops trusting the file and re-derives ~${nf.format(weight)} tokens by hand.`);
   L.push("");
   L.push("  Your agent reads all of this as ground truth, every call.");
   L.push("  npx depthfinder --json for full results");

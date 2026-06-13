@@ -327,6 +327,34 @@ test("--burn (V1.1): shadows a local agent against the top finding; real output 
   }
 });
 
+test("rot tax: the deterministic tax line shows when false>0, absent when clean", () => {
+  const dirty = materialize("dirty");
+  const clean = materialize("clean");
+  try {
+    assert.match(runCli(dirty).stdout, /the rot tax: your agent acts on those false lines, or stops trusting the file/);
+    assert.doesNotMatch(runCli(clean).stdout, /rot tax/, "no tax line on an honest repo");
+  } finally {
+    cleanup(dirty);
+    cleanup(clean);
+  }
+});
+
+test("--burn: surfaces the verification-detour tax when the agent catches the lie", () => {
+  const root = materialize("dirty");
+  const env = { DEPTHFINDER_BURN_AGENT: `${process.execPath} ${STUB_AGENT}`, DEPTHFINDER_STUB_DETOUR: "1" };
+  try {
+    const r = runCli(root, ["--burn"], env);
+    assert.equal(r.code, 0);
+    assert.match(r.stdout, /caught the lie — but only after proposing \d+ checks? \(/, "names the detour count");
+    assert.match(r.stdout, /grep|find/, "lists the verification steps");
+    const p = JSON.parse(runCli(root, ["--json", "--burn"], env).stdout);
+    const burned = p.claims.find((c) => c.burn && !c.burn.error);
+    assert.ok(burned.burn.detours.length >= 1, "detours recorded on the payload");
+  } finally {
+    cleanup(root);
+  }
+});
+
 test("--burn: no agent available degrades cleanly (warn, exit 0, no card change)", () => {
   const root = materialize("dirty");
   try {
