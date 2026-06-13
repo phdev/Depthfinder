@@ -28,8 +28,11 @@ jobs:
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
-      - name: Ensure npm supports trusted publishing (>= 11.5.0)
-        run: npm install -g npm@latest
+      - name: Ensure npm supports trusted publishing (>= 11.5.1)
+        run: |
+          npm install -g npm@latest
+          hash -r 2>/dev/null || true
+          echo "node $(node --version) / npm $(npm --version)"
       - name: Configure git identity
         run: |
           git config --global user.name depthfinder-ci
@@ -37,4 +40,6 @@ jobs:
       - name: Run test suite
         run: npm test
       - name: Publish (OIDC trusted publishing; provenance automatic; no token)
-        run: npm publish --provenance --access public
+        run: |
+          echo "publishing with npm $(npm --version)"
+          npm publish --provenance --access public
