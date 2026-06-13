@@ -124,6 +124,37 @@ without these HURTS an honesty tool's trust posture. Design deliberately:
 - Worker in its OWN package (isolates miniflare/wrangler dev deps; CLI stays zero-dep) + wrangler deploy.
 Design doc: ~/.gstack/projects/phdev-Depthfinder/peterhowell-main-design-v1.2-score-history-benchmark-20260613-091103.md (NOT-in-scope section).
 
+## OKF (Google Open Knowledge Format) — WATCH + defensive probe (assessed 2026-06-13)
+
+Evaluated OKF v0.1 draft (knowledge-catalog SPEC.md). **Decision: HOLD — don't
+build OKF support.** It's a tailwind for the thesis (markdown agents trust as
+ground truth, that rots) but a misfit for the engine: an OKF concept's ground
+truth is an **external live system** (a BigQuery table, an API), not the git
+tree — verifying it needs network + per-resource adapters + non-determinism,
+which breaks invariant #4 and the offline contract. OKF's one git-checkable
+surface (internal cross-links) is **spec-declared safe-when-broken** ("Consumers
+MUST tolerate broken links… may simply represent not-yet-written knowledge"), so
+applying the path oracle there is a guaranteed false accusation (violates
+unknown-never-false). The valuable version (concept-vs-live-resource drift) is a
+different product.
+
+**The one actionable item — defensive, do before any publish that defaults
+`--docs` ON:** a `--docs` scan of a repo CONTAINING an OKF bundle will likely
+FALSE-ACCUSE on cross-links. Bundle-relative `/tables/x.md` resolves from the
+*bundle* root, but our path oracle resolves `/`-rooted paths from the *repo*
+root → target "missing" → false verdict. Action: add an OKF-bundle fixture to
+`scripts/doc-corpus.mjs` and confirm zero false; teach the doc-tier skip-list /
+modality filter to recognize a bundle (an `index.md`+`log.md` pair, or `.md`
+files carrying OKF `type:` frontmatter) and treat its links as spec-tolerant
+(downgrade to unknown, never false). ~an afternoon; pure ship-gate protection.
+
+**Tripwire to re-evaluate building:** if OKF bundles start describing the
+**codebase** (concepts whose `resource:`/body reference in-repo file paths or
+code symbols) rather than external data assets, the path/symbol oracles light up
+and there's a real, invariant-respecting OKF play. Until then it's a data
+catalog — out of our git-grounded domain. Full reasoning: memory
+`depthfinder-okf-assessment`.
+
 ## (reference) Original score-history notes
 
 **What:** Per-repo scan history under the user's cache dir
