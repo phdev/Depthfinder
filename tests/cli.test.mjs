@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, existsSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 import { materialize, makeRepo, runCli, hashTree, cleanup, STUB_AGENT } from "./helpers/fixture.mjs";
 
 test("exit 2: not a git repository", () => {
@@ -413,6 +414,45 @@ test("score-history (V1.2): delta across runs; no-change; --no-history silent; s
   } finally {
     cleanup(root);
     rmSync(cache, { recursive: true, force: true });
+  }
+});
+
+test("score-history: deltas are scoped to the branch (no cross-branch fake trend)", () => {
+  const files = { "CLAUDE.md": "" };
+  const lines = ["# svc", ""];
+  for (const n of ["a", "b", "c", "d", "e"]) {
+    files[`src/${n}.js`] = `export const ${n} = 1\n`;
+    lines.push(`Module ${n} lives in \`src/${n}.js\`.`);
+  }
+  files["CLAUDE.md"] = lines.join("\n") + "\n";
+  const root = makeRepo(files);
+  const cache = mkdtempSync(join(tmpdir(), "df-branch-cache-"));
+  const env = { DEPTHFINDER_CACHE: cache };
+  try {
+    runCli(root, [], env); // run on main → records honesty 100 @ main
+    spawnSync("git", ["-C", root, "checkout", "-q", "-b", "feature"]);
+    // first run on the new branch: nothing comparable yet → no delta
+    assert.doesNotMatch(runCli(root, [], env).stdout, /since last run/, "no cross-branch delta on a fresh branch");
+    // second run on the branch → comparable to the branch's own prior
+    assert.match(runCli(root, [], env).stdout, /no change since last run/, "within-branch trend works");
+  } finally {
+    cleanup(root);
+    rmSync(cache, { recursive: true, force: true });
+  }
+});
+
+test("score-history: a cache path resolving inside the scanned repo is refused (5A guard)", () => {
+  const root = materialize("dirty"); // false claims present → history block runs
+  try {
+    const before = hashTree(root);
+    // a RELATIVE override resolves against the subprocess cwd (= the repo root)
+    const r = runCli(root, [], { DEPTHFINDER_CACHE: "." });
+    assert.equal(r.code, 0);
+    assert.match(r.stderr, /cache path resolves inside the scanned repo/);
+    assert.equal(hashTree(root), before, "nothing was written into the scanned repo");
+    assert.doesNotMatch(r.stdout, /since last run/, "no delta when history is skipped");
+  } finally {
+    cleanup(root);
   }
 });
 

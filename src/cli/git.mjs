@@ -62,6 +62,14 @@ export function isShallow(root) {
   return res.status === 0 && res.stdout.trim() === "true";
 }
 
+// Current branch (or "HEAD" when detached, "" if git can't say). Used to scope
+// score-history deltas to a branch — a cross-branch "since last run" isn't a
+// real trend.
+export function currentBranch(root) {
+  const res = run(["rev-parse", "--abbrev-ref", "HEAD"], root);
+  return res.status === 0 ? res.stdout.trim() : "";
+}
+
 // Lazy, per-rendered-claim history evidence for a deleted/renamed path.
 // Returns { kind: "deleted"|"renamed"|"unknown-history", sha?, commitsAgo?, to? }.
 export function deletionEvidence(root, relPath, shallow) {

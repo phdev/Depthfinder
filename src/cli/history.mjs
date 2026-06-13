@@ -15,7 +15,7 @@
 import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, appendFileSync, writeFileSync, renameSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, dirname } from "node:path";
+import { join, dirname, resolve } from "node:path";
 import { createHash } from "node:crypto";
 
 const MAX_RECORDS = 50; // keep the last N runs
@@ -37,29 +37,37 @@ export function repoIdentity(root) {
 }
 
 // github.com/owner/repo from https://user:pass@github.com/owner/repo.git or
-// git@github.com:owner/repo.git — strip scheme, creds, .git, trailing slash;
-// SCP colon → slash; lowercase the host only.
+// git@github.com:owner/repo.git. One repo must yield ONE key across URL forms,
+// and two repos must never collide. Strip scheme, creds, trailing slashes
+// (BEFORE .git, so `repo.git/` and `repo.git` agree), then .git. Convert the
+// SCP `host:path` colon to a slash ONLY for the schemeless short form — leaving
+// a URL's `host:port` colon alone (mangling a port would split one repo into
+// two keys). Lowercase the whole thing: hosts + GitHub/GitLab org/repo are
+// case-insensitive, so `Owner/Repo` and `owner/repo` are one repo.
 function normalizeOrigin(url) {
-  let u = url.trim()
-    .replace(/^[a-z][a-z0-9+.-]*:\/\//i, "") // scheme://
-    .replace(/^[^@/]+@/, "")                  // user[:pass]@
-    .replace(/\.git$/i, "")
+  const raw = url.trim();
+  const hadScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw);
+  let u = raw
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//i, "")
+    .replace(/^[^@/]+@/, "")
     .replace(/\/+$/, "")
-    .replace(":", "/");                        // git@host:path SCP form
-  const slash = u.indexOf("/");
-  if (slash > 0) u = u.slice(0, slash).toLowerCase() + u.slice(slash);
-  return u;
+    .replace(/\.git$/i, "");
+  if (!hadScheme) u = u.replace(":", "/"); // SCP short form only
+  return u.toLowerCase();
 }
 
 // The history file for a repo key. Honors DEPTHFINDER_CACHE (also the test
-// isolation hook) > XDG_CACHE_HOME > per-OS default. Always under a
-// `depthfinder/` subdir so we never litter the cache root.
+// isolation hook) > XDG_CACHE_HOME > per-OS default. RESOLVES the base to an
+// absolute path so a relative override (e.g. DEPTHFINDER_CACHE=.) can't quietly
+// land the cache inside cwd — the caller additionally refuses to write a path
+// inside the scanned repo (5A). Always under a `depthfinder/` subdir.
 export function cacheFile(key, env = process.env) {
-  const base =
+  const base = resolve(
     env.DEPTHFINDER_CACHE ||
     env.XDG_CACHE_HOME ||
     (process.platform === "win32" && env.LOCALAPPDATA) ||
-    (process.platform === "darwin" ? join(homedir(), "Library", "Caches") : join(homedir(), ".cache"));
+    (process.platform === "darwin" ? join(homedir(), "Library", "Caches") : join(homedir(), ".cache")),
+  );
   return join(base, "depthfinder", `${key}.jsonl`);
 }
 
@@ -70,6 +78,7 @@ export function cacheFile(key, env = process.env) {
 function comparable(rec, cmp) {
   return !!rec
     && rec.scoringSchema === cmp.scoringSchema
+    && rec.branch === cmp.branch
     && rec.follow === cmp.follow
     && rec.docs === cmp.docs;
 }
@@ -93,10 +102,12 @@ export function readLast(file, cmp) {
   return null;
 }
 
-// Append one record (O_APPEND, atomic). Returns true on success, false on any
-// error (caller warns; the scan still exits 0). Prunes only when the file
-// grows past PRUNE_AT — rare, so the read-rewrite race window is tiny and a
-// lost prune merely leaves a few extra lines.
+// Append one record. The append itself is atomic (O_APPEND single write, a
+// ~300-byte line « PIPE_BUF), so two overlapping runs never lose a RECORD.
+// Returns true on success, false on any error (caller warns; the scan still
+// exits 0). maybePrune is the one non-atomic step: a concurrent append landing
+// between its read and rename CAN be dropped — but it only runs past PRUNE_AT
+// (rare), and the loss is one trend datapoint, never the scan, so we accept it.
 export function append(file, record) {
   try {
     mkdirSync(dirname(file), { recursive: true });

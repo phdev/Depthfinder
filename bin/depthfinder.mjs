@@ -22,10 +22,10 @@
 // stream/serializer boundary.
 import { parseArgs } from "node:util";
 import { existsSync, statSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { resolve, sep } from "node:path";
 import { redact, redactDeep } from "../lib/redact.mjs";
 import { tokchars } from "../lib/text.mjs";
-import { findRoot, lsFiles, isShallow, deletionEvidence, GitMissingError, NotARepoError } from "../src/cli/git.mjs";
+import { findRoot, lsFiles, isShallow, deletionEvidence, currentBranch, GitMissingError, NotARepoError } from "../src/cli/git.mjs";
 import { discover, discoverDocs } from "../src/cli/discover.mjs";
 import { readContextFile } from "../src/cli/ingest.mjs";
 import { keepDocClaims } from "../src/cli/docmode.mjs";
@@ -43,7 +43,13 @@ import { firstSegment, resolveRelPosix } from "../src/cli/paths.mjs";
 import { directiveLinks } from "../src/cli/follow.mjs";
 import { resolveAgent, runBurn, verificationDetours } from "../src/cli/burn.mjs";
 
-const VERSION = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
+// Read once at load; a missing/corrupt package.json (only a hand-copied partial
+// tree, never a real npm install) must NOT crash the CLI before its exit-code
+// logic — fall back to a sentinel version.
+let VERSION = "0.0.0";
+try {
+  VERSION = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version || VERSION;
+} catch { /* keep the sentinel */ }
 
 const USAGE = `usage: depthfinder [path] [--json] [--out <dir>] [--no-follow] [--docs]
 
@@ -312,18 +318,28 @@ function run({ values, positionals }) {
   // cache write disables the delta but never breaks the scan.
   let scoreDelta = null;
   if (!values["no-history"] && score.honesty != null) {
-    const cmp = { scoringSchema: SCORING_SCHEMA, follow: !values["no-follow"], docs: !!values.docs };
+    const cmp = { scoringSchema: SCORING_SCHEMA, branch: currentBranch(root), follow: !values["no-follow"], docs: !!values.docs };
     try {
       const { raw, key } = repoIdentity(root);
       const file = cacheFile(key);
-      const prev = readLast(file, cmp);
-      if (prev && prev.honesty != null) scoreDelta = score.honesty - prev.honesty;
-      const ok = append(file, {
-        schema: 0, at: ctx.now, toolVersion: VERSION, ...cmp,
-        honesty: score.honesty, definite: score.definite,
-        false: score.falseCount, stale: score.staleCount, weight, identity: raw,
-      });
-      if (!ok) warn("score-history: cache not writable — delta disabled (use --no-history to silence)");
+      // 5A guard: never write history inside the SCANNED repo, even if the
+      // cache env var resolved there (relative DEPTHFINDER_CACHE/XDG_CACHE_HOME).
+      if (resolve(file).startsWith(resolve(root) + sep)) {
+        warn("score-history: cache path resolves inside the scanned repo — skipping (set DEPTHFINDER_CACHE to an absolute path outside the repo)");
+      } else {
+        const prev = readLast(file, cmp);
+        // require a numeric prior honesty — a corrupt record must not yield a NaN delta
+        if (prev && typeof prev.honesty === "number") scoreDelta = score.honesty - prev.honesty;
+        const ok = append(file, {
+          schema: 0, at: ctx.now, toolVersion: VERSION, ...cmp,
+          honesty: score.honesty, definite: score.definite,
+          false: score.falseCount, stale: score.staleCount, weight, identity: raw,
+        });
+        if (!ok) {
+          warn("score-history: cache not writable — delta disabled (use --no-history to silence)");
+          scoreDelta = null; // don't show a delta we couldn't persist
+        }
+      }
     } catch (e) {
       warn(`score-history: ${e?.message || e}`);
     }
