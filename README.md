@@ -105,6 +105,8 @@ npx depthfinder --no-history # don't record this run / show a "since last run" d
 npx depthfinder --no-follow # don't follow "read first" links into repo docs
 npx depthfinder --docs     # opt in to the wider-docs scan (Doc Honesty)
 npx depthfinder --burn     # run your agent against the top false claim (opt-in; calls a model)
+npx depthfinder --strict   # CI gate: exit 4 when your context has rotted (false claims)
+npx depthfinder --strict --max-false 5  # ...allow up to 5 before failing (ratchet)
 npx depthfinder --version  # print the version and exit (-v); --help (-h) for usage
 ```
 
@@ -121,6 +123,35 @@ scanned repo. It does keep a small **score history** in your cache dir
 delta — `Context Honesty 95 (▼17 since last run)`. That stays on your machine;
 `--no-history` turns it off.
 
+### Fail CI when your context rots — `--strict`
+
+The default scan is advisory (always exit 0). `--strict` turns it into a **gate**:
+it exits **4** when your Context Honesty has any false claim — so a PR that lets
+`CLAUDE.md` drift out of sync with the repo fails the build.
+
+```yaml
+# .github/workflows/context-honesty.yml
+on: [pull_request]
+jobs:
+  depthfinder:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4   # fetch-depth:0 if you want stale/rename evidence
+      - run: npx depthfinder@1.0.1 --strict   # PIN the version (see below)
+```
+
+- **Gates the Context tier only** (your convention files + nested + the "read
+  first" links they follow, minus `--no-follow`). `--docs` (Doc Honesty) is
+  advisory and never fails the build.
+- **`--max-false N`** allows a budget of `N` false claims (default 0). Adopt on
+  an already-rotten repo at a high `N`, then ratchet it down each sprint.
+- **Pin the npm version** (`npx depthfinder@1.0.1`, not bare `npx depthfinder`).
+  The false count is extractor-dependent; a future release could change it and
+  turn your build red with zero repo changes. Pinning makes `--max-false` stable.
+- Exit **4** is distinct from **1** (a tool crash), so a wrapper can tell "your
+  context rotted" from "depthfinder broke." `--json` carries a
+  `gate: { strict, maxFalse, false, failed, tier }` object for programmatic use.
+
 ### Exit codes
 
 | Code | Meaning |
@@ -129,6 +160,7 @@ delta — `Context Honesty 95 (▼17 since last run)`. That stays on your machin
 | 1 | internal error |
 | 2 | usage error · not a git repo · git missing · bad `--out` |
 | 3 | no context files found |
+| 4 | `--strict` gate breach: Context Honesty has > `--max-false` false claims |
 
 ### What it checks
 

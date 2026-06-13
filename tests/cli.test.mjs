@@ -492,3 +492,139 @@ test("large --json payloads (>64KB) are not truncated by exit (pipe flush)", () 
     cleanup(root);
   }
 });
+
+// ── --strict CI gate (Phase A) ──────────────────────────────────────────────
+test("--strict: clean passes (exit 0), dirty fails with the DISTINCT exit 4 (not 1=internal-error)", () => {
+  const clean = materialize("clean");
+  const dirty = materialize("dirty");
+  try {
+    const c = runCli(clean, ["--strict"]);
+    assert.equal(c.code, 0, "clean repo passes the gate");
+    assert.match(c.stderr, /strict: PASS/);
+
+    const d = runCli(dirty, ["--strict"]);
+    assert.equal(d.code, 4, "dirty repo fails with exit 4 — distinct from 1 (internal error)");
+    assert.match(d.stderr, /strict: FAIL/);
+    assert.match(d.stderr, /exit 4/);
+  } finally {
+    cleanup(clean); cleanup(dirty);
+  }
+});
+
+test("--strict --max-false: boundary is > not >= (==N passes, N-1 fails); gates on TOTAL falseCount", () => {
+  const dirty = materialize("dirty");
+  try {
+    const n = JSON.parse(runCli(dirty, ["--json"]).stdout).score.false;
+    assert.ok(n > 0, "dirty fixture has false claims");
+    assert.equal(runCli(dirty, ["--strict", "--max-false", String(n)]).code, 0, `budget ${n} == false ${n} → pass`);
+    assert.equal(runCli(dirty, ["--strict", "--max-false", String(n - 1)]).code, 4, `budget ${n - 1} < false ${n} → fail`);
+    assert.equal(runCli(dirty, ["--strict", "--max-false", "0"]).code, 4, "explicit --max-false 0 == default");
+  } finally {
+    cleanup(dirty);
+  }
+});
+
+test("--max-false: invalid values are a usage error (exit 2) BEFORE any repo work", () => {
+  const clean = materialize("clean");
+  try {
+    for (const bad of ["abc", "1.5", "1e3", "Infinity", "NaN", "", " ", "0x4"]) {
+      const r = runCli(clean, ["--strict", "--max-false", bad]);
+      assert.equal(r.code, 2, `--max-false "${bad}" → exit 2`);
+      assert.match(r.stderr, /max-false must be a non-negative integer/);
+    }
+    // negative (via = form so parseArgs keeps it as the value) is rejected, never silently 0
+    assert.equal(runCli(clean, ["--strict", "--max-false=-1"]).code, 2, "--max-false=-1 → exit 2");
+  } finally {
+    cleanup(clean);
+  }
+});
+
+test("--strict --json: gate object + failed flag; stdout stays valid JSON; exit 4 (orthogonal to format)", () => {
+  const dirty = materialize("dirty");
+  try {
+    const r = runCli(dirty, ["--strict", "--json"]);
+    assert.equal(r.code, 4, "exit code is independent of --json");
+    const p = JSON.parse(r.stdout); // verdict went to stderr → stdout is still valid JSON
+    assert.deepEqual(p.gate, { strict: true, maxFalse: 0, false: p.score.false, failed: true, tier: "context" });
+    // a non-strict run has gate: null (additive, no inference forced on consumers)
+    assert.equal(JSON.parse(runCli(dirty, ["--json"]).stdout).gate, null);
+  } finally {
+    cleanup(dirty);
+  }
+});
+
+test("--strict does NOT alter stdout: the card is byte-identical to a non-strict run (verdict is stderr-only)", () => {
+  const dirty = materialize("dirty");
+  try {
+    const plain = runCli(dirty, []);
+    const strict = runCli(dirty, ["--strict"]);
+    assert.equal(strict.stdout, plain.stdout, "rendered card unchanged by --strict (golden stays stable)");
+    assert.equal(plain.code, 0, "a non-strict run is advisory: exit 0 even with false claims");
+    assert.equal(strict.code, 4);
+  } finally {
+    cleanup(dirty);
+  }
+});
+
+test("--strict gates the CONTEXT tier only: a doc-tier dead ref never fails the build (D2)", () => {
+  const root = makeRepo({
+    "CLAUDE.md": "# proj\n\nEntry point is `src/index.js`.\n",
+    "src/index.js": "export const x = 1\n",
+    "docs/runbook.md": "# runbook\n\nThe worker entry point is `src/worker/main.js`.\n",
+  });
+  try {
+    const p = JSON.parse(runCli(root, ["--json", "--docs"]).stdout);
+    assert.equal(p.score.false, 0, "context tier is clean");
+    assert.ok(p.docScore && p.docScore.false > 0, "doc tier has a dead ref to gate-test against");
+    const r = runCli(root, ["--strict", "--docs"]);
+    assert.equal(r.code, 0, "doc-tier rot does NOT fail the gate — Context-only (D2)");
+    assert.match(r.stderr, /Doc Honesty is advisory and was not gated/);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("--strict gates on falseCount even when the score is SUPPRESSED (definite<5, honesty null)", () => {
+  // One false path claim, far under MIN_DEFINITE_FOR_SCORE → honesty is null,
+  // but the gate keys off falseCount, so it still fails. This is why D1 chose a
+  // count budget over --min-honesty (which would be undefined here).
+  const root = makeRepo({ "CLAUDE.md": "# t\n\nSee `src/gone.js` for details.\n", "src/real.js": "x\n" });
+  try {
+    const p = JSON.parse(runCli(root, ["--json"]).stdout);
+    assert.equal(p.score.honesty, null, "score is suppressed (definite < 5)");
+    assert.ok(p.score.false >= 1, "but there is a false claim");
+    assert.equal(runCli(root, ["--strict"]).code, 4, "gate fails on the count despite the null score");
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("--strict --out: an --out write failure (exit 2) outranks the gate breach (exit 4)", () => {
+  const dirty = materialize("dirty"); // would fail the gate (exit 4) on its own
+  try {
+    // --out into a path under a regular file → ENOTDIR on write → exit 2 wins
+    const badOut = join(materializeFile(), "claims-dir");
+    const r = runCli(dirty, ["--strict", "--out", badOut]);
+    assert.equal(r.code, 2, "the requested --out artifact wasn't produced → exit 2, not the gate's 4");
+    assert.match(r.stderr, /could not write --out/);
+  } finally {
+    cleanup(dirty);
+  }
+});
+
+test("--strict with no context files: exit 3 (unchanged) — 'nothing to check' is not a gate fail", () => {
+  const root = makeRepo({ "src/a.js": "x\n" });
+  try {
+    assert.equal(runCli(root, ["--strict"]).code, 3, "no-context exit 3 is not conflated with the gate's 4");
+  } finally {
+    cleanup(root);
+  }
+});
+
+// helper: a path that is a FILE, so writing a dir under it fails with ENOTDIR
+function materializeFile() {
+  const dir = mkdtempSync(join(tmpdir(), "df-outfail-"));
+  const f = join(dir, "afile");
+  writeFileSync(f, "x");
+  return f;
+}

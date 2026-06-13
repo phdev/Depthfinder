@@ -7,10 +7,13 @@
 // in the user cache dir (--no-history to skip).
 //
 //   Exit codes (full table — absorb #4):
-//     0  ran successfully (findings or not — V1 is advisory)
+//     0  ran successfully (findings or not — the default run is advisory)
 //     1  internal error (uncaught)
 //     2  usage error / bad --out / not a git repo / git binary missing
 //     3  no context files found
+//     4  --strict gate breach: Context Honesty has > --max-false false claims.
+//        DISTINCT from 1 so a wrapper/CI Action can tell rot from a crash; only
+//        ever appears under --strict. Precedence: 2 > 3 > 4 > 0.
 //
 //   Pipeline:
 //     cwd ─▶ git root ─▶ ls-files Set ─▶ discover context files
@@ -51,7 +54,7 @@ try {
   VERSION = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version || VERSION;
 } catch { /* keep the sentinel */ }
 
-const USAGE = `usage: depthfinder [path] [--json] [--out <dir>] [--no-follow] [--docs]
+const USAGE = `usage: depthfinder [path] [--json] [--out <dir>] [--no-follow] [--docs] [--strict [--max-false N]]
 
   path        starting directory for the repo search (default: cwd)
   --json      machine-readable payload to stdout instead of the card
@@ -59,6 +62,13 @@ const USAGE = `usage: depthfinder [path] [--json] [--out <dir>] [--no-follow] [-
   --no-follow do not follow "read first" links from context files into repo docs
   --docs      also scan the wider repo docs for a Doc Honesty score (opt-in;
               the doc grammar isn't yet corpus-clean enough to accuse by default)
+  --strict    CI gate: exit 4 when Context Honesty has false claims (rot).
+              Gates the Context tier only (convention files + nested + followed
+              "read first" links, minus --no-follow); Doc Honesty is never gated.
+              Pin the version in CI (e.g. npx depthfinder@${VERSION}) so the
+              threshold is stable across releases.
+  --max-false N  allow up to N false Context claims before --strict fails
+              (default 0). A non-negative integer; ratchet it down over time.
   --burn      run a local agent (claude/codex) against the top false claim and
               show what it actually says — opt-in; the ONLY path that calls a
               model. Override the agent with --burn-agent "<cmd>".
@@ -83,6 +93,8 @@ function main() {
         burn: { type: "boolean" },
         "burn-agent": { type: "string" },
         "no-history": { type: "boolean" },
+        strict: { type: "boolean" },
+        "max-false": { type: "string" },
         version: { type: "boolean", short: "v" },
         help: { type: "boolean", short: "h" },
       },
@@ -116,6 +128,19 @@ function main() {
 }
 
 function run({ values, positionals }) {
+  // Validate --max-false BEFORE any repo work (usage error → exit 2). A pure
+  // non-negative integer only: rejects floats, exponentials, NaN/Infinity,
+  // negatives, and empty — each would otherwise silently mis-set the budget.
+  let maxFalse = 0;
+  if (values["max-false"] !== undefined) {
+    const raw = String(values["max-false"]).trim();
+    if (!/^\d+$/.test(raw)) {
+      process.stderr.write(`depthfinder: --max-false must be a non-negative integer (got "${values["max-false"]}")\n${USAGE}\n`);
+      process.exit(2);
+    }
+    maxFalse = parseInt(raw, 10);
+  }
+
   const startDir = resolve(positionals[0] || ".");
   if (!existsSync(startDir) || !statSync(startDir).isDirectory()) {
     process.stderr.write(`depthfinder: no such directory: ${startDir}\n`);
@@ -320,6 +345,12 @@ function run({ values, positionals }) {
   }
 
   const score = computeScore(claims);
+  // --strict gate state (Phase A), evaluated on the CONTEXT tier only. Recorded
+  // in the payload so `--json` consumers read gate.failed directly instead of
+  // re-deriving it from score.false. null unless --strict was requested.
+  const gate = values.strict
+    ? { strict: true, maxFalse, false: score.falseCount, failed: score.falseCount > maxFalse, tier: "context" }
+    : null;
   // docScore is null when no docs were scanned (--no-docs, or a repo with no
   // doc files) — distinct from "scanned, nothing checkable" (a real score
   // object with honesty null). The render + payload both key off this.
@@ -370,6 +401,7 @@ function run({ values, positionals }) {
     trackedCount: index.size,
     findings,
     score,
+    gate,
     docScore,
     delta: scoreDelta,
     dead,
@@ -396,6 +428,24 @@ function run({ values, positionals }) {
       process.exitCode = 2;
       return;
     }
+  }
+  // --strict gate (Phase A): fail CI with a DISTINCT exit 4 — never 1 (internal
+  // error), so a wrapper/Action can tell "context rotted" from "tool crashed".
+  // Runs AFTER --out (an --out write failure already returned with exit 2: the
+  // requested artifact wasn't produced, which outranks the gate). Sets
+  // process.exitCode, never process.exit() — exit() would truncate a >64KB
+  // --json payload mid-write (same guard as the success path below).
+  if (gate) {
+    if (values.docs)
+      process.stderr.write("  ! --strict gates Context Honesty only; Doc Honesty is advisory and was not gated\n");
+    if (gate.failed) {
+      process.stderr.write(
+        `depthfinder --strict: FAIL — ${score.falseCount} false Context claim${score.falseCount === 1 ? "" : "s"} > --max-false ${maxFalse} (exit 4)\n`,
+      );
+      process.exitCode = 4;
+      return;
+    }
+    process.stderr.write(`depthfinder --strict: PASS — ${score.falseCount} false ≤ --max-false ${maxFalse} (Context Honesty)\n`);
   }
   // No process.exit() here: payloads >64KB are still buffered in the stdout
   // pipe, and exit() would truncate them mid-write (caught live on a

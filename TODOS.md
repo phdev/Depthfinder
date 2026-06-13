@@ -31,13 +31,15 @@ mismatch 404s in a way that looks like a permissions/2FA problem.
 provenance, no token, no manual step. Optional cleanup: delete the now-unused `NPM_TOKEN`
 secret (`gh secret delete NPM_TOKEN --repo phdev/Depthfinder`).
 
-## Phase A — `--strict` CI gate — DESIGN LOCKED (eng-review 2026-06-13)
+## ✅ Phase A — `--strict` CI gate — SHIPPED 2026-06-13
 
 The next RETENTION brick: a CI-grade exit gate so a build fails when context rot is
 introduced. Eng-reviewed (4 decisions) + Codex outside-voice (8 findings, 1 reversal,
-5 hardenings absorbed). Build tasks in `~/.gstack/projects/phdev-Depthfinder/tasks-eng-review-*.jsonl`.
+5 hardenings absorbed). **Built + tested (70 tests, golden byte-stable, bench within
+budget); all decisions below implemented in `bin/depthfinder.mjs` + `src/cli/claims.mjs`
++ `tests/cli.test.mjs`.** Ships in the next version bump (no tag yet).
 
-**Locked design:**
+**Implemented design:**
 - **Flags:** `--strict` (boolean) + `--max-false N` (default 0). Gate trips when
   **Context-tier `score.falseCount > N`**. `--max-false` is a ratchet (adopt on a rotten
   repo at N=12, lower over time). NOT `--min-honesty` (honesty is null under 5 claims).
