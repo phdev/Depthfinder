@@ -28,7 +28,11 @@ export function evaluateClaims(claims, ctx) {
     if (c.predicate.type !== "file_exists") continue;
     const paths = effectivePaths(c);
     const known = paths.some((p) => ctx.index.has(p) || existsSync(join(ctx.root, p)));
-    if (!known) misses.push(c.predicate.args.path); // gitignore on the path the doc actually wrote
+    // Gitignore-check EVERY candidate form, not just the root-relative one: a
+    // nested context file may reference a path gitignored under its own dir
+    // (e.g. packages/foo/AGENTS.md → `logs/x` ignored at packages/foo/logs/x).
+    // Checking only the root form would fall through to a false accusation.
+    if (!known) misses.push(...paths);
   }
   const ignored = misses.length ? checkIgnored(ctx.root, misses) : new Set();
   if (ignored === null) ctx.warn("git check-ignore failed — missing paths reported as unchecked");
@@ -70,14 +74,13 @@ function effectivePaths(claim) {
 }
 
 function evalPath(claim, ctx, ignored) {
-  const { path } = claim.predicate.args;
   const paths = effectivePaths(claim);
   if (paths.some((p) => ctx.index.has(p))) return { verdict: "true", summary: "tracked file exists" };
   if (paths.some((p) => existsSync(join(ctx.root, p))))
     return { verdict: "unknown", summary: "present on disk but untracked (gitignored or not yet added)" };
   if (ignored === null)
     return { verdict: "unknown", summary: "missing, and gitignore status undecidable" };
-  if (ignored.has(path))
+  if (paths.some((p) => ignored.has(p)))
     return { verdict: "unknown", summary: "gitignored — machine-local state (logs/config/build output), absent here" };
   return { verdict: "false", summary: "no such tracked file" };
 }
@@ -271,7 +274,12 @@ function countTopLevel(text, openIdx, opener) {
       }
     } else if (depth === 1) {
       if (c === ",") {
-        if (sawContent) elements++;
+        // A comma with no preceding content is a sparse/elision hole
+        // ([a, , c] has JS length 3 but only 2 written elements) or a leading
+        // comma — counting diverges from the language's length, so escape to
+        // uncertainty rather than risk a false count verdict.
+        if (!sawContent) return null;
+        elements++;
         sawContent = false;
       } else if (!/\s/.test(c)) sawContent = true;
     }

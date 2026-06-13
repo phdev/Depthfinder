@@ -35,6 +35,13 @@ stderr, prompt redacted (1A on input), hermetic stub-agent tests. Only path
 that calls a model (invariant #4). 48 tests, golden unchanged.
 
 **Remaining V1.1 polish (non-blocking):**
+- **Burn redaction is best-effort (review finding, P3).** `buildBurnPrompt`
+  redacts known secret shapes via `lib/redact.mjs`, but an exotic secret
+  (e.g. `DATABASE_URL=postgres://user:pass@host/db`) on the top-finding line
+  would reach the local agent under `--burn`. Mitigations to weigh: broaden
+  redact patterns (connection strings, high-entropy `KEY=value`) without
+  over-redacting; or surface the line in the consent notice so the user sees
+  exactly what's sent. Bounded risk (opt-in, goes to the user's own agent).
 - Burn only the #1 finding today (model calls are slow). Optional `--burn-all`
   / `--burn N` to burn more, with a per-call timeout budget.
 - Question templates are one-per-oracle and generic; could tailor by claim

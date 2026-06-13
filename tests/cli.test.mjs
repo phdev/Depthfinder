@@ -201,8 +201,15 @@ test("transitive discovery: follows directive links one hop; --no-follow disable
       "- [changelog](docs/changelog.md)",
       "",
     ].join("\n"),
-    // linked doc carries one true + one genuinely-dead path claim
-    "docs/brain.md": "Core logic in `src/real.js`; legacy lived in `src/gone.js`.\n",
+    // linked doc: a clean present-tense true, a clean genuinely-dead false,
+    // and a NARRATIVE line that the modality filter must drop (review fix:
+    // linked docs are prose, so they get the docmode filter before scoring).
+    "docs/brain.md": [
+      "Core logic lives in `src/real.js`.",
+      "The auth module is `src/gone.js`.",
+      "Legacy support lived in `src/old.js`.",
+      "",
+    ].join("\n"),
     // linked ONLY from a non-directive section -> must not be scanned
     "docs/changelog.md": "Shipped `src/also-gone.js` last week.\n",
     "src/real.js": "export const real = 1\n",
@@ -214,12 +221,15 @@ test("transitive discovery: follows directive links one hop; --no-follow disable
     assert.ok(!files.has("docs/changelog.md"), "non-directive-section link is NOT followed");
     assert.ok(p.linked.some((l) => l.file === "docs/brain.md" && l.from === "CLAUDE.md"));
     assert.ok(!p.linked.some((l) => String(l.file).includes("example.com")), "scheme links never followed");
-    // the linked doc's claims fold into the score
+    const claimPaths = new Set(p.claims.map((c) => c.predicate.args.path));
+    // present-tense linked claims fold into the score
     const real = p.claims.find((c) => c.predicate.args.path === "src/real.js");
     const gone = p.claims.find((c) => c.predicate.args.path === "src/gone.js");
     assert.equal(real.verdict, "true");
     assert.equal(gone.verdict, "false");
     assert.equal(gone.source.file, "docs/brain.md", "the dead-path lie is attributed to the linked doc");
+    // the narrative line is filtered — a linked brain doc can't false-accuse on prose
+    assert.ok(!claimPaths.has("src/old.js"), "narrative 'legacy ... lived in' line filtered from the linked doc");
 
     const card = runCli(root).stdout;
     assert.match(card, /\(\+1 linked doc\)/);

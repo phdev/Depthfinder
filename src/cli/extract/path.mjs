@@ -23,8 +23,12 @@ export function extractPathClaims(file, lines, ctx) {
     // (Real-corpus FP: home-center June-6 scan false-accused `./dist`.)
     const candidate = raw.startsWith("./") ? raw.slice(2) : raw;
     if (!candidate.includes("/")) return;
+    // Reject any traversal/relative segment anywhere in the path. `..` lets a
+    // join() escape the repo root (existsSync probing outside, or a false
+    // accusation on the un-normalized form); `.` is noise. Repo files are
+    // referenced by plain forward paths.
+    if (candidate.split("/").some((s) => s === ".." || s === ".")) return;
     const seg = firstSegment(candidate);
-    if (seg === "." || seg === "..") return;
     if (isHostLike(seg)) return;
     if (!ctx.dirExists(seg)) return; // first segment must be a repo dir
     const key = `${line.n}:${candidate}`;

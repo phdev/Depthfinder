@@ -25,6 +25,9 @@ test("path oracle: extraction table", () => {
     ["bare prose path src/auth/oauth.ts is undelimited", []],
     ["first segment not a repo dir: `vendor/x/y.js`", []],
     ["single segment `README.md` is not a path claim", []],
+    // traversal rejection (review fix): `..` lets join() escape the repo root
+    ["escape attempt `src/../../etc/passwd`", []],
+    ["internal dotdot `src/../config.js`", []],
     // real-corpus FP class (home-center June-6 scan): ./-prefixed and
     // parent-relative candidates never match the git index verbatim.
     ["Build output goes to `./dist`.", []],

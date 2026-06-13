@@ -130,8 +130,9 @@ are the tax, surfaced as "the detour is the tax, every session."
    resolution) — enforced by the boundary test.
 4. **No model calls except `--burn`.** The default path is fully
    deterministic and offline. `--burn` is the single, consent-gated
-   exception: it calls a local agent, sends ONE redacted line, prints the
-   contract first, and never writes to the repo (runs in a temp cwd).
+   exception: it calls a local agent, sends ONE line (best-effort redacted —
+   pattern-based, not airtight), prints the contract first, and never writes
+   to the repo (runs in a temp cwd).
 5. **Pre-tag ritual:** `npm run corpus` against real external repos +
    hand-verification of every false verdict, before any release tag.
 

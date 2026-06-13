@@ -80,9 +80,13 @@ $ npx depthfinder --burn
 ```
 
 `--burn` is the **only** path that calls a model. It's opt-in (the flag is
-your consent), it prints exactly what it's about to send before it runs, it
-redacts the line first, and it sends only that one line — not your repo.
-Override the agent with `--burn-agent "<cmd>"` or `DEPTHFINDER_BURN_AGENT`.
+your consent), it prints exactly what it's about to send before it runs, and
+it sends only that one line — not your repo — to a coding agent you already
+run (so it goes wherever your own `claude`/`codex` already sends prompts).
+Known secret shapes (API keys, tokens) are redacted from the line first;
+redaction is best-effort and pattern-based, so don't rely on it to scrub an
+exotic secret. Override the agent with `--burn-agent "<cmd>"` or
+`DEPTHFINDER_BURN_AGENT`.
 
 ## Run
 

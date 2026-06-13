@@ -57,6 +57,43 @@ test("path: gitignored-and-absent = unknown, never false (real-corpus class)", (
   }
 });
 
+test("path: nested context file gitignored under its OWN dir = unknown, never false (review fix A)", () => {
+  const root = makeRepo({
+    ".gitignore": "packages/foo/logs/\n",
+    "packages/foo/app.js": "x\n",
+    "packages/foo/AGENTS.md": "# foo\n",
+    "CLAUDE.md": "# root\n",
+  });
+  try {
+    // `logs/run.log` resolves to packages/foo/logs/run.log, gitignored there.
+    const ign = claimOf("path", "file_exists", { path: "logs/run.log" });
+    ign.source.file = "packages/foo/AGENTS.md";
+    // genuinely dangling nested ref — neither root nor package-relative exists, not ignored.
+    const gone = claimOf("path", "file_exists", { path: "lib/missing.js" });
+    gone.source.file = "packages/foo/AGENTS.md";
+    evaluateClaims([ign, gone], ctxFor(root));
+    assert.equal(ign.verdict, "unknown", "gitignored under the nested dir is machine-local state, not a lie");
+    assert.match(ign.evidence.summary, /gitignored/);
+    assert.equal(gone.verdict, "false", "a non-ignored nested dangling ref still reads false");
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("count: sparse-array elision holes = unknown, never false (review fix B)", () => {
+  const root = makeRepo({
+    "router/config.js": "export const tiers = [a, b, , d]\n", // JS length 4, one elision hole
+    "CLAUDE.md": "# t\n",
+  });
+  try {
+    const c = claimOf("count", "count_matches", { n: 4, noun: "tiers", anchor: "router/config.js" }, "med");
+    evaluateClaims([c], ctxFor(root));
+    assert.equal(c.verdict, "unknown", "an elision hole makes the count uncertain — never accuse");
+  } finally {
+    cleanup(root);
+  }
+});
+
 test("dependency: all four fields + workspace manifests count", () => {
   const root = makeRepo({
     "package.json": JSON.stringify({

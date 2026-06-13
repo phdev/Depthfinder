@@ -130,7 +130,7 @@ function run({ values, positionals }) {
   const fileParagraphs = new Map();
   let skippedLines = 0;
   let weightChars = 0;
-  const ingestOne = (rel, counted) => {
+  const ingestOne = (rel, counted, filter = false) => {
     const r = readContextFile(root, rel);
     if (!r.ok) {
       warn(`skipped ${rel}: ${r.reason}`);
@@ -141,12 +141,21 @@ function run({ values, positionals }) {
     if (r.skippedLines)
       warn(`${rel}: ${r.skippedLines} line(s) over 1,000 chars excluded from extraction`);
     fileParagraphs.set(rel, r.paragraphs);
-    claims.push(
+    let extracted = [
       ...extractPathClaims(rel, r.lines, ctx),
       ...extractDependencyClaims(rel, r.lines),
       ...extractSymbolClaims(rel, r.lines),
       ...extractCountClaims(rel, r.lines),
-    );
+    ];
+    // Linked "read first" docs are still PROSE — apply the doc modality filter
+    // (drop fenced/narrative/example/generated lines) so a linked brain doc
+    // can't false-accuse on the default Context score. Convention files are
+    // present-tense contracts and keep the unfiltered grammar (byte-stable).
+    if (filter) {
+      const linesByNum = new Map(r.lines.map((l) => [l.n, l]));
+      extracted = keepDocClaims(extracted, linesByNum);
+    }
+    claims.push(...extracted);
     return r;
   };
 
@@ -179,7 +188,7 @@ function run({ values, positionals }) {
     if (resolved.length > FOLLOW_CAP)
       warn(`${resolved.length} linked docs found; scanning the first ${FOLLOW_CAP} (cap) — ${resolved.length - FOLLOW_CAP} not scanned`);
     for (const entry of resolved.slice(0, FOLLOW_CAP))
-      if (ingestOne(entry.file, false)) linkedFiles.push(entry);
+      if (ingestOne(entry.file, false, true)) linkedFiles.push(entry); // filter: linked docs are prose
   }
 
   // ── doc tier (opt-in via --docs): the wider repo docs read on demand ───
