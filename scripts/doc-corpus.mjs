@@ -25,14 +25,31 @@ const BIN = join(dirname(fileURLToPath(import.meta.url)), "..", "bin", "depthfin
 // docs. Curated for diversity (TS/Py/Go/Rust, monorepo, doc-heavy). Repos
 // without a context file exit 3 and are reported as "no context files".
 const REPOS = [
+  // Confirmed to carry an agent context file (from earlier runs).
   { name: "openai/codex", url: "https://github.com/openai/codex" },
   { name: "sst/opencode", url: "https://github.com/sst/opencode" },
   { name: "block/goose", url: "https://github.com/block/goose" },
   { name: "browserbase/stagehand", url: "https://github.com/browserbase/stagehand" },
   { name: "cloudflare/agents", url: "https://github.com/cloudflare/agents" },
   { name: "modelcontextprotocol/servers", url: "https://github.com/modelcontextprotocol/servers" },
-  { name: "anthropics/anthropic-sdk-python", url: "https://github.com/anthropics/anthropic-sdk-python" },
   { name: "vercel/ai", url: "https://github.com/vercel/ai" },
+  // Rot-likely candidates: active AI repos that adopted a context file early
+  // and refactor heavily (more churn since the file was written = more rot).
+  // CONFIRMED REAL ROT (hand-verified 2026-06-13):
+  //   All-Hands-AI/OpenHands — AGENTS.md, Context Honesty 60: 12 dead path
+  //     refs, several MOVED files (e.g. AGENTS.md says the LLM is at
+  //     openhands/llm/llm.py; it moved to openhands/app_server/utils/llm.py).
+  //     A real --burn here makes claude confidently open the ghost, no hedge.
+  //     This is the headline real-rot demo + V1.1 burn corpus.
+  //   openai/codex — AGENTS.md → codex-rs/.../mcp_connection_manager.rs (gone).
+  //   LibreChat / mastra / continue / litellm — doc-tier rot (verify per-run).
+  { name: "All-Hands-AI/OpenHands", url: "https://github.com/All-Hands-AI/OpenHands" },
+  { name: "continuedev/continue", url: "https://github.com/continuedev/continue" },
+  { name: "mastra-ai/mastra", url: "https://github.com/mastra-ai/mastra" },
+  { name: "humanlayer/humanlayer", url: "https://github.com/humanlayer/humanlayer" },
+  { name: "BerriAI/litellm", url: "https://github.com/BerriAI/litellm" },
+  { name: "danny-avila/LibreChat", url: "https://github.com/danny-avila/LibreChat" },
+  { name: "pydantic/pydantic-ai", url: "https://github.com/pydantic/pydantic-ai" },
 ];
 
 const { values } = parseArgs({
