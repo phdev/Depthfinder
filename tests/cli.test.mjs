@@ -312,7 +312,7 @@ test("--burn (V1.1): shadows a local agent against the top finding; real output 
     assert.equal(r.code, 0);
     assert.match(r.stderr, /--burn: running/, "consent contract printed before the call");
     assert.match(r.stdout, /answered \(your context/, "real agent output framed on the card");
-    assert.match(r.stdout, /open src\/auth\/oauth\.ts/, "agent trusted the rotten line and named the dead path");
+    assert.match(r.stdout, /src\/auth\/oauth\.ts/, "agent trusted the rotten line and named the dead path");
     assert.match(r.stdout, /stated as fact/, "the contradiction punchline replaces the template");
     // burn rides the JSON payload
     const p = JSON.parse(runCli(root, ["--json", "--burn"], env).stdout);

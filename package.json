@@ -42,6 +42,7 @@
     "bench": "node scripts/bench.mjs",
     "corpus": "node scripts/corpus.mjs",
     "corpus:docs": "node scripts/doc-corpus.mjs",
+    "corpus:burn": "node scripts/burn-corpus.mjs",
     "snapshot:update": "node tests/helpers/update-golden.mjs"
   },
   "dependencies": {},
