@@ -4,16 +4,21 @@
 
 Core landed (eng-reviewed): second advisory **Doc Honesty** score over all tracked
 `.md` beyond the Context set, path-oracle-only + `src/cli/docmode.mjs` modality
-filter (fenced/narrative/example/generated-sink drop), monorepo-relative resolution,
-filename skip-list, 200-doc cap, `--no-docs`. home-center: Doc Honesty 100 · 143
-claims · 55 docs, zero false. 46 tests.
+filter (fenced/narrative/example/generated-sink/imperative-spec drop), monorepo-
+relative resolution (all tiers), filename skip-list, 200-doc cap. **OPT-IN via
+`--docs`** (default OFF as of the corpus-gate run). home-center: Doc Honesty 100 ·
+142 · 55 docs, zero false. 46 tests + `scripts/doc-corpus.mjs` gate.
 
-**Remaining before npm publish (P1, blocks the tag — Tension 1 ship gate):**
-- `scripts/doc-corpus.mjs` — clone/scan ~8–10 diverse public repos with CLAUDE/docs,
-  print every false verdict for hand-verification. Default-on doc accusations are
-  only validated against home-center (one corpus, self-authored); a first-run FP on
-  a stranger's repo is the fatal error. If a real FP survives, harden the filter (add
-  the cue) or fall back to `--docs` opt-in until clean. This is the publish gate.
+**Flip Doc Honesty back to DEFAULT-ON once the corpus gate is zero-false:**
+- `npm run corpus:docs` currently surfaces ~18 FPs across 7 public repos (spec-dir
+  delete-lists with no per-line cue, config-location tables, "files like X", local/
+  uncommitted config paths). These are the bar. Each needs either a deterministic
+  filter rule that doesn't over-drop, or acceptance that the doc grammar stays opt-in.
+- Hardest residual: spec-dir bullet lists (the cue is the doc's PURPOSE, not the
+  line) — may need a doc-purpose heuristic or a `specs/` convention, both fragile.
+  Candidate: treat a doc as "spec/plan" if its title/heading carries remove/migrate/
+  refactor intent and downgrade its path claims to unknown.
+- The corpus gate is now ADVISORY (docs opt-in), not a publish blocker.
 
 **Deferred doc-tier refinements (post-validation):**
 - Span-level modality (multiple paths on one line with different modality) — today's

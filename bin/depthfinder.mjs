@@ -40,13 +40,14 @@ import { buildPayload, writeOut } from "../src/cli/claims.mjs";
 import { firstSegment, resolveRelPosix } from "../src/cli/paths.mjs";
 import { directiveLinks } from "../src/cli/follow.mjs";
 
-const USAGE = `usage: depthfinder [path] [--json] [--out <dir>] [--no-follow] [--no-docs]
+const USAGE = `usage: depthfinder [path] [--json] [--out <dir>] [--no-follow] [--docs]
 
   path        starting directory for the repo search (default: cwd)
   --json      machine-readable payload to stdout instead of the card
   --out       write claims.json into <dir> (atomic; nothing is written otherwise)
   --no-follow do not follow "read first" links from context files into repo docs
-  --no-docs   do not scan the wider repo docs for the Doc Honesty score`;
+  --docs      also scan the wider repo docs for a Doc Honesty score (opt-in;
+              the doc grammar isn't yet corpus-clean enough to accuse by default)`;
 
 main();
 
@@ -59,7 +60,7 @@ function main() {
         json: { type: "boolean" },
         out: { type: "string" },
         "no-follow": { type: "boolean" },
-        "no-docs": { type: "boolean" },
+        docs: { type: "boolean" },
       },
     });
   } catch (e) {
@@ -174,17 +175,19 @@ function run({ values, positionals }) {
       if (ingestOne(entry.file, false)) linkedFiles.push(entry);
   }
 
-  // ── doc tier: the wider repo docs the agent reads on demand ────────────
+  // ── doc tier (opt-in via --docs): the wider repo docs read on demand ───
   // PATH ORACLE ONLY (dependency/count/symbol are prose-FP drivers in docs),
   // then the docmode modality filter drops narrative/example/generated/fenced
   // lines. A separate advisory Doc Honesty score; never touches Weight or the
   // contract breakdown. Doc claims carry tier:"doc" so evaluate also resolves
-  // them relative to their own dir (monorepo READMEs).
+  // them relative to their own dir (monorepo READMEs). OPT-IN for V1: the doc
+  // grammar isn't yet corpus-clean enough to accuse by default (the doc-corpus
+  // gate still surfaces repo-idiosyncratic FPs); flip to default-on once clean.
   const DOC_CAP = 200;
   const docClaims = [];
   const docFiles = [];
   const docMeta = { totalFound: 0, scanned: 0, cappedAt: null };
-  if (!values["no-docs"]) {
+  if (values.docs) {
     const contextSet = new Set([...usable, ...linkedFiles.map((l) => l.file)]);
     const allDocs = discoverDocs(root, index, contextSet);
     docMeta.totalFound = allDocs.length;

@@ -25,7 +25,6 @@ $ npx depthfinder
       └ an agent reasoning about "4 tiers" will plan against a structure that has 3
 
   Context Honesty   64 · 22 checkable claims · 3 unchecked
-  Doc Honesty       91 · 188 checkable claims · 34 docs · 4 dead refs
   Weight   ~9,480 tokens load every turn
   5 false claims · 3 stale · ~4,210 tokens describe code that no longer exists
 
@@ -34,12 +33,22 @@ $ npx depthfinder
 
 **Context Honesty** scores the files your agent auto-loads every turn
 (`CLAUDE.md`, `AGENTS.md`, `.cursorrules`, and the docs they tell it to
-read first). **Doc Honesty** scores the wider repo docs it reads on demand —
-runbooks, design notes, package READMEs. They're separate because they're
-different trust tiers; a dead link in a runbook shouldn't drag down your
-contract score. Doc scanning is precision-hardened (it ignores code
-examples, past-tense narration like "we removed X", and generated-artifact
-paths) so it never accuses honest prose. Turn it off with `--no-docs`.
+read first). Run with **`--docs`** to also get a separate **Doc Honesty**
+score over the wider repo docs your agent reads on demand — runbooks,
+design notes, package READMEs:
+
+```
+  Context Honesty   64 · 22 checkable claims · 3 unchecked
+  Doc Honesty       91 · 188 checkable claims · 34 docs · 4 dead refs
+  ...
+```
+
+They're separate because they're different trust tiers; a dead link in a
+runbook shouldn't drag down your contract score. Doc scanning is precision-
+hardened (it ignores code examples, past-tense narration like "we removed
+X", and generated-artifact paths). It's **opt-in for now** — the doc grammar
+isn't yet validated across enough repos to accuse by default, which for an
+honesty tool is a line we won't cross until it's earned.
 
 **Weight** is what the Context files cost on every single agent call.
 **False** claims never matched the repo's history (fabricated or always
@@ -59,7 +68,7 @@ npx depthfinder ~/proj     # scan another repo
 npx depthfinder --json     # machine-readable claims + score (stdout)
 npx depthfinder --out dir  # also write claims.json (atomic; the ONLY write)
 npx depthfinder --no-follow # don't follow "read first" links into repo docs
-npx depthfinder --no-docs  # skip the wider-docs scan (Doc Honesty)
+npx depthfinder --docs     # opt in to the wider-docs scan (Doc Honesty)
 ```
 
 By default, when a context file links repo docs under a "read first" /

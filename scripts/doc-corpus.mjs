@@ -62,7 +62,9 @@ function clone(repo) {
 }
 
 function scan(dir) {
-  const r = sh(process.execPath, [BIN, dir, "--json"]);
+  // --docs: the doc tier is opt-in; this gate exists to validate it toward
+  // being default-on, so it must request the doc scan explicitly.
+  const r = sh(process.execPath, [BIN, dir, "--json", "--docs"]);
   if (r.status === 3) return { skipped: "no context files" };
   if (r.status !== 0) return { error: `exit ${r.status}: ${(r.stderr || "").trim().split("\n").pop()}` };
   try {

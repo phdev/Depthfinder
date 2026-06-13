@@ -262,7 +262,9 @@ test("doc tier: Doc Honesty scores docs; every FP class is never accused", () =>
     "docs/notes-sample.md": "See `src/also-missing.js`.\n", // -sample.md -> not scanned
   });
   try {
-    const p = JSON.parse(runCli(root, ["--json"]).stdout);
+    // docs are OPT-IN (--docs); the grammar isn't corpus-clean enough to
+    // accuse by default. Without the flag the doc tier never runs.
+    const p = JSON.parse(runCli(root, ["--json", "--docs"]).stdout);
     assert.equal(p.score.false, 0, "context tier clean");
     // exactly the one genuine present-tense dead reference, nothing else
     const docFalse = p.docClaims.filter((c) => c.verdict === "false").map((c) => c.predicate.args.path);
@@ -272,13 +274,13 @@ test("doc tier: Doc Honesty scores docs; every FP class is never accused", () =>
     for (const fp of ["src/gone.js", "out/report.md", "src/sample.js", "src/fenced.js", "src/deleted.js", "src/also-missing.js"])
       assert.ok(!docPaths.has(fp), `FP class not extracted: ${fp}`);
     assert.equal(p.docScore.honesty, 83, "5 true + 1 false over 6 definite");
-    assert.match(runCli(root).stdout, /Doc Honesty\s+83 · 6 checkable claims · 1 doc · 1 dead ref/);
+    assert.match(runCli(root, ["--docs"]).stdout, /Doc Honesty\s+83 · 6 checkable claims · 1 doc · 1 dead ref/);
     assert.ok(p.weight.approxTokens < 60, "docs never inflate Weight (convention-only)");
-    // --no-docs disables the whole tier
-    const off = JSON.parse(runCli(root, ["--json", "--no-docs"]).stdout);
+    // default run (no --docs): doc tier is silent
+    const off = JSON.parse(runCli(root, ["--json"]).stdout);
     assert.equal(off.docClaims.length, 0);
     assert.equal(off.docScore, null);
-    assert.doesNotMatch(runCli(root, ["--no-docs"]).stdout, /Doc Honesty/);
+    assert.doesNotMatch(runCli(root).stdout, /Doc Honesty/);
   } finally {
     cleanup(root);
   }
@@ -294,7 +296,7 @@ test("doc tier: home-center FP shapes produce ZERO false (regression / precision
     "docs/devon-morning-brief-sample.md": "Latest artifact: `design_outputs/daily/2026-04-21-x.md`.\n",
   });
   try {
-    const p = JSON.parse(runCli(root, ["--json"]).stdout);
+    const p = JSON.parse(runCli(root, ["--json", "--docs"]).stdout);
     const docFalse = p.docClaims.filter((c) => c.verdict === "false");
     assert.equal(docFalse.length, 0, `zero false accusations on honest narrative docs, got ${JSON.stringify(docFalse.map((c) => c.predicate.args.path))}`);
   } finally {

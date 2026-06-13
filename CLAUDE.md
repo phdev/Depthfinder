@@ -54,9 +54,12 @@ or generated-artifact sinks (`writes`/`written to`/`available at`…). Doc paths
 resolve relative to their own dir (monorepo READMEs). Discovery = all tracked `.md`
 minus the Context set minus a skip-list (`CHANGELOG*`/`*-sample.md`/`examples/`…),
 capped at 200 (sorted, surfaced). Doc claims are advisory, **excluded from Weight**,
-and never touch the contract breakdown. `--no-docs` disables the tier. **Ship gate:
-zero false accusations across a MULTI-repo corpus** (`scripts/doc-corpus.mjs`, the
-remaining pre-publish task), not just home-center.
+and never touch the contract breakdown. **OPT-IN via `--docs`** (default OFF): the
+`scripts/doc-corpus.mjs` gate still surfaces repo-idiosyncratic FPs (spec-dir delete
+lists, config-location tables) across public repos, so the doc grammar isn't yet
+clean enough to accuse by default. Flip to default-on once the corpus gate runs zero-
+false. Context-tier FPs the corpus already fixed: nested-monorepo path resolution
+(applies to ALL tiers now) and PascalCase-type-as-dependency rejection.
 
 Card anatomy below the findings: the `Context Honesty` score line (`N ·
 M checkable claims · K unchecked`); the `Doc Honesty` line (`N · M checkable
