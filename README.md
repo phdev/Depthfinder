@@ -88,6 +88,12 @@ redaction is best-effort and pattern-based, so don't rely on it to scrub an
 exotic secret. Override the agent with `--burn-agent "<cmd>"` or
 `DEPTHFINDER_BURN_AGENT`.
 
+Because `--burn` runs your agent in headless mode (`claude -p` / `codex exec`),
+each burn counts against that agent's usage quota. On Claude subscription
+plans (from 2026-06-15) that's the separate **Agent SDK** allotment, metered
+apart from your interactive sessions. It's one call per run, but keep it in
+mind before wiring `--burn` into CI or a loop.
+
 ## Run
 
 ```bash

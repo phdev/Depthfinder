@@ -109,7 +109,11 @@ are the tax, surfaced as "the detour is the tax, every session."
   the rotten line, and render its real reply in place of the template. The
   ONLY path that calls a model: opt-in, prints a consent contract first, and
   **redacts the prompt** (1A on the input, not just output). Hermetic tests
-  inject `tests/helpers/stub-agent.mjs` via the env override.
+  inject `tests/helpers/stub-agent.mjs` via the env override (so CI/tests make
+  NO real model call). Cost note: a real burn runs the user's agent headless
+  (`claude -p` / `codex exec`), so it draws on that agent's usage quota — on
+  Claude plans, the separate Agent SDK allotment (from 2026-06-15). One call
+  per run; documented in the README `--burn` section.
 - `src/cli/templates.mjs` — the ONLY inferential sentence per finding;
   templates are data with an exact-match test (cut-rule in header).
 - Default run **writes nothing** to the scanned repo; `--out` is the sole
