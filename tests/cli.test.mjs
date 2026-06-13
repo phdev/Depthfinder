@@ -232,6 +232,76 @@ test("transitive discovery: follows directive links one hop; --no-follow disable
   }
 });
 
+test("doc tier: Doc Honesty scores docs; every FP class is never accused", () => {
+  const root = makeRepo({
+    "CLAUDE.md": "Entry is `src/index.js`.\n", // convention, clean
+    "src/index.js": "export const x = 1\n",
+    "src/real.js": "export const r = 1\n",
+    "src/helpers.js": "export const h = 1\n",
+    "src/router.js": "export const r = 1\n",
+    "src/state.js": "export const s = 1\n",
+    "src/config.js": "export const c = 1\n",
+    "docs/guide.md": [
+      "# Guide",
+      "",
+      "Core logic lives in `src/real.js`.", // TRUE (present-tense)
+      "Helpers live in `src/helpers.js`.", // TRUE
+      "The router is `src/router.js`.", // TRUE
+      "State is in `src/state.js`.", // TRUE
+      "Config is `src/config.js`.", // TRUE  -> 5 true
+      "Legacy code lived in `src/gone.js`.", // narrative (legacy) -> dropped
+      "A gate that writes `out/report.md`.", // generated, no 'to' -> dropped
+      "e.g. `src/sample.js`", // example -> dropped
+      "Auth is `src/missing.js`.", // present-tense, genuinely dead -> FALSE
+      "",
+      "```markdown",
+      "See `src/fenced.js` in the example below.", // fenced backtick path -> dropped
+      "```",
+    ].join("\n") + "\n",
+    "CHANGELOG.md": "Removed `src/deleted.js`.\n", // skip-listed file -> not scanned
+    "docs/notes-sample.md": "See `src/also-missing.js`.\n", // -sample.md -> not scanned
+  });
+  try {
+    const p = JSON.parse(runCli(root, ["--json"]).stdout);
+    assert.equal(p.score.false, 0, "context tier clean");
+    // exactly the one genuine present-tense dead reference, nothing else
+    const docFalse = p.docClaims.filter((c) => c.verdict === "false").map((c) => c.predicate.args.path);
+    assert.deepEqual(docFalse, ["src/missing.js"], "only the real dead ref is false");
+    const docPaths = new Set(p.docClaims.map((c) => c.predicate.args.path));
+    assert.ok(docPaths.has("src/real.js"), "present-tense ref extracted");
+    for (const fp of ["src/gone.js", "out/report.md", "src/sample.js", "src/fenced.js", "src/deleted.js", "src/also-missing.js"])
+      assert.ok(!docPaths.has(fp), `FP class not extracted: ${fp}`);
+    assert.equal(p.docScore.honesty, 83, "5 true + 1 false over 6 definite");
+    assert.match(runCli(root).stdout, /Doc Honesty\s+83 · 6 checkable claims · 1 doc · 1 dead ref/);
+    assert.ok(p.weight.approxTokens < 60, "docs never inflate Weight (convention-only)");
+    // --no-docs disables the whole tier
+    const off = JSON.parse(runCli(root, ["--json", "--no-docs"]).stdout);
+    assert.equal(off.docClaims.length, 0);
+    assert.equal(off.docScore, null);
+    assert.doesNotMatch(runCli(root, ["--no-docs"]).stdout, /Doc Honesty/);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("doc tier: home-center FP shapes produce ZERO false (regression / precision gate)", () => {
+  // The exact shapes that made the full-docs sweep cry wolf, hermetic.
+  const root = makeRepo({
+    "CLAUDE.md": "# t\n",
+    "agentci/explainer.js": "export const e = 1\n",
+    "docs/agentci_overview.md": "- A minimal gate that writes `agentci/reports/latest.md`\n",
+    "docs/diff_and_replay.md": "The latest gate report is written to `agentci/reports/latest.md`.\n",
+    "docs/devon-morning-brief-sample.md": "Latest artifact: `design_outputs/daily/2026-04-21-x.md`.\n",
+  });
+  try {
+    const p = JSON.parse(runCli(root, ["--json"]).stdout);
+    const docFalse = p.docClaims.filter((c) => c.verdict === "false");
+    assert.equal(docFalse.length, 0, `zero false accusations on honest narrative docs, got ${JSON.stringify(docFalse.map((c) => c.predicate.args.path))}`);
+  } finally {
+    cleanup(root);
+  }
+});
+
 test("large --json payloads (>64KB) are not truncated by exit (pipe flush)", () => {
   // 200 true path claims -> payload well past the 64KB pipe buffer.
   const files = { "CLAUDE.md": "" };

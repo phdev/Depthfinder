@@ -15,7 +15,8 @@ const nf = new Intl.NumberFormat("en-US"); // locale-pinned for determinism
 
 export function renderCard(model) {
   const {
-    scannedFiles, linkedFiles = [], trackedCount, findings, score, dead, weight, claimsTotal,
+    scannedFiles, linkedFiles = [], trackedCount, findings, score, docScore, docFiles = [],
+    dead, weight, claimsTotal,
   } = model;
   const L = [];
   L.push("");
@@ -46,6 +47,19 @@ export function renderCard(model) {
   } else {
     const unchecked = score.unknownCount > 0 ? ` · ${nf.format(score.unknownCount)} unchecked` : "";
     L.push(`  Context Honesty   ${score.honesty} · ${nf.format(score.definite)} checkable claims${unchecked}`);
+  }
+  // Doc Honesty — the wider repo docs the agent reads on demand. Advisory,
+  // separate from the contract score; its dead-refs never touch the line
+  // below. Label padded to align under "Context Honesty".
+  if (docFiles.length > 0 && docScore) {
+    const pad = "Doc Honesty".padEnd("Context Honesty".length);
+    const docs = `${nf.format(docFiles.length)} doc${docFiles.length === 1 ? "" : "s"}`;
+    if (docScore.honesty === null) {
+      L.push(`  ${pad}   — · ${docs} · too few checkable claims`);
+    } else {
+      const refs = docScore.falseCount > 0 ? ` · ${nf.format(docScore.falseCount)} dead ref${docScore.falseCount === 1 ? "" : "s"}` : "";
+      L.push(`  ${pad}   ${docScore.honesty} · ${nf.format(docScore.definite)} checkable claims · ${docs}${refs}`);
+    }
   }
   L.push(`  Weight   ~${nf.format(weight)} tokens load every turn`);
   const fab = score.falseCount - score.staleCount;

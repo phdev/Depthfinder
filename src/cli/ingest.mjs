@@ -48,10 +48,26 @@ export function readContextFile(root, rel) {
 
   const rawLines = text.split(/\r?\n/);
   let skippedLines = 0;
+  // Fenced-code tracking (CommonMark-ish): ``` or ~~~ (3+), indent ≤3. The
+  // opener may carry an info string; the closer is the same char, length ≥
+  // opener, no info string. `inFence` is computed for EVERY file but only the
+  // doc-scan path consults it (Context Honesty stays byte-stable). Unclosed
+  // fence at EOF leaves the tail fenced — a safe miss, never a false claim.
+  let fence = null;
   const lines = rawLines.map((t, i) => {
     const long = t.length > MAX_LINE_CHARS;
     if (long) skippedLines++;
-    return { n: i + 1, text: t, long };
+    let inFence;
+    const m = t.match(/^\s{0,3}(`{3,}|~{3,})(.*)$/);
+    if (m) {
+      const ch = m[1][0], len = m[1].length, info = m[2].trim();
+      if (!fence) { fence = { ch, len }; inFence = true; }
+      else if (ch === fence.ch && len >= fence.len && info === "") { fence = null; inFence = true; }
+      else inFence = true; // fence-like line inside a different fence = content
+    } else {
+      inFence = fence !== null;
+    }
+    return { n: i + 1, text: t, long, inFence };
   });
 
   // Blank-line paragraph segmentation with line ranges.

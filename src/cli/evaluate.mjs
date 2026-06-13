@@ -7,6 +7,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { checkIgnored } from "./git.mjs";
+import { resolveRelPosix } from "./paths.mjs";
 
 const SYMBOL_FILE_CAP = 2000; // repo-wide search caps (design doc)
 const SYMBOL_WALL_MS = 1000;
@@ -25,8 +26,9 @@ export function evaluateClaims(claims, ctx) {
   const misses = [];
   for (const c of claims) {
     if (c.predicate.type !== "file_exists") continue;
-    const p = c.predicate.args.path;
-    if (!ctx.index.has(p) && !existsSync(join(ctx.root, p))) misses.push(p);
+    const paths = effectivePaths(c);
+    const known = paths.some((p) => ctx.index.has(p) || existsSync(join(ctx.root, p)));
+    if (!known) misses.push(c.predicate.args.path); // gitignore on the path the doc actually wrote
   }
   const ignored = misses.length ? checkIgnored(ctx.root, misses) : new Set();
   if (ignored === null) ctx.warn("git check-ignore failed — missing paths reported as unchecked");
@@ -34,7 +36,7 @@ export function evaluateClaims(claims, ctx) {
   for (const claim of claims) {
     const { type, args } = claim.predicate;
     let r;
-    if (type === "file_exists") r = evalPath(args, ctx, ignored);
+    if (type === "file_exists") r = evalPath(claim, ctx, ignored);
     else if (type === "declared_dependency") r = evalDependency(args, ctx, pkg, polyglot);
     else if (type === "symbol_exported") r = evalSymbol(args, ctx);
     else if (type === "count_matches") r = evalCount(args, ctx);
@@ -48,9 +50,29 @@ export function evaluateClaims(claims, ctx) {
 }
 
 // ── path ────────────────────────────────────────────────────────────────
-function evalPath({ path }, ctx, ignored) {
-  if (ctx.index.has(path)) return { verdict: "true", summary: "tracked file exists" };
-  if (existsSync(join(ctx.root, path)))
+// A path claim's candidate locations. Convention claims resolve only at the
+// path the author wrote. Doc claims ALSO resolve relative to their own file's
+// directory — a package README that says `src/index.ts` means
+// packages/foo/src/index.ts, not repo root (eng-review absorb #5). False only
+// when NEITHER candidate exists; otherwise no monorepo accusation.
+function effectivePaths(claim) {
+  const path = claim.predicate.args.path;
+  const out = [path];
+  if (claim.tier === "doc") {
+    const sf = claim.source.file;
+    if (sf && sf.includes("/")) {
+      const rel = resolveRelPosix(sf, path);
+      if (rel && rel !== path) out.push(rel);
+    }
+  }
+  return out;
+}
+
+function evalPath(claim, ctx, ignored) {
+  const { path } = claim.predicate.args;
+  const paths = effectivePaths(claim);
+  if (paths.some((p) => ctx.index.has(p))) return { verdict: "true", summary: "tracked file exists" };
+  if (paths.some((p) => existsSync(join(ctx.root, p))))
     return { verdict: "unknown", summary: "present on disk but untracked (gitignored or not yet added)" };
   if (ignored === null)
     return { verdict: "unknown", summary: "missing, and gitignore status undecidable" };

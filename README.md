@@ -25,13 +25,23 @@ $ npx depthfinder
       └ an agent reasoning about "4 tiers" will plan against a structure that has 3
 
   Context Honesty   64 · 22 checkable claims · 3 unchecked
+  Doc Honesty       91 · 188 checkable claims · 34 docs · 4 dead refs
   Weight   ~9,480 tokens load every turn
   5 false claims · 3 stale · ~4,210 tokens describe code that no longer exists
 
   Your agent reads all of this as ground truth, every call.
 ```
 
-**Weight** is what these files cost on every single agent call.
+**Context Honesty** scores the files your agent auto-loads every turn
+(`CLAUDE.md`, `AGENTS.md`, `.cursorrules`, and the docs they tell it to
+read first). **Doc Honesty** scores the wider repo docs it reads on demand —
+runbooks, design notes, package READMEs. They're separate because they're
+different trust tiers; a dead link in a runbook shouldn't drag down your
+contract score. Doc scanning is precision-hardened (it ignores code
+examples, past-tense narration like "we removed X", and generated-artifact
+paths) so it never accuses honest prose. Turn it off with `--no-docs`.
+
+**Weight** is what the Context files cost on every single agent call.
 **False** claims never matched the repo's history (fabricated or always
 wrong); **stale** claims were once true — git proves the file existed
 before it was deleted or moved. Both count against the score; the split
@@ -49,6 +59,7 @@ npx depthfinder ~/proj     # scan another repo
 npx depthfinder --json     # machine-readable claims + score (stdout)
 npx depthfinder --out dir  # also write claims.json (atomic; the ONLY write)
 npx depthfinder --no-follow # don't follow "read first" links into repo docs
+npx depthfinder --no-docs  # skip the wider-docs scan (Doc Honesty)
 ```
 
 By default, when a context file links repo docs under a "read first" /

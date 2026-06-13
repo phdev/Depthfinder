@@ -7,8 +7,21 @@
 import { mkdirSync, writeFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
 
+const scoreShape = (s) => ({
+  honesty: s.honesty,
+  suppressed: s.suppressed,
+  definite: s.definite,
+  true: s.trueCount,
+  false: s.falseCount,
+  stale: s.staleCount,
+  unknown: s.unknownCount,
+});
+
 export function buildPayload(model) {
-  const { scannedFiles, linkedFiles = [], trackedCount, score, dead, claims, meta } = model;
+  const {
+    scannedFiles, linkedFiles = [], trackedCount, score, docScore, docFiles = [], docMeta,
+    dead, claims, docClaims = [], meta,
+  } = model;
   return {
     schema: 0,
     tool: "depthfinder",
@@ -17,19 +30,22 @@ export function buildPayload(model) {
     scanned: scannedFiles,
     linked: linkedFiles,
     trackedFiles: trackedCount,
-    score: {
-      honesty: score.honesty,
-      suppressed: score.suppressed,
-      definite: score.definite,
-      true: score.trueCount,
-      false: score.falseCount,
-      stale: score.staleCount,
-      unknown: score.unknownCount,
-    },
+    // Context tier — the surface the agent auto-loads every turn. `score` and
+    // `claims` keep their exact V0 shape (additive change only).
+    score: scoreShape(score),
     weight: { approxTokens: model.weight, method: "chars/4 over scanned context files — loads every turn" },
     deadTokens: { approx: dead, method: "chars/4 over paragraphs containing ≥1 false path/symbol claim" },
+    // Doc tier — the wider repo docs read on demand. Advisory; NEW fields.
+    docScore: docScore ? scoreShape(docScore) : null,
+    docs: {
+      files: docFiles,
+      totalFound: docMeta?.totalFound ?? docFiles.length,
+      scanned: docMeta?.scanned ?? docFiles.length,
+      cappedAt: docMeta?.cappedAt ?? null,
+    },
     meta,
     claims,
+    docClaims,
   };
 }
 

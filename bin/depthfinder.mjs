@@ -25,8 +25,9 @@ import { resolve } from "node:path";
 import { redact, redactDeep } from "../lib/redact.mjs";
 import { tokchars } from "../lib/text.mjs";
 import { findRoot, lsFiles, isShallow, deletionEvidence, GitMissingError, NotARepoError } from "../src/cli/git.mjs";
-import { discover } from "../src/cli/discover.mjs";
+import { discover, discoverDocs } from "../src/cli/discover.mjs";
 import { readContextFile } from "../src/cli/ingest.mjs";
+import { keepDocClaims } from "../src/cli/docmode.mjs";
 import { extractPathClaims } from "../src/cli/extract/path.mjs";
 import { extractDependencyClaims } from "../src/cli/extract/dependency.mjs";
 import { extractSymbolClaims } from "../src/cli/extract/symbol.mjs";
@@ -39,12 +40,13 @@ import { buildPayload, writeOut } from "../src/cli/claims.mjs";
 import { firstSegment, resolveRelPosix } from "../src/cli/paths.mjs";
 import { directiveLinks } from "../src/cli/follow.mjs";
 
-const USAGE = `usage: depthfinder [path] [--json] [--out <dir>] [--no-follow]
+const USAGE = `usage: depthfinder [path] [--json] [--out <dir>] [--no-follow] [--no-docs]
 
   path        starting directory for the repo search (default: cwd)
   --json      machine-readable payload to stdout instead of the card
   --out       write claims.json into <dir> (atomic; nothing is written otherwise)
-  --no-follow do not follow "read first" links from context files into repo docs`;
+  --no-follow do not follow "read first" links from context files into repo docs
+  --no-docs   do not scan the wider repo docs for the Doc Honesty score`;
 
 main();
 
@@ -57,6 +59,7 @@ function main() {
         json: { type: "boolean" },
         out: { type: "string" },
         "no-follow": { type: "boolean" },
+        "no-docs": { type: "boolean" },
       },
     });
   } catch (e) {
@@ -171,7 +174,44 @@ function run({ values, positionals }) {
       if (ingestOne(entry.file, false)) linkedFiles.push(entry);
   }
 
-  evaluateClaims(claims, ctx);
+  // ── doc tier: the wider repo docs the agent reads on demand ────────────
+  // PATH ORACLE ONLY (dependency/count/symbol are prose-FP drivers in docs),
+  // then the docmode modality filter drops narrative/example/generated/fenced
+  // lines. A separate advisory Doc Honesty score; never touches Weight or the
+  // contract breakdown. Doc claims carry tier:"doc" so evaluate also resolves
+  // them relative to their own dir (monorepo READMEs).
+  const DOC_CAP = 200;
+  const docClaims = [];
+  const docFiles = [];
+  const docMeta = { totalFound: 0, scanned: 0, cappedAt: null };
+  if (!values["no-docs"]) {
+    const contextSet = new Set([...usable, ...linkedFiles.map((l) => l.file)]);
+    const allDocs = discoverDocs(root, index, contextSet);
+    docMeta.totalFound = allDocs.length;
+    const scanned = allDocs.length > DOC_CAP ? allDocs.slice(0, DOC_CAP) : allDocs;
+    if (allDocs.length > DOC_CAP) {
+      docMeta.cappedAt = DOC_CAP;
+      warn(`${allDocs.length} docs found; scanning the first ${DOC_CAP} (sorted) — ${allDocs.length - DOC_CAP} not scanned`);
+    }
+    for (const rel of scanned) {
+      const r = readContextFile(root, rel);
+      if (!r.ok) {
+        warn(`skipped ${rel}: ${r.reason}`);
+        continue;
+      }
+      docFiles.push(rel);
+      if (r.skippedLines)
+        warn(`${rel}: ${r.skippedLines} line(s) over 1,000 chars excluded from extraction`);
+      const linesByNum = new Map(r.lines.map((l) => [l.n, l]));
+      const kept = keepDocClaims(extractPathClaims(rel, r.lines, ctx), linesByNum);
+      for (const c of kept) c.tier = "doc";
+      docClaims.push(...kept);
+    }
+    docMeta.scanned = docFiles.length;
+  }
+
+  // One evaluation pass over both tiers (single check-ignore batch).
+  evaluateClaims(claims.concat(docClaims), ctx);
   const findings = selectFindings(claims);
 
   // Lazy git history (path oracle) doubles as stale classification: a false
@@ -200,6 +240,10 @@ function run({ values, positionals }) {
   }
 
   const score = computeScore(claims);
+  // docScore is null when no docs were scanned (--no-docs, or a repo with no
+  // doc files) — distinct from "scanned, nothing checkable" (a real score
+  // object with honesty null). The render + payload both key off this.
+  const docScore = docFiles.length ? computeScore(docClaims) : null;
   const dead = deadTokens(fileParagraphs, claims, tokchars);
 
   const model = {
@@ -207,13 +251,17 @@ function run({ values, positionals }) {
     rootLabel: firstSegment(root.split("/").filter(Boolean).pop() || root),
     scannedFiles: usable,
     linkedFiles,
+    docFiles,
+    docMeta,
     trackedCount: index.size,
     findings,
     score,
+    docScore,
     dead,
     weight: Math.round(weightChars / 4),
     claimsTotal: claims.length,
     claims,
+    docClaims,
     meta: { skippedLines, warnings, shallowClone: shallow },
   };
 

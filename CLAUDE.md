@@ -19,13 +19,15 @@ graph view loads Cytoscape from a CDN in the browser).
 ## CLI architecture (V1.0)
 
 ```
-cwd ─▶ git root ─▶ ls-files Set ─▶ discover (5 conventions)
-   ─▶ follow "read first" links ONE HOP into tracked repo docs (--no-follow)
-   ─▶ ingest (7A policy: BOM/size/EACCES skip+warn, 1k line cap)
-   ─▶ extract (4 oracles, conservative grammars)
-   ─▶ evaluate (unknown-never-false predicates)
+cwd ─▶ git root ─▶ ls-files Set ─▶ discover (5 conventions)        ┐ Context tier
+   ─▶ follow "read first" links ONE HOP into tracked repo docs     │ (4 oracles, auto-
+   ─▶ ingest (7A: BOM/size/EACCES skip+warn, 1k cap, fence flag)   │  loaded every turn)
+   ─▶ extract (4 oracles, conservative grammars)                   ┘
+   ─▶ discoverDocs (all other tracked .md − skip-list)  ┐ Doc tier (path oracle
+   ─▶ path oracle ─▶ docmode modality filter            ┘ ONLY, on-demand reads)
+   ─▶ evaluate (unknown-never-false; doc claims resolve monorepo-relative too)
    ─▶ top-3 ─▶ lazy git evidence + stale classification (capped)
-   ─▶ score (+<5 suppression) ─▶ render
+   ─▶ score×2 (Context + Doc Honesty, each +<5 suppression) ─▶ render
 ```
 
 **Transitive discovery** (`src/cli/follow.mjs`): a convention file that
@@ -39,13 +41,32 @@ disables it. Corpus proof: home-center's CLAUDE.md is a thin pointer to
 five `docs/*` brain docs — convention-only scanning saw 37 claims; with
 follow, 112 (all true).
 
-Card anatomy below the findings: the score line (`Context Honesty N ·
-M checkable claims · K unchecked`), the **Weight** line (~chars/4 of the
-scanned files — what loads into the agent every turn), and the breakdown
-line `N false claims · M stale · ~T tokens describe code that no longer
-exists`. **Stale** = a false path claim whose target verifiably existed in
-git history (deleted/renamed — the doc rotted); **false** = no such history
-(fabricated or never true). Both count against honesty identically; the
+**Doc tier / Doc Honesty** (`src/cli/docmode.mjs`, `discoverDocs`): the wider
+repo docs (runbooks, design notes, package READMEs) the agent reads on demand
+also rot, so they get a SECOND, separate **Doc Honesty** score. Scanning them
+naively false-accuses honest prose (proven: all 3 home-center doc "findings"
+were FPs — generated-artifact paths + a `*-sample.md` example), so the doc tier
+is precision-hardened: **path oracle only** (dependency/count/symbol are prose-FP
+drivers), plus a modality filter that drops claims on lines that are fenced code
+(`line.inFence`, detected in ingest, applied doc-only so Context Honesty is
+byte-stable), narrative (`removed`/`legacy`/`used to`…), example (`e.g.`/`sample`),
+or generated-artifact sinks (`writes`/`written to`/`available at`…). Doc paths also
+resolve relative to their own dir (monorepo READMEs). Discovery = all tracked `.md`
+minus the Context set minus a skip-list (`CHANGELOG*`/`*-sample.md`/`examples/`…),
+capped at 200 (sorted, surfaced). Doc claims are advisory, **excluded from Weight**,
+and never touch the contract breakdown. `--no-docs` disables the tier. **Ship gate:
+zero false accusations across a MULTI-repo corpus** (`scripts/doc-corpus.mjs`, the
+remaining pre-publish task), not just home-center.
+
+Card anatomy below the findings: the `Context Honesty` score line (`N ·
+M checkable claims · K unchecked`); the `Doc Honesty` line (`N · M checkable
+claims · K docs · J dead refs`, or `— · K docs · too few checkable claims` when
+suppressed; omitted when no docs); the **Weight** line (~chars/4 of the Context
+files — what loads into the agent every turn); and the contract breakdown line
+`N false claims · M stale · ~T tokens describe code that no longer exists`
+(Context-tier only). **Stale** = a false path claim whose target verifiably
+existed in git history (deleted/renamed — the doc rotted); **false** = no such
+history (fabricated or never true). Both count against honesty identically; the
 split is evidence, not forgiveness.
 
 - `bin/depthfinder.mjs` — orchestration, parseArgs, exit codes (0 ran /
@@ -64,7 +85,12 @@ split is evidence, not forgiveness.
   fields), ESM/TS symbol forms with unknown escapes (`export *`, default
   expressions, CJS), literal-cardinality counts with uncertainty escapes,
   and gitignored-but-absent paths → unknown (logs/local config/build output
-  are machine-local state, not doc lies; batch `git check-ignore`).
+  are machine-local state, not doc lies; batch `git check-ignore`). Doc-tier
+  path claims (`tier:"doc"`) also resolve relative to their own file's dir
+  (monorepo READMEs); `false` only when NEITHER repo-root nor doc-relative exists.
+- `src/cli/docmode.mjs` — pure (no fs) modality filter for the doc tier:
+  `isNarrativeLine`/`keepDocClaims` drop doc claims on fenced/narrative/example/
+  generated-sink lines. Conservative line-level drop (a safe miss, never an FP).
 - `src/cli/templates.mjs` — the ONLY inferential sentence per finding;
   templates are data with an exact-match test (cut-rule in header).
 - Default run **writes nothing** to the scanned repo; `--out` is the sole
@@ -75,6 +101,9 @@ split is evidence, not forgiveness.
 1. **Unknown-never-false.** A false accusation is fatal to an honesty
    tool. Ship gate: zero false verdicts on clean-fixture and zero
    unlabeled false verdicts on dirty-fixture — enforced per-push in CI.
+   The doc tier extends this: zero false on the home-center FP shapes
+   (regression test) and, before any publish tag, zero false across the
+   multi-repo doc corpus (`scripts/doc-corpus.mjs`).
 2. **The golden card is the contract.** `tests/golden/dirty-card.txt`
    byte-locks the render; intentional changes go through
    `npm run snapshot:update` and review of the diff.
@@ -85,7 +114,7 @@ split is evidence, not forgiveness.
 
 ## Tests / bench
 
-`npm test` — 40 tests (node:test; hermetic git fixtures with pinned
+`npm test` — 46 tests (node:test; hermetic git fixtures with pinned
 dates → deterministic SHAs). `npm run bench` — per-phase timings + local
 5s tripwire (never in CI). CI: 3 OS × node 20/22; publish on `v*` tags
 (needs `NPM_TOKEN` secret).

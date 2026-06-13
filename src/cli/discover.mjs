@@ -48,3 +48,23 @@ export function discover(root, index) {
 
   return [...found].sort();
 }
+
+// Narrative-by-nature file kinds, excluded wholesale from the docs audit:
+// changelogs and explicitly-named example/sample files are 100% historical or
+// illustrative, so per-line filtering can't make them safe. (eng-review #2)
+const DOC_SKIP =
+  /(^|\/)(CHANGELOG|HISTORY|CHANGES)[^/]*$|-sample\.md$|\.example\.md$|(^|\/)(examples?|samples?|fixtures|testdata)\//i;
+
+// Doc-tier discovery: every TRACKED .md that isn't already a Context-tier
+// surface (convention file or one-hop linked doc) and isn't a narrative file
+// kind. Index-only (no disk walk); gitignored files are absent for free.
+export function discoverDocs(root, index, exclude) {
+  const out = [];
+  for (const rel of index) {
+    if (!/\.md$/i.test(rel)) continue;
+    if (exclude.has(rel)) continue;
+    if (DOC_SKIP.test(rel)) continue;
+    out.push(rel);
+  }
+  return out.sort();
+}
