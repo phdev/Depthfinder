@@ -56,9 +56,33 @@ wrong); **stale** claims were once true — git proves the file existed
 before it was deleted or moved. Both count against the score; the split
 tells you whether your docs rot or lie.
 
-Zero config. Sub-5 seconds. **No model calls — nothing leaves your
-machine.** Deterministic checks only: if Depthfinder can't decide a claim
-safely, it says `unknown` — it never guesses and never accuses.
+Zero config. Sub-5 seconds. **No model calls by default — nothing leaves
+your machine** unless you explicitly opt in with `--burn` (below).
+Deterministic checks only: if Depthfinder can't decide a claim safely, it
+says `unknown` — it never guesses and never accuses.
+
+### `--burn`: watch your agent get it wrong (opt-in)
+
+The default card *tells* you a stale line would mislead your agent. `--burn`
+*shows* you. It takes the top false claim, feeds the rotten line to a coding
+agent you already have (`claude`, else `codex`), and prints what the agent
+actually says — which confidently names the file that no longer exists:
+
+```
+$ npx depthfinder --burn
+
+  ✗ CLAUDE.md:5  "Auth flows live in `src/auth/oauth.ts`."
+      └ no such tracked file — deleted at fccd7c9, 1 commit ago
+      ▶ claude -p answered (your context, no repo to check):
+           To fix the auth bug, open src/auth/oauth.ts and check the
+           token validation in the oauth handler first.
+      └ stated as fact — from a line your repo already contradicts.
+```
+
+`--burn` is the **only** path that calls a model. It's opt-in (the flag is
+your consent), it prints exactly what it's about to send before it runs, it
+redacts the line first, and it sends only that one line — not your repo.
+Override the agent with `--burn-agent "<cmd>"` or `DEPTHFINDER_BURN_AGENT`.
 
 ## Run
 
@@ -69,6 +93,7 @@ npx depthfinder --json     # machine-readable claims + score (stdout)
 npx depthfinder --out dir  # also write claims.json (atomic; the ONLY write)
 npx depthfinder --no-follow # don't follow "read first" links into repo docs
 npx depthfinder --docs     # opt in to the wider-docs scan (Doc Honesty)
+npx depthfinder --burn     # run your agent against the top false claim (opt-in; calls a model)
 ```
 
 By default, when a context file links repo docs under a "read first" /

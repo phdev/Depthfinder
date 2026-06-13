@@ -1,5 +1,24 @@
 # TODOS
 
+## V1.1 Live Burn (`--burn`) — SHIPPED 2026-06-13
+
+`src/cli/burn.mjs`: shadows a local agent (claude/codex, override via
+DEPTHFINDER_BURN_AGENT/--burn-agent) against the #1 false claim in an empty
+temp cwd, renders the real reply + contradiction. Opt-in, consent contract on
+stderr, prompt redacted (1A on input), hermetic stub-agent tests. Only path
+that calls a model (invariant #4). 48 tests, golden unchanged.
+
+**Remaining V1.1 polish (non-blocking):**
+- Burn only the #1 finding today (model calls are slow). Optional `--burn-all`
+  / `--burn N` to burn more, with a per-call timeout budget.
+- Question templates are one-per-oracle and generic; could tailor by claim
+  topic (extract the subject from the surrounding paragraph) for sharper Qs.
+- A real-agent E2E (behind an opt-in env, never in CI) to sanity-check that
+  claude/codex print modes actually produce the expected "names the dead
+  path" behavior — today only the stub is exercised.
+- Validate `--burn-agent` parsing for commands with quoted/spaced args
+  (current split is whitespace-only; fine for `claude -p` / `codex exec`).
+
 ## Docs audit / Doc Honesty — corpus gate (core SHIPPED 2026-06-13)
 
 Core landed (eng-reviewed): second advisory **Doc Honesty** score over all tracked

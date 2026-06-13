@@ -29,11 +29,19 @@ export function renderCard(model) {
   for (const f of findings) {
     L.push(`  ✗ ${f.source.file}:${f.source.line}  "${truncate(f.text, 88)}"`);
     L.push(`      └ ${f.evidence.summary}`);
-    const why = consequence(f);
-    if (why) L.push(`      └ ${why}`);
-    // skip the actual line when the consequence already carries it (count)
-    if (f.evidence.actual && !(why && why.includes(f.evidence.actual)))
-      L.push(`      └ actual: ${f.evidence.actual}`);
+    if (f.burn && !f.burn.error) {
+      // The moment, undeniable: a real agent's words, then the contradiction.
+      L.push(`      ▶ ${f.burn.agent} answered (your context, no repo to check):`);
+      for (const ln of wrapText(f.burn.output, 60)) L.push(`           ${ln}`);
+      L.push(`      └ stated as fact — from a line your repo already contradicts.`);
+    } else {
+      if (f.burn?.error) L.push(`      ▶ burn skipped: ${f.burn.error}`);
+      const why = consequence(f);
+      if (why) L.push(`      └ ${why}`);
+      // skip the actual line when the consequence already carries it (count)
+      if (f.evidence.actual && !(why && why.includes(f.evidence.actual)))
+        L.push(`      └ actual: ${f.evidence.actual}`);
+    }
     L.push("");
   }
 
@@ -76,4 +84,18 @@ export function renderCard(model) {
 function truncate(s, max) {
   const t = s.replace(/\s+/g, " ").trim();
   return t.length <= max ? t : t.slice(0, max - 1) + "…";
+}
+
+// Word-wrap the burned agent reply to keep the card readable; cap at 6 lines
+// (the full reply is in --json). A long single token is hard-split.
+function wrapText(s, width) {
+  const lines = [];
+  let cur = "";
+  for (const w of s.replace(/\s+/g, " ").trim().split(" ")) {
+    if (cur && cur.length + 1 + w.length > width) { lines.push(cur); cur = w; }
+    else cur = cur ? `${cur} ${w}` : w;
+  }
+  if (cur) lines.push(cur);
+  if (lines.length > 6) { lines.length = 6; lines[5] = lines[5].slice(0, width - 1) + "…"; }
+  return lines;
 }

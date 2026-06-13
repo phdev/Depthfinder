@@ -94,6 +94,13 @@ split is evidence, not forgiveness.
 - `src/cli/docmode.mjs` — pure (no fs) modality filter for the doc tier:
   `isNarrativeLine`/`keepDocClaims` drop doc claims on fenced/narrative/example/
   generated-sink lines. Conservative line-level drop (a safe miss, never an FP).
+- `src/cli/burn.mjs` (V1.1, `--burn`) — Live Burn: shadow a local agent CLI
+  (`claude`, else `codex`; override `DEPTHFINDER_BURN_AGENT`/`--burn-agent`)
+  against the #1 false claim, in an EMPTY temp cwd so the agent answers from
+  the rotten line, and render its real reply in place of the template. The
+  ONLY path that calls a model: opt-in, prints a consent contract first, and
+  **redacts the prompt** (1A on the input, not just output). Hermetic tests
+  inject `tests/helpers/stub-agent.mjs` via the env override.
 - `src/cli/templates.mjs` — the ONLY inferential sentence per finding;
   templates are data with an exact-match test (cut-rule in header).
 - Default run **writes nothing** to the scanned repo; `--out` is the sole
@@ -112,13 +119,18 @@ split is evidence, not forgiveness.
    `npm run snapshot:update` and review of the diff.
 3. **The CLI module graph never imports `lib/repo.mjs`** (import-time path
    resolution) — enforced by the boundary test.
-4. **Pre-tag ritual:** `npm run corpus` against real external repos +
+4. **No model calls except `--burn`.** The default path is fully
+   deterministic and offline. `--burn` is the single, consent-gated
+   exception: it calls a local agent, sends ONE redacted line, prints the
+   contract first, and never writes to the repo (runs in a temp cwd).
+5. **Pre-tag ritual:** `npm run corpus` against real external repos +
    hand-verification of every false verdict, before any release tag.
 
 ## Tests / bench
 
-`npm test` — 46 tests (node:test; hermetic git fixtures with pinned
-dates → deterministic SHAs). `npm run bench` — per-phase timings + local
+`npm test` — 48 tests (node:test; hermetic git fixtures with pinned
+dates → deterministic SHAs; `--burn` tested via a stub agent, never a real
+model call). `npm run bench` — per-phase timings + local
 5s tripwire (never in CI). CI: 3 OS × node 20/22; publish on `v*` tags
 (needs `NPM_TOKEN` secret).
 

@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, existsSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { materialize, makeRepo, runCli, hashTree, cleanup } from "./helpers/fixture.mjs";
+import { materialize, makeRepo, runCli, hashTree, cleanup, STUB_AGENT } from "./helpers/fixture.mjs";
 
 test("exit 2: not a git repository", () => {
   const dir = mkdtempSync(join(tmpdir(), "df-norepo-"));
@@ -299,6 +299,41 @@ test("doc tier: home-center FP shapes produce ZERO false (regression / precision
     const p = JSON.parse(runCli(root, ["--json", "--docs"]).stdout);
     const docFalse = p.docClaims.filter((c) => c.verdict === "false");
     assert.equal(docFalse.length, 0, `zero false accusations on honest narrative docs, got ${JSON.stringify(docFalse.map((c) => c.predicate.args.path))}`);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("--burn (V1.1): shadows a local agent against the top finding; real output on the card", () => {
+  const root = materialize("dirty");
+  const env = { DEPTHFINDER_BURN_AGENT: `${process.execPath} ${STUB_AGENT}` };
+  try {
+    const r = runCli(root, ["--burn"], env);
+    assert.equal(r.code, 0);
+    assert.match(r.stderr, /--burn: running/, "consent contract printed before the call");
+    assert.match(r.stdout, /answered \(your context/, "real agent output framed on the card");
+    assert.match(r.stdout, /open src\/auth\/oauth\.ts/, "agent trusted the rotten line and named the dead path");
+    assert.match(r.stdout, /stated as fact/, "the contradiction punchline replaces the template");
+    // burn rides the JSON payload
+    const p = JSON.parse(runCli(root, ["--json", "--burn"], env).stdout);
+    const burned = p.claims.find((c) => c.burn && !c.burn.error);
+    assert.ok(burned, "a finding carries a burn result");
+    assert.match(burned.burn.output, /oauth\.ts/);
+    // the planted secret is NEVER in the burn prompt (1A applies to the input)
+    assert.doesNotMatch(burned.burn.prompt, /sk-test-aaaabbbbccccddddeeee/);
+    assert.match(burned.burn.prompt, /«redacted/);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("--burn: no agent available degrades cleanly (warn, exit 0, no card change)", () => {
+  const root = materialize("dirty");
+  try {
+    const r = runCli(root, ["--burn"], { DEPTHFINDER_BURN_AGENT: "/nonexistent/agent-xyz" });
+    assert.equal(r.code, 0);
+    assert.match(r.stderr, /--burn:/);
+    assert.doesNotMatch(r.stdout, /answered \(your context/, "no fabricated output when the agent fails");
   } finally {
     cleanup(root);
   }

@@ -39,6 +39,7 @@ import { renderCard } from "../src/cli/render.mjs";
 import { buildPayload, writeOut } from "../src/cli/claims.mjs";
 import { firstSegment, resolveRelPosix } from "../src/cli/paths.mjs";
 import { directiveLinks } from "../src/cli/follow.mjs";
+import { resolveAgent, runBurn } from "../src/cli/burn.mjs";
 
 const USAGE = `usage: depthfinder [path] [--json] [--out <dir>] [--no-follow] [--docs]
 
@@ -47,7 +48,11 @@ const USAGE = `usage: depthfinder [path] [--json] [--out <dir>] [--no-follow] [-
   --out       write claims.json into <dir> (atomic; nothing is written otherwise)
   --no-follow do not follow "read first" links from context files into repo docs
   --docs      also scan the wider repo docs for a Doc Honesty score (opt-in;
-              the doc grammar isn't yet corpus-clean enough to accuse by default)`;
+              the doc grammar isn't yet corpus-clean enough to accuse by default)
+  --burn      run a local agent (claude/codex) against the top false claim and
+              show what it actually says — opt-in; the ONLY path that calls a
+              model. Override the agent with --burn-agent "<cmd>".
+  --burn-agent <cmd>  the agent command for --burn (default: claude, else codex)`;
 
 main();
 
@@ -61,6 +66,8 @@ function main() {
         out: { type: "string" },
         "no-follow": { type: "boolean" },
         docs: { type: "boolean" },
+        burn: { type: "boolean" },
+        "burn-agent": { type: "string" },
       },
     });
   } catch (e) {
@@ -246,6 +253,28 @@ function run({ values, positionals }) {
       c.evidence.summary = `no such tracked file — deleted at ${ev.sha}${ev.commitsAgo ? `, ${ev.commitsAgo} commit${ev.commitsAgo === 1 ? "" : "s"} ago` : ""}`;
     } else if (shallow) {
       c.evidence.summary = "no such tracked file (history unavailable in shallow clone)";
+    }
+  }
+
+  // Live Burn (V1.1, opt-in) — show what a real agent does with the top
+  // rotten line. The --burn flag is consent; this is the ONLY path that calls
+  // a model. Burn the #1 finding only (model calls are slow). The contract
+  // notice names exactly what is sent and to which agent before it runs.
+  if (values.burn) {
+    if (!findings.length) {
+      warn("--burn: no false claims to demonstrate");
+    } else {
+      const agent = resolveAgent({ agentCmd: values["burn-agent"] });
+      if (!agent) {
+        warn("--burn: no agent found — install claude or codex, or set DEPTHFINDER_BURN_AGENT");
+      } else {
+        const f = findings[0];
+        process.stderr.write(
+          redact(`  ! --burn: running \`${agent.join(" ")}\` against ${f.source.file}:${f.source.line}; that line is sent to the agent (passing --burn is your consent)\n`),
+        );
+        f.burn = runBurn(f, { agent });
+        if (f.burn.error) warn(`--burn: ${f.burn.error}`);
+      }
     }
   }
 

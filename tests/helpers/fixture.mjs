@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const BIN = join(HERE, "..", "..", "bin", "depthfinder.mjs");
+export const STUB_AGENT = join(HERE, "stub-agent.mjs"); // deterministic --burn agent
 
 const GIT_ENV = {
   GIT_AUTHOR_NAME: "Depthfinder Fixture",
