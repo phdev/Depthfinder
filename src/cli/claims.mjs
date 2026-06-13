@@ -8,13 +8,14 @@ import { mkdirSync, writeFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
 
 export function buildPayload(model) {
-  const { scannedFiles, trackedCount, score, dead, claims, meta } = model;
+  const { scannedFiles, linkedFiles = [], trackedCount, score, dead, claims, meta } = model;
   return {
     schema: 0,
     tool: "depthfinder",
     generatedAt: model.now,
     root: model.rootLabel,
     scanned: scannedFiles,
+    linked: linkedFiles,
     trackedFiles: trackedCount,
     score: {
       honesty: score.honesty,

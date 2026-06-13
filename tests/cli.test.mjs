@@ -184,6 +184,54 @@ test("precision gate (9A): zero false accusations on hand-labeled corpus", () =>
   }
 });
 
+test("transitive discovery: follows directive links one hop; --no-follow disables", () => {
+  const root = makeRepo({
+    "CLAUDE.md": [
+      "# Proj",
+      "",
+      "## Project Brain - Read First",
+      "",
+      "Before changes, read:",
+      "",
+      "- [brain](docs/brain.md) - the model",
+      "- [external](https://example.com/x.md)",
+      "",
+      "## Notes",
+      "",
+      "- [changelog](docs/changelog.md)",
+      "",
+    ].join("\n"),
+    // linked doc carries one true + one genuinely-dead path claim
+    "docs/brain.md": "Core logic in `src/real.js`; legacy lived in `src/gone.js`.\n",
+    // linked ONLY from a non-directive section -> must not be scanned
+    "docs/changelog.md": "Shipped `src/also-gone.js` last week.\n",
+    "src/real.js": "export const real = 1\n",
+  });
+  try {
+    const p = JSON.parse(runCli(root, ["--json"]).stdout);
+    const files = new Set(p.claims.map((c) => c.source.file));
+    assert.ok(files.has("docs/brain.md"), "directive-linked doc is scanned");
+    assert.ok(!files.has("docs/changelog.md"), "non-directive-section link is NOT followed");
+    assert.ok(p.linked.some((l) => l.file === "docs/brain.md" && l.from === "CLAUDE.md"));
+    assert.ok(!p.linked.some((l) => String(l.file).includes("example.com")), "scheme links never followed");
+    // the linked doc's claims fold into the score
+    const real = p.claims.find((c) => c.predicate.args.path === "src/real.js");
+    const gone = p.claims.find((c) => c.predicate.args.path === "src/gone.js");
+    assert.equal(real.verdict, "true");
+    assert.equal(gone.verdict, "false");
+    assert.equal(gone.source.file, "docs/brain.md", "the dead-path lie is attributed to the linked doc");
+
+    const card = runCli(root).stdout;
+    assert.match(card, /\(\+1 linked doc\)/);
+
+    const off = JSON.parse(runCli(root, ["--json", "--no-follow"]).stdout);
+    assert.ok(!new Set(off.claims.map((c) => c.source.file)).has("docs/brain.md"), "--no-follow disables it");
+    assert.equal(off.linked.length, 0);
+  } finally {
+    cleanup(root);
+  }
+});
+
 test("large --json payloads (>64KB) are not truncated by exit (pipe flush)", () => {
   // 200 true path claims -> payload well past the 64KB pipe buffer.
   const files = { "CLAUDE.md": "" };

@@ -36,13 +36,15 @@ import { computeScore, deadTokens } from "../src/cli/score.mjs";
 import { selectFindings } from "../src/cli/select.mjs";
 import { renderCard } from "../src/cli/render.mjs";
 import { buildPayload, writeOut } from "../src/cli/claims.mjs";
-import { firstSegment } from "../src/cli/paths.mjs";
+import { firstSegment, resolveRelPosix } from "../src/cli/paths.mjs";
+import { directiveLinks } from "../src/cli/follow.mjs";
 
-const USAGE = `usage: depthfinder [path] [--json] [--out <dir>]
+const USAGE = `usage: depthfinder [path] [--json] [--out <dir>] [--no-follow]
 
-  path     starting directory for the repo search (default: cwd)
-  --json   machine-readable payload to stdout instead of the card
-  --out    write claims.json into <dir> (atomic; nothing is written otherwise)`;
+  path        starting directory for the repo search (default: cwd)
+  --json      machine-readable payload to stdout instead of the card
+  --out       write claims.json into <dir> (atomic; nothing is written otherwise)
+  --no-follow do not follow "read first" links from context files into repo docs`;
 
 main();
 
@@ -51,7 +53,11 @@ function main() {
   try {
     args = parseArgs({
       allowPositionals: true,
-      options: { json: { type: "boolean" }, out: { type: "string" } },
+      options: {
+        json: { type: "boolean" },
+        out: { type: "string" },
+        "no-follow": { type: "boolean" },
+      },
     });
   } catch (e) {
     process.stderr.write(`depthfinder: ${e.message}\n${USAGE}\n`);
@@ -106,20 +112,20 @@ function run({ values, positionals }) {
     dirExists: (seg) => dirSet.has(seg) || existsSync(resolve(root, seg)),
   };
 
-  // ingest + extract
+  // ingest + extract. `counted` files feed Weight (per-turn load); linked
+  // docs are scanned for honesty but do NOT load every turn, so they are
+  // not counted toward Weight.
   const claims = [];
   const fileParagraphs = new Map();
   let skippedLines = 0;
-  let weightChars = 0; // Weight = what these files load into the agent, every turn
-  const usable = [];
-  for (const rel of scannedFiles) {
+  let weightChars = 0;
+  const ingestOne = (rel, counted) => {
     const r = readContextFile(root, rel);
     if (!r.ok) {
       warn(`skipped ${rel}: ${r.reason}`);
-      continue;
+      return null;
     }
-    usable.push(rel);
-    weightChars += r.chars;
+    if (counted) weightChars += r.chars;
     skippedLines += r.skippedLines;
     if (r.skippedLines)
       warn(`${rel}: ${r.skippedLines} line(s) over 1,000 chars excluded from extraction`);
@@ -130,6 +136,39 @@ function run({ values, positionals }) {
       ...extractSymbolClaims(rel, r.lines),
       ...extractCountClaims(rel, r.lines),
     );
+    return r;
+  };
+
+  const usable = [];
+  const linkCandidates = []; // {target, from, line} — directive links to resolve
+  for (const rel of scannedFiles) {
+    const r = ingestOne(rel, true);
+    if (!r) continue;
+    usable.push(rel);
+    if (!values["no-follow"])
+      for (const l of directiveLinks(r.lines)) linkCandidates.push({ ...l, from: rel });
+  }
+
+  // Transitive discovery (one hop): resolve directive links to TRACKED repo
+  // docs, dedupe against the convention set + each other, cap for the budget,
+  // and scan them. We never follow links found INSIDE linked docs — one hop
+  // means no cycles and a bounded fan-out by construction.
+  const FOLLOW_CAP = 25;
+  const linkedFiles = [];
+  if (linkCandidates.length) {
+    const primary = new Set(usable);
+    const seen = new Set();
+    const resolved = [];
+    for (const c of linkCandidates) {
+      const rel = resolveRelPosix(c.from, c.target);
+      if (!rel || primary.has(rel) || seen.has(rel) || !index.has(rel)) continue;
+      seen.add(rel);
+      resolved.push({ file: rel, from: c.from });
+    }
+    if (resolved.length > FOLLOW_CAP)
+      warn(`${resolved.length} linked docs found; scanning the first ${FOLLOW_CAP} (cap) — ${resolved.length - FOLLOW_CAP} not scanned`);
+    for (const entry of resolved.slice(0, FOLLOW_CAP))
+      if (ingestOne(entry.file, false)) linkedFiles.push(entry);
   }
 
   evaluateClaims(claims, ctx);
@@ -167,6 +206,7 @@ function run({ values, positionals }) {
     now: ctx.now,
     rootLabel: firstSegment(root.split("/").filter(Boolean).pop() || root),
     scannedFiles: usable,
+    linkedFiles,
     trackedCount: index.size,
     findings,
     score,

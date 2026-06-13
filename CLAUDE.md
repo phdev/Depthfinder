@@ -20,12 +20,24 @@ graph view loads Cytoscape from a CDN in the browser).
 
 ```
 cwd ─▶ git root ─▶ ls-files Set ─▶ discover (5 conventions)
+   ─▶ follow "read first" links ONE HOP into tracked repo docs (--no-follow)
    ─▶ ingest (7A policy: BOM/size/EACCES skip+warn, 1k line cap)
    ─▶ extract (4 oracles, conservative grammars)
    ─▶ evaluate (unknown-never-false predicates)
    ─▶ top-3 ─▶ lazy git evidence + stale classification (capped)
    ─▶ score (+<5 suppression) ─▶ render
 ```
+
+**Transitive discovery** (`src/cli/follow.mjs`): a convention file that
+says "read the project brain docs first" and links them is instructing the
+agent to load that surface, so those docs are context too. One hop only
+(no cycles, bounded fan-out); inline markdown links to *tracked* `.md`
+files under a directive heading (`read`/`brain`/`context`/…); capped at 25
+with a stderr note. Linked-doc claims fold into the honesty score, but do
+**not** count toward Weight (they don't load every turn). `--no-follow`
+disables it. Corpus proof: home-center's CLAUDE.md is a thin pointer to
+five `docs/*` brain docs — convention-only scanning saw 37 claims; with
+follow, 112 (all true).
 
 Card anatomy below the findings: the score line (`Context Honesty N ·
 M checkable claims · K unchecked`), the **Weight** line (~chars/4 of the
@@ -73,7 +85,7 @@ split is evidence, not forgiveness.
 
 ## Tests / bench
 
-`npm test` — 37 tests (node:test; hermetic git fixtures with pinned
+`npm test` — 40 tests (node:test; hermetic git fixtures with pinned
 dates → deterministic SHAs). `npm run bench` — per-phase timings + local
 5s tripwire (never in CI). CI: 3 OS × node 20/22; publish on `v*` tags
 (needs `NPM_TOKEN` secret).

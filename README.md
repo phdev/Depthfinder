@@ -48,7 +48,14 @@ npx depthfinder            # scan the repo you're in
 npx depthfinder ~/proj     # scan another repo
 npx depthfinder --json     # machine-readable claims + score (stdout)
 npx depthfinder --out dir  # also write claims.json (atomic; the ONLY write)
+npx depthfinder --no-follow # don't follow "read first" links into repo docs
 ```
+
+By default, when a context file links repo docs under a "read first" /
+"project brain" heading, Depthfinder follows those links **one hop** and
+scans the linked docs too — that pointed-to surface is context your agent
+reads as well. Linked-doc claims count toward the score; they don't count
+toward Weight (they don't load every turn). `--no-follow` turns this off.
 
 Requires **Node ≥ 20** and **git** (evidence comes from git history;
 shallow clones degrade gracefully). The default run writes **nothing** to

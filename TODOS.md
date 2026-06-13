@@ -1,28 +1,23 @@
 # TODOS
 
-## V1.x: Transitive context discovery (follow "Read First" pointers)
+## Transitive discovery — refinements (core SHIPPED 2026-06-13)
 
-**What:** When a convention file (CLAUDE.md etc.) links other in-repo docs
-with read-this semantics ("Read First", "project brain", markdown links in
-an opening section), scan those targets too — one hop, link-targets only,
-capped.
+Core landed in `src/cli/follow.mjs` (one hop, directive-heading-gated,
+tracked-`.md` only, cap 25, folds into honesty, excluded from Weight,
+`--no-follow` to disable). home-center: 37 → 112 claims, still 100 · 0 false.
+Residual sharp edges, deferred:
 
-**Why:** Corpus-proven gap (home-center, 2026-06-12): its post-cleanup
-CLAUDE.md is a 99-line contract whose first section points agents at five
-`docs/*` brain docs. Convention-only discovery scored the repo 100 · 37
-claims while the de-facto agent context (brain docs) held 75 more claims —
-and the full `docs/` tree held 3 genuinely dangling references that never
-surfaced. The thing Depthfinder audits is "what the agent reads", and
-pointer-style CLAUDE.md files are how big repos structure exactly that.
-
-**Cons / open design:** Where to stop (one hop? markdown links only? a
-heading heuristic?); claim attribution and render labels for non-convention
-files; cap + dedupe to protect the 5s budget; users may consider linked
-docs "documentation, not context" — maybe `--follow-links` opt-in first.
-
-**Depends on:** Nothing technical (extract/evaluate already take arbitrary
-file lists — the corpus measurement used them directly). Sequencing: after
-Stage-1; candidate for V1.1 or V1.5.
+- **Lead-in detection without a heading.** Some files write "Before
+  changes, read:" then a bare list with no directive *heading*. Current
+  gating is heading-only, so those are missed. Add: a link is eligible if
+  the nearest preceding non-empty prose line carries a reading cue.
+- **Non-directive subheading closes the scope.** "## Read First" followed
+  by "### Caveats" ends the directive scope at the subheading even though
+  it's nested under Read First. Track heading level to keep scope open
+  until a same-or-higher-level non-directive heading.
+- **Multi-hop / config-pointer discovery.** Only convention-file links are
+  followed; a brain doc that points at further docs stops at one hop (by
+  design, for now). Revisit if corpus shows deep pointer chains.
 
 ## V1.5: Scan-history store (user cache dir)
 

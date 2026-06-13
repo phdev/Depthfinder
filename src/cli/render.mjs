@@ -15,11 +15,14 @@ const nf = new Intl.NumberFormat("en-US"); // locale-pinned for determinism
 
 export function renderCard(model) {
   const {
-    scannedFiles, trackedCount, findings, score, dead, weight, claimsTotal,
+    scannedFiles, linkedFiles = [], trackedCount, findings, score, dead, weight, claimsTotal,
   } = model;
   const L = [];
   L.push("");
-  L.push(`  Scanning ${scannedFiles.join(", ")} against ${nf.format(trackedCount)} tracked files…`);
+  const linkNote = linkedFiles.length
+    ? ` (+${linkedFiles.length} linked doc${linkedFiles.length === 1 ? "" : "s"})`
+    : "";
+  L.push(`  Scanning ${scannedFiles.join(", ")}${linkNote} against ${nf.format(trackedCount)} tracked files…`);
   L.push("");
 
   for (const f of findings) {

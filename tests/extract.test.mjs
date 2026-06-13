@@ -5,6 +5,8 @@ import { extractPathClaims } from "../src/cli/extract/path.mjs";
 import { extractDependencyClaims } from "../src/cli/extract/dependency.mjs";
 import { extractSymbolClaims } from "../src/cli/extract/symbol.mjs";
 import { extractCountClaims } from "../src/cli/extract/count.mjs";
+import { directiveLinks } from "../src/cli/follow.mjs";
+import { resolveRelPosix } from "../src/cli/paths.mjs";
 
 const L = (text, n = 1) => ({ n, text, long: false });
 const ctx = { dirExists: (seg) => ["src", "router", "docs", ".cursor", "lib"].includes(seg) };
@@ -102,4 +104,31 @@ test("long lines are excluded from extraction (ReDoS guard)", () => {
   const long = { n: 1, text: "`src/a.js` " + "x".repeat(2000), long: true };
   assert.equal(extractPathClaims("CLAUDE.md", [long], ctx).length, 0);
   assert.equal(extractDependencyClaims("CLAUDE.md", [long]).length, 0);
+});
+
+test("directiveLinks: .md links under a directive heading only", () => {
+  const lines = [
+    L("# Title", 1),
+    L("## Project Brain - Read First", 2),
+    L("- [a](docs/a.md) - state model", 3),
+    L("- [ext](https://example.com/b.md)", 4), // scheme: excluded
+    L("- [anchored](docs/c.md#section)", 5), // anchor stripped -> docs/c.md
+    L("- [code](src/x.js)", 6), // not .md: excluded
+    L("## Notes", 7), // non-directive: scope closes
+    L("- [d](docs/d.md)", 8),
+  ].map((x, i) => ({ ...x, n: i + 1 }));
+  assert.deepEqual(directiveLinks(lines).map((x) => x.target), ["docs/a.md", "docs/c.md"]);
+
+  // a directive heading with no in-repo .md links yields nothing
+  assert.equal(directiveLinks([L("## Context", 1), L("plain prose, no links", 2)]).length, 0);
+  // long line skipped (ReDoS parity)
+  assert.equal(directiveLinks([L("## Read", 1), { n: 2, text: "[a](docs/a.md)", long: true }]).length, 0);
+});
+
+test("resolveRelPosix: relative resolution, ../ and root-escape", () => {
+  assert.equal(resolveRelPosix("CLAUDE.md", "docs/a.md"), "docs/a.md");
+  assert.equal(resolveRelPosix("CLAUDE.md", "./docs/a.md"), "docs/a.md");
+  assert.equal(resolveRelPosix("school-updates/CLAUDE.md", "docs/a.md"), "school-updates/docs/a.md");
+  assert.equal(resolveRelPosix("school-updates/CLAUDE.md", "../docs/a.md"), "docs/a.md");
+  assert.equal(resolveRelPosix("CLAUDE.md", "../escape.md"), null, "escaping the root is null, never index-matched");
 });
