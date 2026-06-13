@@ -261,14 +261,17 @@ function run({ values, positionals }) {
   // a model. Burn the #1 finding only (model calls are slow). The contract
   // notice names exactly what is sent and to which agent before it runs.
   if (values.burn) {
-    if (!findings.length) {
+    // Burn the top rendered finding (context tier); if the contract surface is
+    // clean but the docs rot, fall back to the first confirmed-false doc claim
+    // so --docs --burn still demonstrates the moment.
+    const f = findings[0] || docClaims.find((c) => c.verdict === "false");
+    if (!f) {
       warn("--burn: no false claims to demonstrate");
     } else {
       const agent = resolveAgent({ agentCmd: values["burn-agent"] });
       if (!agent) {
         warn("--burn: no agent found — install claude or codex, or set DEPTHFINDER_BURN_AGENT");
       } else {
-        const f = findings[0];
         process.stderr.write(
           redact(`  ! --burn: running \`${agent.join(" ")}\` against ${f.source.file}:${f.source.line}; that line is sent to the agent (passing --burn is your consent)\n`),
         );
