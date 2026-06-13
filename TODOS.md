@@ -31,6 +31,50 @@ mismatch 404s in a way that looks like a permissions/2FA problem.
 provenance, no token, no manual step. Optional cleanup: delete the now-unused `NPM_TOKEN`
 secret (`gh secret delete NPM_TOKEN --repo phdev/Depthfinder`).
 
+## Phase A — `--strict` CI gate — DESIGN LOCKED (eng-review 2026-06-13)
+
+The next RETENTION brick: a CI-grade exit gate so a build fails when context rot is
+introduced. Eng-reviewed (4 decisions) + Codex outside-voice (8 findings, 1 reversal,
+5 hardenings absorbed). Build tasks in `~/.gstack/projects/phdev-Depthfinder/tasks-eng-review-*.jsonl`.
+
+**Locked design:**
+- **Flags:** `--strict` (boolean) + `--max-false N` (default 0). Gate trips when
+  **Context-tier `score.falseCount > N`**. `--max-false` is a ratchet (adopt on a rotten
+  repo at N=12, lower over time). NOT `--min-honesty` (honesty is null under 5 claims).
+- **Gate on `falseCount`** (the full count — fabricated + stale rot), NOT the 3 rendered
+  findings, NOT `honesty` (so it works even when the score is suppressed). `unknown` never
+  gates (unknown-never-false holds for free).
+- **Context tier ONLY** = convention files + nested + default-followed "read first" links
+  (minus `--no-follow`). NOT the Doc tier. `--strict-docs` DEFERRED until the doc corpus is
+  zero-false (rides the same gate that flips `--docs` default-on) — gating a known-FP-prone
+  tier would fail builds on false positives, the cardinal sin.
+- **Exit 4** on a gate breach (distinct, NOT shared with `1`=internal-error). New code only
+  appears under `--strict`, so zero breakage; gives wrappers + the future Action a clean
+  "rotted vs crashed" contract. Precedence: `2` (usage/git/--out-fail) > `3` (no context) >
+  `4` (gate) > `0`.
+- **CRITICAL impl:** set `process.exitCode = 4`, **never `process.exit()`** after stdout —
+  `process.exit()` truncates >64KB payloads mid-write (bin/depthfinder.mjs:400-403 already
+  guards this; the gate must too).
+- **`--out` precedence:** an `--out` write failure (exit 2) returns before the gate → exit 2
+  wins (the requested artifact wasn't produced).
+- **`--strict --docs`:** print a stderr advisory `Doc Honesty is advisory and was not gated`
+  so a green build with visible doc rot isn't confusing.
+- **`--json`:** add an additive `gate` object — `{strict, maxFalse, false, failed, tier:"context"}`
+  — so consumers read `gate.failed` directly, not infer from `score.false`.
+- **Tests (~13):** clean→0, dirty→4, boundary `==`(pass)/`>`(fail), invalid `--max-false`
+  (float/NaN/Infinity/negative/empty)→2 BEFORE repo work, `--strict --json` valid+exit4+no-
+  truncation, stdout byte-identical to non-strict (golden unaffected), **doc-tier-never-gates**
+  regression, **suppressed-score-still-gates** edge, >3 false gates on total falseCount,
+  `--out` precedence, no-context→3.
+- **Docs:** CLAUDE.md + README + a CI example that **PINS the npm version** (`npx depthfinder@1.0.1`)
+  — `--max-false N` is only a stable policy against a pinned extractor (a release can change
+  the count with zero repo changes).
+
+**NOT in scope (deferred, tracked):** `--strict-docs` (until doc corpus zero-false) ·
+consumer **GitHub Action** (thin composite over `npx depthfinder --strict`; ships after the
+exit-code contract is proven — design doc's V1.5 vision) · `--min-honesty` · packaged
+pre-commit hook · remapping existing exit codes to ESLint convention (breaking).
+
 ## Roadmap — re-sequenced 2026-06-13 around durable value (acquisition vs retention)
 
 Field-validating `--burn` on 6 real rotten repos showed frontier agents often
