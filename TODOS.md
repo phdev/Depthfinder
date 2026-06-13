@@ -1,5 +1,31 @@
 # TODOS
 
+## Roadmap — re-sequenced 2026-06-13 around durable value (acquisition vs retention)
+
+Field-validating `--burn` on 6 real rotten repos showed frontier agents often
+*catch* stale lines (and pay a verification tax) rather than crash. So the durable
+value is the **rot tax** (paid by every agent, every call), not the crash demo.
+ACQUISITION (burn, benchmark) = make pain felt, commoditizable, spend only enough.
+RETENTION (tax-visible, tracked score, gate, memory) = where durable effort goes.
+Full thesis: design doc "Durable Value & Commoditization" + premise P7.
+
+Build priority:
+1. **[RETENTION, next, cheap] Make the tax visible.** Card line: "~N tokens
+   actively mislead; your agent re-verifies the whole file once it catches one."
+   When `--burn` shows the agent proposing find/grep, count the detour steps.
+2. **[RETENTION] Score-history store — PULLED FORWARD from V1.5 to V1.2** (below).
+   The score as a TRACKED team metric ("honesty 95→78") is the first thing a
+   harness can't emit. It's also the benchmark baseline.
+3. **[ACQUISITION] Benchmark / `--share` card** — seed corpus already exists
+   (`scripts/doc-corpus.mjs`). Percentile only after a population exists.
+4. **[RETENTION] The gate** — `--strict` CI (exit 1 when false>0), then the
+   blocking V2 gate. First workflow guarantee a model can't give.
+5. **[RETENTION] Cross-agent memory loop (V2)** — capture→freshness→recall. The moat.
+
+Reconsider: **safe-fix (rename-only diff)** — tabled earlier, but the durable
+value is *keeping context honest*, and the fix is the action that closes
+found→fixed. Stronger candidate now (close the loop); still rename-class only.
+
 ## V1.1 Live Burn (`--burn`) — SHIPPED 2026-06-13
 
 `src/cli/burn.mjs`: shadows a local agent (claude/codex, override via
@@ -66,7 +92,11 @@ Residual sharp edges, deferred:
   followed; a brain doc that points at further docs stops at one hop (by
   design, for now). Revisit if corpus shows deep pointer chains.
 
-## V1.5: Scan-history store (user cache dir)
+## Score-history store (user cache dir) — PULLED FORWARD V1.5 → V1.2 (2026-06-13)
+
+Re-prioritized: this is the first RETENTION brick (the score becomes a tracked
+team metric a harness can't emit) and the benchmark baseline. See re-sequenced
+roadmap above.
 
 **What:** Per-repo scan history under the user's cache dir
 (`~/.cache/depthfinder/<repo-hash>/`), recording each run's claims + score.
