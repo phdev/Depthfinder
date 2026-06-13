@@ -1,5 +1,26 @@
 # TODOS
 
+## ✅ V1.0 PUBLISHED to npm — 2026-06-13
+
+`depthfinder@1.0.0` is LIVE (`npx depthfinder` works; npmjs.com/package/depthfinder,
+latest:1.0.0, deps:none, 25 files/96.9kB). The tag-triggered CI publish failed 4× with
+`EOTP` — the npm account's 2FA-for-writes demands a one-time password CI can't supply,
+and the granular token didn't bypass it (only a classic Automation token would, which
+wasn't available in the UI). Shipped via a **manual local publish** (`npm login` web
+flow → `npm publish --access public` → browser 2FA). v1.0.0 has **no provenance badge**
+(manual); v1.0.1+ will.
+
+**CI re-armed with OIDC trusted publishing** (publish.yml: dropped `NODE_AUTH_TOKEN`,
+node 24 + `npm i -g npm@latest`, kept `id-token: write` + `--provenance`). **One-time
+user step before the next release:** add a Trusted Publisher on
+npmjs.com/package/depthfinder → Settings → GitHub Actions (org `phdev`, repo
+`Depthfinder`, workflow `publish.yml`, env blank). After that every release =
+bump version + `git tag vX.Y.Z && git push` → CI auto-publishes with provenance, no
+token, no manual step. The now-unused `NPM_TOKEN` repo secret can be deleted
+(`gh secret delete NPM_TOKEN --repo phdev/Depthfinder`) — left as a harmless fallback
+for now. (`actions/checkout@v4`+`setup-node@v4` will force-bump to Node 24 runners
+after 2026-06-16 — already aligned.)
+
 ## Roadmap — re-sequenced 2026-06-13 around durable value (acquisition vs retention)
 
 Field-validating `--burn` on 6 real rotten repos showed frontier agents often

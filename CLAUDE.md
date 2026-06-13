@@ -158,8 +158,12 @@ are the tax, surfaced as "the detour is the tax, every session."
 `npm test` — 61 tests (node:test; hermetic git fixtures with pinned
 dates → deterministic SHAs; `--burn` tested via a stub agent, never a real
 model call). `npm run bench` — per-phase timings + local
-5s tripwire (never in CI). CI: 3 OS × node 20/22; publish on `v*` tags
-(needs `NPM_TOKEN` secret).
+5s tripwire (never in CI). CI: 3 OS × node 20/22; publish on `v*` tags via
+**OIDC trusted publishing** (no token/secret — `id-token: write` + a one-time
+npm Trusted Publisher entry; provenance automatic). `depthfinder` is LIVE on
+npm (v1.0.0, published 2026-06-13). v1.0.0 was published manually (a
+token-based CI publish hit `EOTP` — account 2FA-for-writes blocks tokens CI
+can't OTP); OIDC sidesteps that for every release after.
 
 Five tabs, each with a hash route for deep-linking:
 

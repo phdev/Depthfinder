@@ -1,7 +1,17 @@
 name: Publish to npm
 
-# Publishes on version tags (v0.1.0, v1.2.3…). Requires the NPM_TOKEN secret
-# (an npm automation token) configured in the repo settings.
+# Publishes on version tags (v1.0.0, v1.2.3…) via npm **Trusted Publishing
+# (OIDC)** — no token, no 2FA. GitHub Actions mints a short-lived identity from
+# the `id-token: write` permission below; npm verifies it against a one-time
+# "Trusted Publisher" entry configured on the package
+# (npmjs.com/package/depthfinder → Settings → GitHub Actions: org `phdev`,
+# repo `Depthfinder`, workflow `publish.yml`). Provenance is automatic.
+#
+# History: the first publish (v1.0.0) was done manually from a workstation
+# because a token-based CI publish hit `EOTP` (account 2FA-for-writes demands a
+# one-time password CI can't supply, and a granular token doesn't bypass it).
+# OIDC sidesteps tokens and 2FA entirely, so every release after v1.0.0 is
+# fully automated again.
 on:
   push:
     tags: ["v*"]
@@ -11,20 +21,20 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # npm provenance
+      id-token: write # OIDC trusted publishing + provenance
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           registry-url: https://registry.npmjs.org
+      - name: Ensure npm supports trusted publishing (>= 11.5.0)
+        run: npm install -g npm@latest
       - name: Configure git identity
         run: |
           git config --global user.name depthfinder-ci
           git config --global user.email ci@depthfinder.invalid
       - name: Run test suite
         run: npm test
-      - name: Publish
+      - name: Publish (OIDC trusted publishing; provenance automatic; no token)
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
