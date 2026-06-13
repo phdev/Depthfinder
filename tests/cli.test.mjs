@@ -2,7 +2,7 @@
 // discipline, redaction, precision gate, --out atomicity, [path] arg.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, existsSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, existsSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { materialize, makeRepo, runCli, hashTree, cleanup, STUB_AGENT } from "./helpers/fixture.mjs";
@@ -374,6 +374,45 @@ test("--burn: no agent available degrades cleanly (warn, exit 0, no card change)
     assert.doesNotMatch(r.stdout, /answered \(your context/, "no fabricated output when the agent fails");
   } finally {
     cleanup(root);
+  }
+});
+
+test("score-history (V1.2): delta across runs; no-change; --no-history silent; suppressed skips", () => {
+  const files = { "CLAUDE.md": "" };
+  const lines = ["# svc", ""];
+  for (const n of ["a", "b", "c", "d", "e"]) {
+    files[`src/${n}.js`] = `export const ${n} = 1\n`;
+    lines.push(`Module ${n} lives in \`src/${n}.js\`.`); // 5 true path claims → honesty 100, definite 5
+  }
+  files["CLAUDE.md"] = lines.join("\n") + "\n";
+  const root = makeRepo(files);
+  const cache = mkdtempSync(join(tmpdir(), "df-shared-cache-"));
+  const env = { DEPTHFINDER_CACHE: cache };
+  try {
+    // run 1: records, no prior → no delta line
+    assert.doesNotMatch(runCli(root, [], env).stdout, /since last run/, "first run: no delta");
+    // run 2: nothing changed → "no change" (100 vs 100)
+    assert.match(runCli(root, [], env).stdout, /Context Honesty {3}100 .* \(no change since last run\)/, "2nd run, same score");
+    // mutate: +1 dead ref → 83 (5 true / 1 false); card shows the drop (83 vs 100)
+    writeFileSync(join(root, "CLAUDE.md"), files["CLAUDE.md"] + "Auth is `src/gone.js`.\n");
+    assert.match(runCli(root, [], env).stdout, /Context Honesty {3}83 .* \(▼17 since last run\)/, "3rd run shows the drop");
+    // mutate again: +1 more dead ref → 71 (5/7); --json carries the numeric delta (71 vs 83)
+    writeFileSync(join(root, "CLAUDE.md"), files["CLAUDE.md"] + "Auth is `src/gone.js`.\nConfig in `src/gone2.js`.\n");
+    const p = JSON.parse(runCli(root, ["--json"], env).stdout);
+    assert.equal(p.delta, -12, "numeric delta on the payload (71 − 83)");
+    // --no-history: a fresh cache, no record, no delta
+    const off = runCli(root, ["--no-history"], { DEPTHFINDER_CACHE: mkdtempSync(join(tmpdir(), "df-c2-")) });
+    assert.doesNotMatch(off.stdout, /since last run/, "--no-history writes nothing, shows no delta");
+    // suppressed score (<5 definite) never deltas
+    const tiny = makeRepo({ "CLAUDE.md": "Entry `src/x.js`.\n", "src/x.js": "x\n" });
+    try {
+      assert.doesNotMatch(runCli(tiny, [], { DEPTHFINDER_CACHE: cache }).stdout, /since last run/, "suppressed: no delta");
+    } finally {
+      cleanup(tiny);
+    }
+  } finally {
+    cleanup(root);
+    rmSync(cache, { recursive: true, force: true });
   }
 });
 

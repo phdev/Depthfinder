@@ -100,7 +100,8 @@ mind before wiring `--burn` into CI or a loop.
 npx depthfinder            # scan the repo you're in
 npx depthfinder ~/proj     # scan another repo
 npx depthfinder --json     # machine-readable claims + score (stdout)
-npx depthfinder --out dir  # also write claims.json (atomic; the ONLY write)
+npx depthfinder --out dir  # also write claims.json (atomic; the only write to the repo dir)
+npx depthfinder --no-history # don't record this run / show a "since last run" delta
 npx depthfinder --no-follow # don't follow "read first" links into repo docs
 npx depthfinder --docs     # opt in to the wider-docs scan (Doc Honesty)
 npx depthfinder --burn     # run your agent against the top false claim (opt-in; calls a model)
@@ -113,8 +114,11 @@ reads as well. Linked-doc claims count toward the score; they don't count
 toward Weight (they don't load every turn). `--no-follow` turns this off.
 
 Requires **Node ≥ 20** and **git** (evidence comes from git history;
-shallow clones degrade gracefully). The default run writes **nothing** to
-the scanned repo.
+shallow clones degrade gracefully). The default run writes **nothing** to the
+scanned repo. It does keep a small **score history** in your cache dir
+(`~/.cache/depthfinder/…`, honoring `XDG_CACHE_HOME`) so the card can show a
+delta — `Context Honesty 95 (▼17 since last run)`. That stays on your machine;
+`--no-history` turns it off.
 
 ### Exit codes
 

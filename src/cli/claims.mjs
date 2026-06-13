@@ -1,7 +1,8 @@
 // claims.json payload + explicit file writes (eng review 5A + absorb #3).
 //
-// Default run writes NOTHING. --json prints the payload to stdout; --out
-// writes claims.json into the named directory ATOMICALLY (tmp + rename).
+// Default run writes nothing to the SCANNED REPO (the score-history line goes
+// to the user cache dir; see history.mjs). --json prints the payload to
+// stdout; --out writes claims.json into the named directory ATOMICALLY.
 // Output files are excluded from any future scan concern by living wherever
 // the user pointed --out (never auto-inside scanned context conventions).
 import { mkdirSync, writeFileSync, renameSync } from "node:fs";
@@ -33,6 +34,7 @@ export function buildPayload(model) {
     // Context tier — the surface the agent auto-loads every turn. `score` and
     // `claims` keep their exact V0 shape (additive change only).
     score: scoreShape(score),
+    delta: model.delta ?? null, // Context Honesty change vs the last comparable run (null = first run / suppressed)
     weight: { approxTokens: model.weight, method: "chars/4 over scanned context files — loads every turn" },
     deadTokens: { approx: dead, method: "chars/4 over paragraphs containing ≥1 false path/symbol claim" },
     // Doc tier — the wider repo docs read on demand. Advisory; NEW fields.

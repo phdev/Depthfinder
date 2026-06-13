@@ -139,10 +139,14 @@ export function makeRepo(files) {
 }
 
 export function runCli(cwd, args = [], env = {}) {
+  // Isolate the score-history cache per call by default, so default-on history
+  // never bleeds across runs and the golden card stays byte-stable. A caller
+  // that wants to observe a delta passes its own (shared) DEPTHFINDER_CACHE.
+  const cacheDir = env.DEPTHFINDER_CACHE || mkdtempSync(join(tmpdir(), "df-cache-"));
   const res = spawnSync(process.execPath, [BIN, ...args], {
     cwd,
     encoding: "utf8",
-    env: { ...process.env, ...env },
+    env: { ...process.env, DEPTHFINDER_CACHE: cacheDir, ...env },
   });
   return { code: res.status, stdout: res.stdout ?? "", stderr: res.stderr ?? "" };
 }

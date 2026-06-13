@@ -2,8 +2,9 @@
 // depthfinder — keep your AI context honest.
 //
 // Zero-config: `npx depthfinder [path]`. Deterministic oracles only; no
-// model calls; nothing leaves your machine. Default run writes NOTHING to
-// the scanned repo (5A).
+// model calls (except opt-in --burn); nothing leaves your machine. Default run
+// writes NOTHING to the scanned repo (5A); it records one score-history line
+// in the user cache dir (--no-history to skip).
 //
 //   Exit codes (full table — absorb #4):
 //     0  ran successfully (findings or not — V1 is advisory)
@@ -20,7 +21,7 @@
 // every diagnostic goes to stderr. Redaction (1A) wraps both outputs at the
 // stream/serializer boundary.
 import { parseArgs } from "node:util";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, statSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { redact, redactDeep } from "../lib/redact.mjs";
 import { tokchars } from "../lib/text.mjs";
@@ -33,13 +34,16 @@ import { extractDependencyClaims } from "../src/cli/extract/dependency.mjs";
 import { extractSymbolClaims } from "../src/cli/extract/symbol.mjs";
 import { extractCountClaims } from "../src/cli/extract/count.mjs";
 import { evaluateClaims } from "../src/cli/evaluate.mjs";
-import { computeScore, deadTokens } from "../src/cli/score.mjs";
+import { computeScore, deadTokens, SCORING_SCHEMA } from "../src/cli/score.mjs";
+import { repoIdentity, cacheFile, readLast, append } from "../src/cli/history.mjs";
 import { selectFindings } from "../src/cli/select.mjs";
 import { renderCard } from "../src/cli/render.mjs";
 import { buildPayload, writeOut } from "../src/cli/claims.mjs";
 import { firstSegment, resolveRelPosix } from "../src/cli/paths.mjs";
 import { directiveLinks } from "../src/cli/follow.mjs";
 import { resolveAgent, runBurn, verificationDetours } from "../src/cli/burn.mjs";
+
+const VERSION = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 
 const USAGE = `usage: depthfinder [path] [--json] [--out <dir>] [--no-follow] [--docs]
 
@@ -52,7 +56,9 @@ const USAGE = `usage: depthfinder [path] [--json] [--out <dir>] [--no-follow] [-
   --burn      run a local agent (claude/codex) against the top false claim and
               show what it actually says — opt-in; the ONLY path that calls a
               model. Override the agent with --burn-agent "<cmd>".
-  --burn-agent <cmd>  the agent command for --burn (default: claude, else codex)`;
+  --burn-agent <cmd>  the agent command for --burn (default: claude, else codex)
+  --no-history do not record this run / show a "since last run" delta (the
+              record lives in your cache dir, never in the scanned repo)`;
 
 main();
 
@@ -68,6 +74,7 @@ function main() {
         docs: { type: "boolean" },
         burn: { type: "boolean" },
         "burn-agent": { type: "string" },
+        "no-history": { type: "boolean" },
       },
     });
   } catch (e) {
@@ -297,6 +304,30 @@ function run({ values, positionals }) {
   // object with honesty null). The render + payload both key off this.
   const docScore = docFiles.length ? computeScore(docClaims) : null;
   const dead = deadTokens(fileParagraphs, claims, tokchars);
+  const weight = Math.round(weightChars / 4);
+
+  // Score-history (V1.2): delta vs the last COMPARABLE run, then record this
+  // run — to the user cache dir, never the scanned repo (5A holds). Suppressed
+  // scores (honesty null) are skipped: nothing to compare or record. A failed
+  // cache write disables the delta but never breaks the scan.
+  let scoreDelta = null;
+  if (!values["no-history"] && score.honesty != null) {
+    const cmp = { scoringSchema: SCORING_SCHEMA, follow: !values["no-follow"], docs: !!values.docs };
+    try {
+      const { raw, key } = repoIdentity(root);
+      const file = cacheFile(key);
+      const prev = readLast(file, cmp);
+      if (prev && prev.honesty != null) scoreDelta = score.honesty - prev.honesty;
+      const ok = append(file, {
+        schema: 0, at: ctx.now, toolVersion: VERSION, ...cmp,
+        honesty: score.honesty, definite: score.definite,
+        false: score.falseCount, stale: score.staleCount, weight, identity: raw,
+      });
+      if (!ok) warn("score-history: cache not writable — delta disabled (use --no-history to silence)");
+    } catch (e) {
+      warn(`score-history: ${e?.message || e}`);
+    }
+  }
 
   const model = {
     now: ctx.now,
@@ -309,8 +340,9 @@ function run({ values, positionals }) {
     findings,
     score,
     docScore,
+    delta: scoreDelta,
     dead,
-    weight: Math.round(weightChars / 4),
+    weight,
     claimsTotal: claims.length,
     claims,
     docClaims,

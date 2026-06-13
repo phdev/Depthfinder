@@ -16,7 +16,7 @@ const nf = new Intl.NumberFormat("en-US"); // locale-pinned for determinism
 export function renderCard(model) {
   const {
     scannedFiles, linkedFiles = [], trackedCount, findings, score, docScore, docFiles = [],
-    dead, weight, claimsTotal,
+    delta, dead, weight, claimsTotal,
   } = model;
   const L = [];
   L.push("");
@@ -60,7 +60,7 @@ export function renderCard(model) {
     L.push(`  Only ${score.definite} checkable claim${score.definite === 1 ? "" : "s"} — score withheld.`);
   } else {
     const unchecked = score.unknownCount > 0 ? ` · ${nf.format(score.unknownCount)} unchecked` : "";
-    L.push(`  Context Honesty   ${score.honesty} · ${nf.format(score.definite)} checkable claims${unchecked}`);
+    L.push(`  Context Honesty   ${score.honesty} · ${nf.format(score.definite)} checkable claims${unchecked}${deltaSuffix(delta)}`);
   }
   // Doc Honesty — the wider repo docs the agent reads on demand. Advisory,
   // separate from the contract score; its dead-refs never touch the line
@@ -91,6 +91,15 @@ export function renderCard(model) {
   L.push("  npx depthfinder --json for full results");
   L.push("");
   return L.join("\n");
+}
+
+// "since last run" delta on the headline score. Null (first run / suppressed
+// score / --no-history) prints nothing, keeping the card byte-stable in tests.
+function deltaSuffix(delta) {
+  if (delta == null) return "";
+  if (delta > 0) return `  (▲${delta} since last run)`;
+  if (delta < 0) return `  (▼${-delta} since last run)`;
+  return "  (no change since last run)";
 }
 
 function truncate(s, max) {

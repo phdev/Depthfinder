@@ -5,6 +5,11 @@
 // claims is false precision, the exact sin this tool exists to catch.
 export const MIN_DEFINITE_FOR_SCORE = 5;
 
+// Bump when the scoring or oracle logic changes in a way that makes a new
+// score incomparable to old ones. The history store only deltas runs that
+// share this schema, so a stale-vs-fresh comparison never shows a fake trend.
+export const SCORING_SCHEMA = 1;
+
 export function computeScore(claims) {
   let trueCount = 0, falseCount = 0, unknownCount = 0, staleCount = 0;
   for (const c of claims) {

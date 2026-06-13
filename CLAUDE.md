@@ -116,8 +116,16 @@ are the tax, surfaced as "the detour is the tax, every session."
   per run; documented in the README `--burn` section.
 - `src/cli/templates.mjs` — the ONLY inferential sentence per finding;
   templates are data with an exact-match test (cut-rule in header).
-- Default run **writes nothing** to the scanned repo; `--out` is the sole
-  write path (atomic tmp+rename).
+- `src/cli/history.mjs` (V1.2, score-history) — records each run's score to
+  the USER CACHE DIR (origin-else-toplevel sha1 key; O_APPEND JSONL; honors
+  `DEPTHFINDER_CACHE`/`XDG_CACHE_HOME`) so the card shows a "since last run"
+  delta. Writes by default (`--no-history` opts out); a failed cache write
+  warns and the scan still exits 0. Deltas compare only against the last
+  record with the same `scoringSchema` + `follow`/`docs` flags.
+- Default run **writes nothing to the scanned repo**; the only writes are
+  `--out` (atomic, opt-in) and the **score-history line in the user cache dir**
+  (out-of-repo, `--no-history` to skip). "Nothing leaves your machine" still
+  holds — history is local.
 
 ## CLI invariants (do not break)
 
@@ -137,7 +145,11 @@ are the tax, surfaced as "the detour is the tax, every session."
    exception: it calls a local agent, sends ONE line (best-effort redacted —
    pattern-based, not airtight), prints the contract first, and never writes
    to the repo (runs in a temp cwd).
-5. **Pre-tag ritual:** `npm run corpus` against real external repos +
+5. **Writes nothing to the SCANNED repo.** The only out-of-repo writes are
+   `--out` (opt-in) and the score-history cache line (`--no-history` to skip).
+   A failed cache write never breaks the scan. The scanned repo is byte-
+   identical after any run (enforced by the hashTree test).
+6. **Pre-tag ritual:** `npm run corpus` against real external repos +
    hand-verification of every false verdict, before any release tag.
 
 ## Tests / bench

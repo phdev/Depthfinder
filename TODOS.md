@@ -99,11 +99,32 @@ Residual sharp edges, deferred:
   followed; a brain doc that points at further docs stops at one hop (by
   design, for now). Revisit if corpus shows deep pointer chains.
 
-## Score-history store (user cache dir) — PULLED FORWARD V1.5 → V1.2 (2026-06-13)
+## Score-history store — SHIPPED 2026-06-13 (V1.2, eng-reviewed)
 
-Re-prioritized: this is the first RETENTION brick (the score becomes a tracked
-team metric a harness can't emit) and the benchmark baseline. See re-sequenced
-roadmap above.
+`src/cli/history.mjs`: per-repo run history in the user cache dir (origin-else-
+toplevel sha1 key, O_APPEND JSONL, XDG-respecting), delta on the card
+("Context Honesty 95 ▼17 since last run"). Write-by-default, `--no-history` opt
+out, failed write never breaks the scan, deltas only vs the last COMPARABLE run
+(scoringSchema + follow/docs). Test cache isolated in runCli → golden byte-
+stable. 58 tests. 5A reworded (out-of-repo cache write is the only new side effect).
+
+## V1.2.5 Benchmark / `--share` / Worker — DEFERRED (own eng-review)
+
+Split out of V1.2 on cross-model agreement (Step 0 + Codex): a benchmark shipped
+without these HURTS an honesty tool's trust posture. Design deliberately:
+- Privacy: call it aggregate/pseudonymous, NOT "anonymous" (Cloudflare logs
+  IP/UA/ts/body); document logging/retention; submit only a score tuple
+  {honesty, definite, tier, schema}; drop the nonce unless it earns an anti-abuse role.
+- Egress consent: `--share` PRINTS the literal payload + y/N to STDERR (stdout
+  stays card|JSON); `--share --yes` for non-TTY/CI; `DEPTHFINDER_SHARE_ENDPOINT`.
+- Storage: aggregate histogram in a DURABLE OBJECT (KV has no atomic increment).
+- Abuse: rate-limit/dedupe, minimum-N "benchmark warming up" state, schema-versioned distributions.
+- Percentile wording: "at least as high as X% of shared runs" (not "better than", ties).
+- Seeding: an actual task — seed-corpus generation/upload/reset/migration + min-N release gate.
+- Worker in its OWN package (isolates miniflare/wrangler dev deps; CLI stays zero-dep) + wrangler deploy.
+Design doc: ~/.gstack/projects/phdev-Depthfinder/peterhowell-main-design-v1.2-score-history-benchmark-20260613-091103.md (NOT-in-scope section).
+
+## (reference) Original score-history notes
 
 **What:** Per-repo scan history under the user's cache dir
 (`~/.cache/depthfinder/<repo-hash>/`), recording each run's claims + score.
