@@ -60,6 +60,10 @@ test("dependency oracle: extraction table (the self-scan FP class)", () => {
     // real-corpus FP class (home-center June-6 scan): env-var config knobs
     ["speech mode uses `SPEECH_CANDIDATE_COOLDOWN_SECONDS`, not the wake cooldown", []],
     ["uses `MAX_RETRIES` for backoff", []],
+    // real-corpus FP class (home-center brain docs): dotted code expressions.
+    // socket.io-style dotted packages are a deliberate miss, never a claim.
+    ["all time math uses `context.now` so the function is testable", []],
+    ["chat uses `socket.io` for transport", []],
   ];
   for (const [text, expected] of cases) {
     const got = extractDependencyClaims("CLAUDE.md", [L(text)]).map((c) => c.predicate.args.name);

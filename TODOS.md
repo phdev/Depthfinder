@@ -1,5 +1,29 @@
 # TODOS
 
+## V1.x: Transitive context discovery (follow "Read First" pointers)
+
+**What:** When a convention file (CLAUDE.md etc.) links other in-repo docs
+with read-this semantics ("Read First", "project brain", markdown links in
+an opening section), scan those targets too — one hop, link-targets only,
+capped.
+
+**Why:** Corpus-proven gap (home-center, 2026-06-12): its post-cleanup
+CLAUDE.md is a 99-line contract whose first section points agents at five
+`docs/*` brain docs. Convention-only discovery scored the repo 100 · 37
+claims while the de-facto agent context (brain docs) held 75 more claims —
+and the full `docs/` tree held 3 genuinely dangling references that never
+surfaced. The thing Depthfinder audits is "what the agent reads", and
+pointer-style CLAUDE.md files are how big repos structure exactly that.
+
+**Cons / open design:** Where to stop (one hop? markdown links only? a
+heading heuristic?); claim attribution and render labels for non-convention
+files; cap + dedupe to protect the 5s budget; users may consider linked
+docs "documentation, not context" — maybe `--follow-links` opt-in first.
+
+**Depends on:** Nothing technical (extract/evaluate already take arbitrary
+file lists — the corpus measurement used them directly). Sequencing: after
+Stage-1; candidate for V1.1 or V1.5.
+
 ## V1.5: Scan-history store (user cache dir)
 
 **What:** Per-repo scan history under the user's cache dir

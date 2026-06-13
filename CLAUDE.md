@@ -33,8 +33,11 @@ cwd ─▶ git root ─▶ ls-files Set ─▶ discover (5 conventions)
 - `src/cli/extract/{path,dependency,symbol,count}.mjs` — grammars are
   deliberately conservative; the dependency grammar's guards exist because
   the self-scan false-accused `its`/`home-center`/`--lan` on day one, and
-  the first real-corpus run (home-center June-6 snapshot) added `./`-prefix
-  normalization (path) and SCREAMING_SNAKE env-var rejection (dependency).
+  the first real-corpus runs (home-center June-6 snapshot + brain docs)
+  added `./`-prefix normalization (path), SCREAMING_SNAKE env-var rejection
+  and dotted code-expression rejection — `context.now`, non-@ names with
+  dots — at the deliberate cost of missing socket.io-style packages
+  (dependency).
 - `src/cli/evaluate.mjs` — monorepo-aware deps (nearest+workspaces, 4
   fields), ESM/TS symbol forms with unknown escapes (`export *`, default
   expressions, CJS), literal-cardinality counts with uncertainty escapes,

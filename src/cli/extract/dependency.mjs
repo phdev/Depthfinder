@@ -41,9 +41,14 @@ function validName(name, { delimited, phrase }) {
   if (name.includes("/") && !name.startsWith("@")) return false; // path-like
   if (STOPLIST.has(name.toLowerCase())) return false;
   if (ENV_VAR.test(name)) return false;
+  // Dotted non-@scoped names (`context.now`, `req.body`) are code
+  // expressions far more often than packages; socket.io-style names are
+  // the rare loss — a deliberate miss, never an accusation. Real-corpus
+  // FP: "all time math uses `context.now`" became a dependency claim.
+  if (!name.startsWith("@") && name.includes(".")) return false;
   if (phrase && delimited) return PHRASED_NAME.test(name);
   if (!NPM_NAME.test(name)) return false;
-  if (phrase && !delimited) return /[@.]/.test(name);
+  if (phrase && !delimited) return name.includes("@");
   return name.startsWith("@"); // backtick alone
 }
 
