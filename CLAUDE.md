@@ -23,8 +23,18 @@ cwd ─▶ git root ─▶ ls-files Set ─▶ discover (5 conventions)
    ─▶ ingest (7A policy: BOM/size/EACCES skip+warn, 1k line cap)
    ─▶ extract (4 oracles, conservative grammars)
    ─▶ evaluate (unknown-never-false predicates)
-   ─▶ score (+<5 suppression) ─▶ top-3 ─▶ lazy git evidence ─▶ render
+   ─▶ top-3 ─▶ lazy git evidence + stale classification (capped)
+   ─▶ score (+<5 suppression) ─▶ render
 ```
+
+Card anatomy below the findings: the score line (`Context Honesty N ·
+M checkable claims · K unchecked`), the **Weight** line (~chars/4 of the
+scanned files — what loads into the agent every turn), and the breakdown
+line `N false claims · M stale · ~T tokens describe code that no longer
+exists`. **Stale** = a false path claim whose target verifiably existed in
+git history (deleted/renamed — the doc rotted); **false** = no such history
+(fabricated or never true). Both count against honesty identically; the
+split is evidence, not forgiveness.
 
 - `bin/depthfinder.mjs` — orchestration, parseArgs, exit codes (0 ran /
   1 internal / 2 usage·no-git / 3 no context files), stream discipline

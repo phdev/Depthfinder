@@ -110,6 +110,7 @@ function run({ values, positionals }) {
   const claims = [];
   const fileParagraphs = new Map();
   let skippedLines = 0;
+  let weightChars = 0; // Weight = what these files load into the agent, every turn
   const usable = [];
   for (const rel of scannedFiles) {
     const r = readContextFile(root, rel);
@@ -118,6 +119,7 @@ function run({ values, positionals }) {
       continue;
     }
     usable.push(rel);
+    weightChars += r.chars;
     skippedLines += r.skippedLines;
     if (r.skippedLines)
       warn(`${rel}: ${r.skippedLines} line(s) over 1,000 chars excluded from extraction`);
@@ -131,22 +133,35 @@ function run({ values, positionals }) {
   }
 
   evaluateClaims(claims, ctx);
-  const score = computeScore(claims);
-  const dead = deadTokens(fileParagraphs, claims, tokchars);
   const findings = selectFindings(claims);
 
-  // Lazy git evidence for rendered findings only (path oracle).
-  for (const f of findings) {
-    if (f.oracle !== "path") continue;
-    const ev = deletionEvidence(root, f.predicate.args.path, shallow);
+  // Lazy git history (path oracle) doubles as stale classification: a false
+  // claim whose target verifiably existed — deleted or renamed in history —
+  // was once TRUE; the doc rotted rather than lied from birth. Rendered
+  // findings enrich first (they must always carry evidence); the remaining
+  // false path claims classify up to a cap that keeps the lazy-history
+  // budget bounded on pathological repos (uncapped tail stays plain false).
+  const STALE_CAP = 25;
+  const falsePaths = claims.filter((c) => c.verdict === "false" && c.oracle === "path");
+  const ordered = [
+    ...falsePaths.filter((c) => findings.includes(c)),
+    ...falsePaths.filter((c) => !findings.includes(c)),
+  ];
+  for (const c of ordered.slice(0, STALE_CAP)) {
+    const ev = deletionEvidence(root, c.predicate.args.path, shallow);
     if (ev.kind === "renamed") {
-      f.evidence.actual = `moved to ${ev.to} (git rename)`;
+      c.evidence.stale = true;
+      c.evidence.actual = `moved to ${ev.to} (git rename)`;
     } else if (ev.kind === "deleted" && ev.sha) {
-      f.evidence.summary = `no such tracked file — deleted at ${ev.sha}${ev.commitsAgo ? `, ${ev.commitsAgo} commit${ev.commitsAgo === 1 ? "" : "s"} ago` : ""}`;
+      c.evidence.stale = true;
+      c.evidence.summary = `no such tracked file — deleted at ${ev.sha}${ev.commitsAgo ? `, ${ev.commitsAgo} commit${ev.commitsAgo === 1 ? "" : "s"} ago` : ""}`;
     } else if (shallow) {
-      f.evidence.summary = "no such tracked file (history unavailable in shallow clone)";
+      c.evidence.summary = "no such tracked file (history unavailable in shallow clone)";
     }
   }
+
+  const score = computeScore(claims);
+  const dead = deadTokens(fileParagraphs, claims, tokchars);
 
   const model = {
     now: ctx.now,
@@ -156,6 +171,7 @@ function run({ values, positionals }) {
     findings,
     score,
     dead,
+    weight: Math.round(weightChars / 4),
     claimsTotal: claims.length,
     claims,
     meta: { skippedLines, warnings, shallowClone: shallow },

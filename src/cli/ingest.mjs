@@ -15,7 +15,9 @@ import { join } from "node:path";
 export const MAX_FILE_BYTES = 2 * 1024 * 1024;
 export const MAX_LINE_CHARS = 1000;
 
-// -> { ok:true, lines:[{n,text,long}], paragraphs:[{start,end,text}], skippedLines }
+// -> { ok:true, lines:[{n,text,long}], paragraphs:[{start,end,text}],
+//      skippedLines, chars }   (chars feeds the Weight line: chars/4 ≈ the
+//      tokens this file loads into the agent every turn)
 //  | { ok:false, reason }
 export function readContextFile(root, rel) {
   const abs = join(root, rel);
@@ -70,5 +72,5 @@ export function readContextFile(root, rel) {
   if (start !== null)
     paragraphs.push({ start, end: lines.length, text: bufText.join("\n") });
 
-  return { ok: true, lines, paragraphs, skippedLines };
+  return { ok: true, lines, paragraphs, skippedLines, chars: text.length };
 }

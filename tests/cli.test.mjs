@@ -38,8 +38,9 @@ test("clean fixture: no-cry-wolf — 100, 0 false, ~0 dead tokens, exit 0", () =
   try {
     const r = runCli(root);
     assert.equal(r.code, 0);
-    assert.match(r.stdout, /Context Honesty {3}100 · \d+ checkable claims · 0 false/);
-    assert.match(r.stdout, /~0 tokens describe code that no longer exists/);
+    assert.match(r.stdout, /Context Honesty {3}100 · \d+ checkable claims/);
+    assert.match(r.stdout, /Weight {3}~\d[\d,]* tokens load every turn/);
+    assert.match(r.stdout, /0 false claims · 0 stale · ~0 tokens describe code that no longer exists/);
     assert.doesNotMatch(r.stdout, /✗/, "no findings invented on a clean repo");
   } finally {
     cleanup(root);
@@ -60,6 +61,10 @@ test("dirty fixture: the moment — replay-led, top-3, score with denominator", 
     assert.match(r.stdout, /tiers/);
     assert.match(r.stdout, /deleted at [0-9a-f]{7}/, "lazy git evidence on the dead path");
     assert.match(r.stdout, /Context Honesty {3}\d+ · 7 checkable claims · 1 unchecked/);
+    assert.match(r.stdout, /Weight {3}~\d[\d,]* tokens load every turn/);
+    // oauth.ts existed and was deleted -> stale; openWakeWord + tier count
+    // were never true -> false. The breakdown line tells them apart.
+    assert.match(r.stdout, /2 false claims · 1 stale · ~\d[\d,]* tokens describe code that no longer exists/);
     // UTF-16 AGENTS.md was skipped with a warning — on stderr, not stdout
     assert.match(r.stderr, /skipped AGENTS\.md: UTF-16/);
     assert.doesNotMatch(r.stdout, /skipped AGENTS/);
@@ -103,7 +108,9 @@ test("stream discipline (8A): --json parses even when warnings fire", () => {
     assert.equal(payload.schema, 0);
     assert.equal(payload.score.definite, 7);
     assert.equal(payload.score.false, 3);
+    assert.equal(payload.score.stale, 1, "deleted oauth.ts classifies as stale");
     assert.equal(payload.score.unknown, 1);
+    assert.ok(payload.weight.approxTokens > 0, "weight rides the payload");
     assert.ok(payload.meta.warnings.length > 0);
   } finally {
     cleanup(root);

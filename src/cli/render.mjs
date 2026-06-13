@@ -2,17 +2,20 @@
 //
 // Render decisions (approved): replay-led (findings before score), findings
 // cap 3, score always shows its denominator, NO status word, all token
-// figures ~-prefixed, unknown count shown when > 0. Stream discipline (8A):
-// this module RETURNS strings; bin writes the card to stdout and ALL
-// diagnostics to stderr. Redaction (1A) is applied by the caller at the
-// stream/serializer boundary.
+// figures ~-prefixed, unknown count shown when > 0. Below the score: the
+// Weight line (what these files load into the agent every turn) and the
+// breakdown line — false (fabricated/never existed) · stale (was true once,
+// git history proves it) · dead tokens. Stream discipline (8A): this module
+// RETURNS strings; bin writes the card to stdout and ALL diagnostics to
+// stderr. Redaction (1A) is applied by the caller at the stream/serializer
+// boundary.
 import { consequence } from "./templates.mjs";
 
 const nf = new Intl.NumberFormat("en-US"); // locale-pinned for determinism
 
 export function renderCard(model) {
   const {
-    scannedFiles, trackedCount, findings, score, dead, claimsTotal,
+    scannedFiles, trackedCount, findings, score, dead, weight, claimsTotal,
   } = model;
   const L = [];
   L.push("");
@@ -37,13 +40,15 @@ export function renderCard(model) {
     L.push(`  ${nf.format(claimsTotal)} claims found, none decidable — see --json for details.`);
   } else if (score.suppressed) {
     L.push(`  Only ${score.definite} checkable claim${score.definite === 1 ? "" : "s"} — score withheld.`);
-  } else if (score.falseCount === 0) {
-    L.push(`  Context Honesty   100 · ${nf.format(score.definite)} checkable claims · 0 false`);
   } else {
     const unchecked = score.unknownCount > 0 ? ` · ${nf.format(score.unknownCount)} unchecked` : "";
     L.push(`  Context Honesty   ${score.honesty} · ${nf.format(score.definite)} checkable claims${unchecked}`);
   }
-  L.push(`  ~${nf.format(dead)} tokens describe code that no longer exists.`);
+  L.push(`  Weight   ~${nf.format(weight)} tokens load every turn`);
+  const fab = score.falseCount - score.staleCount;
+  L.push(
+    `  ${fab} false claim${fab === 1 ? "" : "s"} · ${score.staleCount} stale · ~${nf.format(dead)} tokens describe code that no longer exists`,
+  );
   L.push("");
   L.push("  Your agent reads all of this as ground truth, every call.");
   L.push("  npx depthfinder --json for full results");

@@ -25,10 +25,17 @@ $ npx depthfinder
       └ an agent reasoning about "4 tiers" will plan against a structure that has 3
 
   Context Honesty   64 · 22 checkable claims · 3 unchecked
-  ~4,210 tokens describe code that no longer exists.
+  Weight   ~9,480 tokens load every turn
+  5 false claims · 3 stale · ~4,210 tokens describe code that no longer exists
 
   Your agent reads all of this as ground truth, every call.
 ```
+
+**Weight** is what these files cost on every single agent call.
+**False** claims never matched the repo's history (fabricated or always
+wrong); **stale** claims were once true — git proves the file existed
+before it was deleted or moved. Both count against the score; the split
+tells you whether your docs rot or lie.
 
 Zero config. Sub-5 seconds. **No model calls — nothing leaves your
 machine.** Deterministic checks only: if Depthfinder can't decide a claim

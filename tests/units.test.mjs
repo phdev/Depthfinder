@@ -63,6 +63,16 @@ test("score: edge matrix — suppression below 5 definite, unknowns excluded", (
   assert.equal(s3.definite, 0);
   assert.equal(s3.honesty, null);
   assert.equal(MIN_DEFINITE_FOR_SCORE, 5);
+
+  // stale is a subset of false: same score arithmetic, separate count.
+  const s4 = computeScore([
+    { verdict: "false", evidence: { stale: true } },
+    { verdict: "false" },
+    ...Array.from({ length: 4 }, () => c("true")),
+  ]);
+  assert.equal(s4.falseCount, 2);
+  assert.equal(s4.staleCount, 1);
+  assert.equal(s4.honesty, 67);
 });
 
 test("dead tokens: only paragraphs containing false path/symbol claims count", () => {

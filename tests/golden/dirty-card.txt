@@ -14,7 +14,8 @@
       └ an agent reasoning about "4 tiers" will plan against a structure that has 3 in `router/config.js`
 
   Context Honesty   57 · 7 checkable claims · 1 unchecked
-  ~21 tokens describe code that no longer exists.
+  Weight   ~77 tokens load every turn
+  2 false claims · 1 stale · ~21 tokens describe code that no longer exists
 
   Your agent reads all of this as ground truth, every call.
   npx depthfinder --json for full results
