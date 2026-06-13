@@ -176,3 +176,24 @@ test("precision gate (9A): zero false accusations on hand-labeled corpus", () =>
     cleanup(dirty);
   }
 });
+
+test("large --json payloads (>64KB) are not truncated by exit (pipe flush)", () => {
+  // 200 true path claims -> payload well past the 64KB pipe buffer.
+  const files = { "CLAUDE.md": "" };
+  const lines = ["# big"];
+  for (let i = 0; i < 200; i++) {
+    files[`src/mod${i}.js`] = `export const m${i} = ${i}\n`;
+    lines.push(`Module ${i} lives in \`src/mod${i}.js\`.`);
+  }
+  files["CLAUDE.md"] = lines.join("\n\n") + "\n";
+  const root = makeRepo(files);
+  try {
+    const r = runCli(root, ["--json"]);
+    assert.equal(r.code, 0);
+    assert.ok(r.stdout.length > 64 * 1024, `payload only ${r.stdout.length} bytes — fixture too small`);
+    const payload = JSON.parse(r.stdout); // truncation = parse failure
+    assert.equal(payload.score.definite, 200);
+  } finally {
+    cleanup(root);
+  }
+});

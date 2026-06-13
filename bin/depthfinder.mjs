@@ -174,8 +174,12 @@ function run({ values, positionals }) {
       process.stderr.write(`  wrote ${file}\n`);
     } catch (e) {
       process.stderr.write(`depthfinder: could not write --out: ${e.message}\n`);
-      process.exit(2);
+      process.exitCode = 2;
+      return;
     }
   }
-  process.exit(0);
+  // No process.exit() here: payloads >64KB are still buffered in the stdout
+  // pipe, and exit() would truncate them mid-write (caught live on a
+  // 92-claim repo). Let the event loop drain; exitCode covers the status.
+  process.exitCode = 0;
 }
