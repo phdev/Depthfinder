@@ -1,25 +1,35 @@
 # TODOS
 
-## ✅ V1.0 PUBLISHED to npm — 2026-06-13
+## ✅ V1.0 PUBLISHED to npm — 2026-06-13 (latest = 1.0.1; OIDC CI confirmed)
 
-`depthfinder@1.0.0` is LIVE (`npx depthfinder` works; npmjs.com/package/depthfinder,
-latest:1.0.0, deps:none, 25 files/96.9kB). The tag-triggered CI publish failed 4× with
-`EOTP` — the npm account's 2FA-for-writes demands a one-time password CI can't supply,
-and the granular token didn't bypass it (only a classic Automation token would, which
-wasn't available in the UI). Shipped via a **manual local publish** (`npm login` web
-flow → `npm publish --access public` → browser 2FA). v1.0.0 has **no provenance badge**
-(manual); v1.0.1+ will.
+`depthfinder` is LIVE — `npx depthfinder` works; npmjs.com/package/depthfinder,
+**latest 1.0.1**, deps:none, 25 files/96.9kB.
+- **1.0.0** — first publish. The tag-triggered CI publish failed 4× with `EOTP` (the npm
+  account's 2FA-for-writes demands an OTP CI can't supply; the granular token didn't bypass
+  it, and classic Automation tokens weren't offered in the UI). Shipped via a **manual local
+  publish** (`npm login` web flow → `npm publish --access public` → browser 2FA). No
+  provenance badge (manual).
+- **1.0.1** — first **OIDC trusted-publishing** auto-publish (adds homepage/bugs links).
+  Verified via OIDC: `_npmUser` = `GitHub Actions <npm-oidc-no-reply@github.com>`,
+  `trustedPublisher.id = github`, **provenance attestation present.**
 
-**CI re-armed with OIDC trusted publishing** (publish.yml: dropped `NODE_AUTH_TOKEN`,
-node 24 + `npm i -g npm@latest`, kept `id-token: write` + `--provenance`). **One-time
-user step before the next release:** add a Trusted Publisher on
-npmjs.com/package/depthfinder → Settings → GitHub Actions (org `phdev`, repo
-`Depthfinder`, workflow `publish.yml`, env blank). After that every release =
-bump version + `git tag vX.Y.Z && git push` → CI auto-publishes with provenance, no
-token, no manual step. The now-unused `NPM_TOKEN` repo secret can be deleted
-(`gh secret delete NPM_TOKEN --repo phdev/Depthfinder`) — left as a harmless fallback
-for now. (`actions/checkout@v4`+`setup-node@v4` will force-bump to Node 24 runners
-after 2026-06-16 — already aligned.)
+**The OIDC pipeline is proven end-to-end.** publish.yml: no token (`id-token: write` +
+trusted publisher), node 24 + `npm i -g npm@latest` (OIDC needs npm ≥11.5.1; runner had
+11.17.0), `--provenance --access public`, plus a harmless `node/npm --version` echo.
+
+**⚠️ HARD-WON GOTCHA:** OIDC publish failed `E404` **six** times after the trusted publisher
+was added — provenance signed each time (OIDC available) but the publish PUT 404'd. Root
+cause: the Trusted Publisher **Repository field was lowercase `depthfinder`, but GitHub's
+OIDC `repository` claim is the canonical case `phdev/Depthfinder`, and npm matches it
+CASE-SENSITIVELY** → OIDC identity rejected → fell back to setup-node's placeholder token
+→ 404. **Fix: set Repository to exactly `Depthfinder` (capital D), name-only.** Ruled out
+first (all fine): npm version, workflow correctness, publishing-access setting, allowed
+actions. Lesson: npm Trusted Publisher org/repo must EXACTLY match GitHub's case; a
+mismatch 404s in a way that looks like a permissions/2FA problem.
+
+**Future releases:** bump version + `git tag vX.Y.Z && git push` → auto-publish with
+provenance, no token, no manual step. Optional cleanup: delete the now-unused `NPM_TOKEN`
+secret (`gh secret delete NPM_TOKEN --repo phdev/Depthfinder`).
 
 ## Roadmap — re-sequenced 2026-06-13 around durable value (acquisition vs retention)
 
