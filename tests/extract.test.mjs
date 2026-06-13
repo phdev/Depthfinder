@@ -66,6 +66,11 @@ test("dependency oracle: extraction table (the self-scan FP class)", () => {
     // socket.io-style dotted packages are a deliberate miss, never a claim.
     ["all time math uses `context.now` so the function is testable", []],
     ["chat uses `socket.io` for transport", []],
+    // real-corpus FP class (corpus gate, sst/opencode AGENTS.md): PascalCase
+    // code types are not npm packages; lowercase-first legacy names still pass.
+    ["it uses `ScopedCache` keyed by directory", []],
+    ["state lives in `InstanceState` from effect", []],
+    ["wake word handled by `openWakeWord`", ["openWakeWord"]],
   ];
   for (const [text, expected] of cases) {
     const got = extractDependencyClaims("CLAUDE.md", [L(text)]).map((c) => c.predicate.args.name);

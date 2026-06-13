@@ -41,6 +41,11 @@ function validName(name, { delimited, phrase }) {
   if (name.includes("/") && !name.startsWith("@")) return false; // path-like
   if (STOPLIST.has(name.toLowerCase())) return false;
   if (ENV_VAR.test(name)) return false;
+  // npm names are lowercase-first; a PascalCase token after "uses `X`" is a
+  // code TYPE/class, not a package (corpus gate: opencode AGENTS.md
+  // "uses `ScopedCache`" / "`InstanceState`"). Legacy camelCase like
+  // openWakeWord (lowercase-first) still passes.
+  if (/^[A-Z]/.test(name.startsWith("@") ? name.split("/")[1] || "" : name)) return false;
   // Dotted non-@scoped names (`context.now`, `req.body`) are code
   // expressions far more often than packages; socket.io-style names are
   // the rare loss — a deliberate miss, never an accusation. Real-corpus

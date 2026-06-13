@@ -50,20 +50,21 @@ export function evaluateClaims(claims, ctx) {
 }
 
 // ── path ────────────────────────────────────────────────────────────────
-// A path claim's candidate locations. Convention claims resolve only at the
-// path the author wrote. Doc claims ALSO resolve relative to their own file's
-// directory — a package README that says `src/index.ts` means
-// packages/foo/src/index.ts, not repo root (eng-review absorb #5). False only
-// when NEITHER candidate exists; otherwise no monorepo accusation.
+// A path claim's candidate locations: the path the author wrote, AND — when
+// the claim's source file is nested — that path resolved relative to the
+// source file's own directory. A `packages/foo/AGENTS.md` (or any nested doc)
+// that says `scripts/build.ts` means packages/foo/scripts/build.ts, not repo
+// root (eng-review absorb #5, broadened to ALL tiers after the corpus gate
+// caught cloudflare/agents false-accusing a nested AGENTS.md). Adding a
+// candidate can only turn false→true, never true→false, so it never creates
+// an accusation. False only when NEITHER candidate exists.
 function effectivePaths(claim) {
   const path = claim.predicate.args.path;
   const out = [path];
-  if (claim.tier === "doc") {
-    const sf = claim.source.file;
-    if (sf && sf.includes("/")) {
-      const rel = resolveRelPosix(sf, path);
-      if (rel && rel !== path) out.push(rel);
-    }
+  const sf = claim.source.file;
+  if (sf && sf.includes("/")) {
+    const rel = resolveRelPosix(sf, path);
+    if (rel && rel !== path) out.push(rel);
   }
   return out;
 }

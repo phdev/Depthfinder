@@ -203,7 +203,14 @@ function run({ values, positionals }) {
       if (r.skippedLines)
         warn(`${rel}: ${r.skippedLines} line(s) over 1,000 chars excluded from extraction`);
       const linesByNum = new Map(r.lines.map((l) => [l.n, l]));
-      const kept = keepDocClaims(extractPathClaims(rel, r.lines, ctx), linesByNum);
+      // Extensionless paths in docs are usually NOT files — JSON-RPC methods
+      // (`ui/initialize`), routes, globs, package/dir refs. Docs get the
+      // with-extension path grammar only (corpus gate: block/goose blog +
+      // codex/cloudflare dir refs false-accused). Convention files keep both.
+      const raw = extractPathClaims(rel, r.lines, ctx).filter(
+        (c) => c.extraction.pattern !== "backtick_path_noext",
+      );
+      const kept = keepDocClaims(raw, linesByNum);
       for (const c of kept) c.tier = "doc";
       docClaims.push(...kept);
     }

@@ -31,8 +31,16 @@ const EXAMPLE =
 // they don't swallow ordinary prose. NOT included: "lives in" / "located in"
 // without a sink — those are present-tense LOCATION claims we WANT to check.
 const GEN_VERB =
-  /\b(written|writes?|wrote|generates?|generated|emits?|emitted|saves?|saved|dumps?|dumped|publish(es|ed)?|downloads?|downloaded|caches?|cached|mounts?|mounted|serves?|served|outputs?|stores?|stored)\b/i;
+  /\b(written|writes?|wrote|generates?|generated|emits?|emitted|saves?|saved|dumps?|dumped|publish(es|ed)?|downloads?|downloaded|caches?|cached|mounts?|mounted|serves?|served|outputs?|stores?|stored|commits?|committed)\b/i;
 const GEN_PHRASE = /\b(created|available|placed|produced)\s+(at|in|under|by|to)\b/i;
+
+// Imperative change-instructions about a file ("Remove `X`", "Delete `X`",
+// "Port `X`") — spec/plan prose, not a present-tense existence claim; the
+// file is often mid-removal and legitimately absent. Require the verb
+// immediately before a backtick so ordinary prose ("remove the cache") is
+// untouched. (corpus gate: sst/opencode specs false-accused dozens.)
+const IMPERATIVE =
+  /\b(remove|delete[sd]?|drops?|rename[sd]?|deprecates?|ports?|migrates?|moves?|replaces?)\s+`/i;
 
 // A doc line yields NO checkable claims when it is fenced code or carries any
 // narrative/example/generated cue. Conservative LINE-level drop (absorb #3):
@@ -42,7 +50,7 @@ export function isNarrativeLine(line) {
   if (!line) return false;
   if (line.inFence) return true;
   const t = line.text;
-  return NARRATIVE.test(t) || EXAMPLE.test(t) || GEN_VERB.test(t) || GEN_PHRASE.test(t);
+  return NARRATIVE.test(t) || EXAMPLE.test(t) || GEN_VERB.test(t) || GEN_PHRASE.test(t) || IMPERATIVE.test(t);
 }
 
 // Keep only the doc path claims that sit on checkable present-tense lines.
