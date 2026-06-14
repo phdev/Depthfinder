@@ -223,6 +223,19 @@ Five tabs, each with a hash route for deep-linking:
 | Evals (rule × test × in-CI matrix + live AgentCI gate) | `#evals` | `scripts/coverage.mjs` |
 | Drift (Packmind context-evaluator, cached/opt-in) | `#drift` | `scripts/drift-refresh.mjs` |
 
+**Summary Health model.** `scripts/summary.mjs` emits a composite `healthScore`
+(0–100) decomposed into three **deterministic** dimensions: **Coherence** (docs
+match code — from map dangling refs + duplicate drift), **Weight** (load every
+turn — from token budgets), **Coverage** (rules/evals enforced in CI — from the
+coverage matrix), weighted 0.4 / 0.3 / 0.3. The design's 4th dimension
+("Simplicity") was dropped as non-deterministic. The Summary tab renders a health
+hero (rating: <35 Critical / 35–69 Caution / ≥70 Healthy) + 3 dimension cards + a
+ranked Hotspots table, styled by `public/summary.css` (scoped under
+`#panel-summary` so the other tabs are untouched). Every score is honest math over
+real signals — no fabricated numbers; the unknown-never-false invariant applies to
+the dashboard too (per-hotspot projected gains are omitted until they can be
+computed, never guessed).
+
 ## Architecture
 
 - `server.mjs` — built-in `http` server. Binds **127.0.0.1 only** by default;
@@ -236,7 +249,8 @@ Five tabs, each with a hash route for deep-linking:
   gitignored; see `.repo-root.example`.
 - `lib/redact.mjs` — secret/token/key patterns are redacted from every API
   payload before it reaches the browser.
-- `public/` — vanilla JS single page (`index.html`, `app.js`, `styles.css`).
+- `public/` — vanilla JS single page (`index.html`, `app.js`, `styles.css`,
+  plus `summary.css` for the ported Summary redesign).
   Monochrome design system (near-black bg, translucent panels, grayscale).
   Hash-based routing: tab clicks push history entries; back/forward work;
   unknown hashes normalize to `#summary`.
