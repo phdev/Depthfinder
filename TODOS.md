@@ -35,9 +35,14 @@ secret (`gh secret delete NPM_TOKEN --repo phdev/Depthfinder`).
 
 The next RETENTION brick: a CI-grade exit gate so a build fails when context rot is
 introduced. Eng-reviewed (4 decisions) + Codex outside-voice (8 findings, 1 reversal,
-5 hardenings absorbed). **Built + tested (70 tests, golden byte-stable, bench within
-budget); all decisions below implemented in `bin/depthfinder.mjs` + `src/cli/claims.mjs`
-+ `tests/cli.test.mjs`.** Ships in the next version bump (no tag yet).
+5 hardenings) + cross-model `/review` (Codex + Claude adversarial). **Built + tested
+(72 tests, golden byte-stable, bench within budget) in `bin/depthfinder.mjs` +
+`src/cli/claims.mjs` + `tests/cli.test.mjs`.** Ships in the next version bump (no tag yet).
+`/review` changed two decisions vs the plan: exit code **4 → 20** (4 collides with
+Node's reserved internal-failure codes 3-12, defeating the "distinct from crash" goal),
+and added **fail-closed** on unread context files (F1, below). It also caught a P1:
+a huge `--max-false` digit string `parseInt`→`Infinity` silently disabled the gate
+(fail-open) — now rejected via `Number.isSafeInteger`.
 
 **Implemented design:**
 - **Flags:** `--strict` (boolean) + `--max-false N` (default 0). Gate trips when
@@ -50,27 +55,41 @@ budget); all decisions below implemented in `bin/depthfinder.mjs` + `src/cli/cla
   (minus `--no-follow`). NOT the Doc tier. `--strict-docs` DEFERRED until the doc corpus is
   zero-false (rides the same gate that flips `--docs` default-on) — gating a known-FP-prone
   tier would fail builds on false positives, the cardinal sin.
-- **Exit 4** on a gate breach (distinct, NOT shared with `1`=internal-error). New code only
-  appears under `--strict`, so zero breakage; gives wrappers + the future Action a clean
-  "rotted vs crashed" contract. Precedence: `2` (usage/git/--out-fail) > `3` (no context) >
-  `4` (gate) > `0`.
-- **CRITICAL impl:** set `process.exitCode = 4`, **never `process.exit()`** after stdout —
-  `process.exit()` truncates >64KB payloads mid-write (bin/depthfinder.mjs:400-403 already
-  guards this; the gate must too).
-- **`--out` precedence:** an `--out` write failure (exit 2) returns before the gate → exit 2
-  wins (the requested artifact wasn't produced).
-- **`--strict --docs`:** print a stderr advisory `Doc Honesty is advisory and was not gated`
-  so a green build with visible doc rot isn't confusing.
-- **`--json`:** add an additive `gate` object — `{strict, maxFalse, false, failed, tier:"context"}`
-  — so consumers read `gate.failed` directly, not infer from `score.false`.
-- **Tests (~13):** clean→0, dirty→4, boundary `==`(pass)/`>`(fail), invalid `--max-false`
-  (float/NaN/Infinity/negative/empty)→2 BEFORE repo work, `--strict --json` valid+exit4+no-
-  truncation, stdout byte-identical to non-strict (golden unaffected), **doc-tier-never-gates**
-  regression, **suppressed-score-still-gates** edge, >3 false gates on total falseCount,
-  `--out` precedence, no-context→3.
+- **Exit 20** on a gate breach — OUTSIDE Node's reserved 1-13 range (1=uncaught, 3-12=Node
+  internal), so wrappers + the future Action get a clean "rotted/unverified vs crashed"
+  contract. Only appears under `--strict`, zero breakage. Precedence: `2` (usage/git/--out-fail)
+  > `3` (no context) > `20` (gate) > `0`.
+- **FAIL-CLOSED on unread context files (F1, /review):** a context file that couldn't be read
+  (UTF-16/EACCES/oversize → 0 claims) ALSO fails the gate (`gate.unverifiedFiles`). "Couldn't
+  verify" must not read as "clean" — a gate that PASSES on an unread file is fail-open, the
+  cardinal sin. (`scannedFiles.length - usable.length`.)
+- **`--max-false` is `Number.isSafeInteger`-bounded:** a huge digit string passes `/^\d+$/`
+  but `parseInt`→`Infinity` (or > 2^53), making `false > maxFalse` always-false = silently
+  disabled gate. Rejected with exit 2.
+- **CRITICAL impl:** set `process.exitCode = 20`, **never `process.exit()`** after stdout —
+  `process.exit()` truncates >64KB payloads mid-write (the gate honors the same guard).
+- **`--out` precedence:** an `--out` write failure (exit 2) returns before the gate → exit 2 wins.
+- **`--strict --docs`:** stderr advisory `Doc Honesty is advisory and was not gated` ONLY when
+  docs actually have ungated rot (not on clean docs).
+- **`--json`:** additive `gate` object — `{strict, maxFalse, false, tier:"context", unverifiedFiles, failed}`
+  where `failed` = rot OR unverified; consumers read `gate.failed` directly.
+- **Tests (~17, 72 total):** clean→0, dirty→20, boundary `==`(pass)/`>`(fail) on a no-skip
+  fixture, invalid `--max-false` (float/NaN/Infinity/negative/empty/huge-overflow)→2 BEFORE
+  repo work, `--strict --json` valid+exit20+no-truncation incl a >64KB FAILING payload,
+  stdout byte-identical to non-strict (golden unaffected), **doc-tier-never-gates** regression,
+  **suppressed-score-still-gates** edge, **fail-closed-on-skipped-file** (F1), `--out` precedence,
+  no-context→3.
 - **Docs:** CLAUDE.md + README + a CI example that **PINS the npm version** (`npx depthfinder@1.0.1`)
   — `--max-false N` is only a stable policy against a pinned extractor (a release can change
   the count with zero repo changes).
+
+**Deferred — P1 follow-up (from /review F1):** fail-closed on the SUBTLER oracle-degradation
+cases, not just unread files: a fatal `git check-ignore` (evaluate.mjs downgrades every missing
+path false→unknown → falseCount collapses → PASS on rot), and a symbol-search timeout
+(`SYMBOL_WALL_MS`/`SYMBOL_FILE_CAP`) that turns would-be-false into unknown under CI load. Needs
+a "degraded due to tool failure" signal threaded through ingest + evaluate, distinct from a
+LEGITIMATE unknown (gitignored-absent path, shallow-clone history) which must still PASS. The
+file-skip case (`unverifiedFiles`) is the clearest slice and is already shipped; this is the rest.
 
 **NOT in scope (deferred, tracked):** `--strict-docs` (until doc corpus zero-false) ·
 consumer **GitHub Action** (thin composite over `npx depthfinder --strict`; ships after the

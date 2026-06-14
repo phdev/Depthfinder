@@ -11,9 +11,10 @@
 //     1  internal error (uncaught)
 //     2  usage error / bad --out / not a git repo / git binary missing
 //     3  no context files found
-//     4  --strict gate breach: Context Honesty has > --max-false false claims.
-//        DISTINCT from 1 so a wrapper/CI Action can tell rot from a crash; only
-//        ever appears under --strict. Precedence: 2 > 3 > 4 > 0.
+//     20 --strict gate breach: Context Honesty has > --max-false false claims,
+//        OR a context file couldn't be verified (skipped/unread → fail-closed).
+//        Outside Node's reserved 1-13 range so a wrapper/CI Action can tell it
+//        from a tool crash; only ever appears under --strict. Precedence: 2 > 3 > 20 > 0.
 //
 //   Pipeline:
 //     cwd ─▶ git root ─▶ ls-files Set ─▶ discover context files
@@ -62,7 +63,8 @@ const USAGE = `usage: depthfinder [path] [--json] [--out <dir>] [--no-follow] [-
   --no-follow do not follow "read first" links from context files into repo docs
   --docs      also scan the wider repo docs for a Doc Honesty score (opt-in;
               the doc grammar isn't yet corpus-clean enough to accuse by default)
-  --strict    CI gate: exit 4 when Context Honesty has false claims (rot).
+  --strict    CI gate: exit 20 when Context Honesty has false claims (rot) or a
+              context file couldn't be verified (skipped/unread → fail-closed).
               Gates the Context tier only (convention files + nested + followed
               "read first" links, minus --no-follow); Doc Honesty is never gated.
               Pin the version in CI (e.g. npx depthfinder@${VERSION}) so the
@@ -139,6 +141,14 @@ function run({ values, positionals }) {
       process.exit(2);
     }
     maxFalse = parseInt(raw, 10);
+    // A huge digit string parseInt-overflows to Infinity (or just exceeds 2^53),
+    // making `falseCount > maxFalse` ALWAYS false — i.e. a silently-disabled gate
+    // (fail-open, the worst failure for a safety check). Refuse anything that
+    // isn't a safe integer; a real rot budget is a handful, never astronomical.
+    if (!Number.isSafeInteger(maxFalse)) {
+      process.stderr.write(`depthfinder: --max-false is too large (got "${values["max-false"]}" — that would silently disable the gate)\n${USAGE}\n`);
+      process.exit(2);
+    }
   }
 
   const startDir = resolve(positionals[0] || ".");
@@ -348,8 +358,20 @@ function run({ values, positionals }) {
   // --strict gate state (Phase A), evaluated on the CONTEXT tier only. Recorded
   // in the payload so `--json` consumers read gate.failed directly instead of
   // re-deriving it from score.false. null unless --strict was requested.
+  //
+  // FAIL-CLOSED: a context-tier file that couldn't even be READ (UTF-16 BOM,
+  // EACCES, oversize) contributes zero claims, so "0 false" doesn't mean "clean"
+  // — it can mean "I never checked this file." A gate that PASSES on an unread
+  // context file is fail-open, the cardinal sin for a safety check. So a skipped
+  // convention file fails the gate too (`unverifiedFiles`). (The subtler oracle-
+  // degradation cases — a fatal `git check-ignore`, a symbol-search timeout that
+  // turns would-be-false into unknown — are a tracked P1 follow-up.)
+  const unverifiedFiles = values.strict ? scannedFiles.length - usable.length : 0;
   const gate = values.strict
-    ? { strict: true, maxFalse, false: score.falseCount, failed: score.falseCount > maxFalse, tier: "context" }
+    ? {
+        strict: true, maxFalse, false: score.falseCount, tier: "context",
+        unverifiedFiles, failed: score.falseCount > maxFalse || unverifiedFiles > 0,
+      }
     : null;
   // docScore is null when no docs were scanned (--no-docs, or a repo with no
   // doc files) — distinct from "scanned, nothing checkable" (a real score
@@ -429,20 +451,32 @@ function run({ values, positionals }) {
       return;
     }
   }
-  // --strict gate (Phase A): fail CI with a DISTINCT exit 4 — never 1 (internal
-  // error), so a wrapper/Action can tell "context rotted" from "tool crashed".
-  // Runs AFTER --out (an --out write failure already returned with exit 2: the
+  // --strict gate (Phase A): fail CI with a DISTINCT exit 20 — outside Node's
+  // reserved 1-13 range (1=uncaught, 3-12=internal), so a wrapper/Action can
+  // tell "context rotted" / "couldn't verify" from "the tool crashed". Runs
+  // AFTER --out (an --out write failure already returned with exit 2: the
   // requested artifact wasn't produced, which outranks the gate). Sets
   // process.exitCode, never process.exit() — exit() would truncate a >64KB
   // --json payload mid-write (same guard as the success path below).
   if (gate) {
-    if (values.docs)
-      process.stderr.write("  ! --strict gates Context Honesty only; Doc Honesty is advisory and was not gated\n");
-    if (gate.failed) {
+    // Only flag the doc tier when it actually has ungated rot — a green build
+    // hiding doc dead-refs is the confusing case worth a word; clean docs aren't.
+    if (values.docs && docScore && docScore.falseCount > 0)
+      process.stderr.write(`  ! --strict gates Context Honesty only; Doc Honesty is advisory and was not gated (${docScore.falseCount} doc dead ref${docScore.falseCount === 1 ? "" : "s"})\n`);
+    if (score.falseCount > maxFalse) {
       process.stderr.write(
-        `depthfinder --strict: FAIL — ${score.falseCount} false Context claim${score.falseCount === 1 ? "" : "s"} > --max-false ${maxFalse} (exit 4)\n`,
+        `depthfinder --strict: FAIL — ${score.falseCount} false Context claim${score.falseCount === 1 ? "" : "s"} > --max-false ${maxFalse} (exit 20)\n`,
       );
-      process.exitCode = 4;
+      process.exitCode = 20;
+      return;
+    }
+    if (unverifiedFiles > 0) {
+      // Fail-closed: we couldn't even read N context file(s), so "0 false" isn't
+      // trustworthy. Don't green-light a run we couldn't verify.
+      process.stderr.write(
+        `depthfinder --strict: COULD NOT VERIFY — ${unverifiedFiles} context file(s) skipped/unread, so "${score.falseCount} false" can't be trusted; failing closed (exit 20)\n`,
+      );
+      process.exitCode = 20;
       return;
     }
     process.stderr.write(`depthfinder --strict: PASS — ${score.falseCount} false ≤ --max-false ${maxFalse} (Context Honesty)\n`);

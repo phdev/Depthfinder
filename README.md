@@ -105,7 +105,7 @@ npx depthfinder --no-history # don't record this run / show a "since last run" d
 npx depthfinder --no-follow # don't follow "read first" links into repo docs
 npx depthfinder --docs     # opt in to the wider-docs scan (Doc Honesty)
 npx depthfinder --burn     # run your agent against the top false claim (opt-in; calls a model)
-npx depthfinder --strict   # CI gate: exit 4 when your context has rotted (false claims)
+npx depthfinder --strict   # CI gate: exit 20 when your context has rotted (false claims)
 npx depthfinder --strict --max-false 5  # ...allow up to 5 before failing (ratchet)
 npx depthfinder --version  # print the version and exit (-v); --help (-h) for usage
 ```
@@ -126,7 +126,7 @@ delta — `Context Honesty 95 (▼17 since last run)`. That stays on your machin
 ### Fail CI when your context rots — `--strict`
 
 The default scan is advisory (always exit 0). `--strict` turns it into a **gate**:
-it exits **4** when your Context Honesty has any false claim — so a PR that lets
+it exits **20** when your Context Honesty has any false claim — so a PR that lets
 `CLAUDE.md` drift out of sync with the repo fails the build.
 
 ```yaml
@@ -148,9 +148,14 @@ jobs:
 - **Pin the npm version** (`npx depthfinder@1.0.1`, not bare `npx depthfinder`).
   The false count is extractor-dependent; a future release could change it and
   turn your build red with zero repo changes. Pinning makes `--max-false` stable.
-- Exit **4** is distinct from **1** (a tool crash), so a wrapper can tell "your
-  context rotted" from "depthfinder broke." `--json` carries a
-  `gate: { strict, maxFalse, false, failed, tier }` object for programmatic use.
+- **Fails closed.** If a context file can't be read (UTF-16, permissions), the
+  gate fails rather than passing on a file it never checked — "couldn't verify"
+  is not "clean."
+- Exit **20** is outside Node's reserved range (1, 3–12 are Node's own internal
+  failures), so a wrapper can tell "your context rotted" from "depthfinder
+  broke." `--json` carries a
+  `gate: { strict, maxFalse, false, tier, unverifiedFiles, failed }` object
+  (`failed` = rot or couldn't-verify) for programmatic use.
 
 ### Exit codes
 
@@ -160,7 +165,7 @@ jobs:
 | 1 | internal error |
 | 2 | usage error · not a git repo · git missing · bad `--out` |
 | 3 | no context files found |
-| 4 | `--strict` gate breach: Context Honesty has > `--max-false` false claims |
+| 20 | `--strict` gate breach: Context Honesty has > `--max-false` false claims, or a context file couldn't be verified (fail-closed) |
 
 ### What it checks
 

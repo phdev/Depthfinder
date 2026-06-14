@@ -494,7 +494,7 @@ test("large --json payloads (>64KB) are not truncated by exit (pipe flush)", () 
 });
 
 // ── --strict CI gate (Phase A) ──────────────────────────────────────────────
-test("--strict: clean passes (exit 0), dirty fails with the DISTINCT exit 4 (not 1=internal-error)", () => {
+test("--strict: clean passes (exit 0), dirty fails with the DISTINCT exit 20 (off Node's reserved range)", () => {
   const clean = materialize("clean");
   const dirty = materialize("dirty");
   try {
@@ -503,24 +503,28 @@ test("--strict: clean passes (exit 0), dirty fails with the DISTINCT exit 4 (not
     assert.match(c.stderr, /strict: PASS/);
 
     const d = runCli(dirty, ["--strict"]);
-    assert.equal(d.code, 4, "dirty repo fails with exit 4 — distinct from 1 (internal error)");
+    assert.equal(d.code, 20, "dirty repo fails with exit 20 — outside Node's reserved 1-13");
     assert.match(d.stderr, /strict: FAIL/);
-    assert.match(d.stderr, /exit 4/);
+    assert.match(d.stderr, /exit 20/);
   } finally {
     cleanup(clean); cleanup(dirty);
   }
 });
 
 test("--strict --max-false: boundary is > not >= (==N passes, N-1 fails); gates on TOTAL falseCount", () => {
-  const dirty = materialize("dirty");
+  // Rot WITHOUT any skipped file, so within-budget genuinely PASSES (the dirty
+  // fixture's UTF-16 AGENTS.md would otherwise trip the fail-closed path).
+  const lines = ["# t", ""];
+  for (let i = 0; i < 6; i++) lines.push(`Item ${i} is \`src/gone${i}.js\`.`); // 6 dead paths
+  const root = makeRepo({ "CLAUDE.md": lines.join("\n") + "\n", "src/real.js": "export const x = 1\n" });
   try {
-    const n = JSON.parse(runCli(dirty, ["--json"]).stdout).score.false;
-    assert.ok(n > 0, "dirty fixture has false claims");
-    assert.equal(runCli(dirty, ["--strict", "--max-false", String(n)]).code, 0, `budget ${n} == false ${n} → pass`);
-    assert.equal(runCli(dirty, ["--strict", "--max-false", String(n - 1)]).code, 4, `budget ${n - 1} < false ${n} → fail`);
-    assert.equal(runCli(dirty, ["--strict", "--max-false", "0"]).code, 4, "explicit --max-false 0 == default");
+    const n = JSON.parse(runCli(root, ["--json"]).stdout).score.false;
+    assert.ok(n >= 5, `expected several false claims, got ${n}`);
+    assert.equal(runCli(root, ["--strict", "--max-false", String(n)]).code, 0, `budget ${n} == false ${n} → pass`);
+    assert.equal(runCli(root, ["--strict", "--max-false", String(n - 1)]).code, 20, `budget ${n - 1} < false ${n} → fail`);
+    assert.equal(runCli(root, ["--strict", "--max-false", "0"]).code, 20, "explicit --max-false 0 fails on rot");
   } finally {
-    cleanup(dirty);
+    cleanup(root);
   }
 });
 
@@ -534,18 +538,42 @@ test("--max-false: invalid values are a usage error (exit 2) BEFORE any repo wor
     }
     // negative (via = form so parseArgs keeps it as the value) is rejected, never silently 0
     assert.equal(runCli(clean, ["--strict", "--max-false=-1"]).code, 2, "--max-false=-1 → exit 2");
+    // [F2, cross-model] a huge digit string passes /^\d+$/ but parseInt-overflows
+    // to Infinity (or just exceeds 2^53) → `false > Infinity` is always false →
+    // the gate would SILENTLY fail-open. Must be rejected (exit 2), never disable.
+    const huge = runCli(clean, ["--strict", "--max-false", "1".padEnd(400, "0")]);
+    assert.equal(huge.code, 2, "astronomically large --max-false → exit 2 (no silent fail-open)");
+    assert.match(huge.stderr, /too large|disable the gate/);
+    assert.equal(runCli(clean, ["--strict", "--max-false", "9007199254740993"]).code, 2, "> MAX_SAFE_INTEGER → exit 2");
   } finally {
     cleanup(clean);
   }
 });
 
-test("--strict --json: gate object + failed flag; stdout stays valid JSON; exit 4 (orthogonal to format)", () => {
+test("--strict + a >64KB FAILING payload: exits 20 without truncating the --json (process.exitCode, not exit())", () => {
+  const lines = [];
+  for (let i = 0; i < 200; i++) lines.push(`Module ${i} lives in \`src/gone${i}.js\`.`); // 200 dead paths
+  const root = makeRepo({ "CLAUDE.md": lines.join("\n\n") + "\n", "src/real.js": "export const x = 1\n" });
+  try {
+    const r = runCli(root, ["--strict", "--json"]);
+    assert.equal(r.code, 20, "gate fails on the large rotten payload");
+    assert.ok(r.stdout.length > 64 * 1024, `payload only ${r.stdout.length} bytes — fixture too small`);
+    const p = JSON.parse(r.stdout); // truncation = parse failure; the gate must NOT process.exit() mid-write
+    assert.equal(p.gate.failed, true);
+    assert.ok(p.score.false >= 200, "all 200 dead paths gated");
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("--strict --json: gate object + failed flag; stdout stays valid JSON; exit 20 (orthogonal to format)", () => {
   const dirty = materialize("dirty");
   try {
     const r = runCli(dirty, ["--strict", "--json"]);
-    assert.equal(r.code, 4, "exit code is independent of --json");
+    assert.equal(r.code, 20, "exit code is independent of --json");
     const p = JSON.parse(r.stdout); // verdict went to stderr → stdout is still valid JSON
-    assert.deepEqual(p.gate, { strict: true, maxFalse: 0, false: p.score.false, failed: true, tier: "context" });
+    // dirty has rot AND a skipped UTF-16 AGENTS.md (unverifiedFiles: 1); both → failed
+    assert.deepEqual(p.gate, { strict: true, maxFalse: 0, false: p.score.false, tier: "context", unverifiedFiles: 1, failed: true });
     // a non-strict run has gate: null (additive, no inference forced on consumers)
     assert.equal(JSON.parse(runCli(dirty, ["--json"]).stdout).gate, null);
   } finally {
@@ -560,7 +588,7 @@ test("--strict does NOT alter stdout: the card is byte-identical to a non-strict
     const strict = runCli(dirty, ["--strict"]);
     assert.equal(strict.stdout, plain.stdout, "rendered card unchanged by --strict (golden stays stable)");
     assert.equal(plain.code, 0, "a non-strict run is advisory: exit 0 even with false claims");
-    assert.equal(strict.code, 4);
+    assert.equal(strict.code, 20);
   } finally {
     cleanup(dirty);
   }
@@ -593,19 +621,19 @@ test("--strict gates on falseCount even when the score is SUPPRESSED (definite<5
     const p = JSON.parse(runCli(root, ["--json"]).stdout);
     assert.equal(p.score.honesty, null, "score is suppressed (definite < 5)");
     assert.ok(p.score.false >= 1, "but there is a false claim");
-    assert.equal(runCli(root, ["--strict"]).code, 4, "gate fails on the count despite the null score");
+    assert.equal(runCli(root, ["--strict"]).code, 20, "gate fails on the count despite the null score");
   } finally {
     cleanup(root);
   }
 });
 
-test("--strict --out: an --out write failure (exit 2) outranks the gate breach (exit 4)", () => {
-  const dirty = materialize("dirty"); // would fail the gate (exit 4) on its own
+test("--strict --out: an --out write failure (exit 2) outranks the gate breach (exit 20)", () => {
+  const dirty = materialize("dirty"); // would fail the gate (exit 20) on its own
   try {
     // --out into a path under a regular file → ENOTDIR on write → exit 2 wins
     const badOut = join(materializeFile(), "claims-dir");
     const r = runCli(dirty, ["--strict", "--out", badOut]);
-    assert.equal(r.code, 2, "the requested --out artifact wasn't produced → exit 2, not the gate's 4");
+    assert.equal(r.code, 2, "the requested --out artifact wasn't produced → exit 2, not the gate's 20");
     assert.match(r.stderr, /could not write --out/);
   } finally {
     cleanup(dirty);
@@ -615,9 +643,38 @@ test("--strict --out: an --out write failure (exit 2) outranks the gate breach (
 test("--strict with no context files: exit 3 (unchanged) — 'nothing to check' is not a gate fail", () => {
   const root = makeRepo({ "src/a.js": "x\n" });
   try {
-    assert.equal(runCli(root, ["--strict"]).code, 3, "no-context exit 3 is not conflated with the gate's 4");
+    assert.equal(runCli(root, ["--strict"]).code, 3, "no-context exit 3 is not conflated with the gate's 20");
   } finally {
     cleanup(root);
+  }
+});
+
+test("--strict fails CLOSED when a context file is skipped/unread (F1): could-not-verify, not a false PASS", () => {
+  // Clean CLAUDE.md (no rot) PLUS an AGENTS.md that can't be read (UTF-16 BOM) →
+  // the gate can't certify the unread file, so it must FAIL (exit 20), not PASS.
+  const dir = mkdtempSync(join(tmpdir(), "df-skip-"));
+  const env = {
+    GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t",
+    GIT_AUTHOR_DATE: "2026-01-01T00:00:00Z", GIT_COMMITTER_DATE: "2026-01-01T00:00:00Z",
+    GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null", GIT_CONFIG_NOSYSTEM: "1",
+  };
+  const g = (...a) => spawnSync("git", ["-C", dir, ...a], { env: { ...process.env, ...env } });
+  try {
+    g("init", "-q", "-b", "main");
+    writeFileSync(join(dir, "CLAUDE.md"), "# t\n\nEntry point is `index.js`.\n"); // clean: index.js exists
+    writeFileSync(join(dir, "index.js"), "export const x = 1\n");
+    // UTF-16LE AGENTS.md with BOM → readContextFile skips it (unread context file)
+    writeFileSync(join(dir, "AGENTS.md"), Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("# a\nSee `index.js`.\n", "utf16le")]));
+    g("add", "-A"); g("commit", "-q", "-m", "i");
+    const p = JSON.parse(runCli(dir, ["--strict", "--json"]).stdout);
+    assert.equal(p.score.false, 0, "the readable context tier has no rot");
+    assert.equal(p.gate.unverifiedFiles, 1, "one context file was skipped/unread");
+    assert.equal(p.gate.failed, true, "gate.failed is true despite 0 false — fail-closed");
+    const r = runCli(dir, ["--strict"]);
+    assert.equal(r.code, 20, "a skipped context file → fail-closed (exit 20), not a false PASS");
+    assert.match(r.stderr, /COULD NOT VERIFY|skipped/i);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 

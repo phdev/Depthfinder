@@ -82,25 +82,32 @@ Under `--burn`, the finding names whichever happened: the agent took the bait
 are the tax, surfaced as "the detour is the tax, every session."
 
 - `bin/depthfinder.mjs` — orchestration, parseArgs, exit codes (0 ran /
-  1 internal / 2 usage·no-git / 3 no context files / **4 `--strict` gate
+  1 internal / 2 usage·no-git / 3 no context files / **20 `--strict` gate
   breach**), stream discipline (stdout = card|JSON only; diagnostics → stderr),
   redaction at both output seams via `lib/redact.mjs`. `--version`/`-v` and
   `--help`/`-h` short-circuit before any repo work and print to stdout (exit 0).
-- **`--strict` CI gate (V1.5 / Phase A):** fails a build (**exit 4**, distinct
-  from 1=internal-error so a wrapper/Action tells rot from a crash) when the
+- **`--strict` CI gate (V1.5 / Phase A):** fails a build (**exit 20** — outside
+  Node's reserved 1-13 range so a wrapper/Action tells rot from a crash) when the
   **Context tier** has more than `--max-false N` false claims (`N` default 0,
-  a non-negative integer ratchet). Gates the **Context tier only** (convention
-  files + nested + default-followed "read first" links, minus `--no-follow`);
-  Doc Honesty is never gated (`--strict --docs` prints a stderr advisory) since
+  a non-negative integer ratchet; rejects values past `Number.isSafeInteger` so a
+  huge digit string can't `parseInt`→Infinity and silently disable the gate).
+  Gates the **Context tier only** (convention files + nested + default-followed
+  "read first" links, minus `--no-follow`); Doc Honesty is never gated
+  (`--strict --docs` prints a stderr advisory when docs have ungated rot) since
   the doc grammar isn't corpus-clean. Gates on the full `score.falseCount` (not
   the 3 rendered findings, not the null-able `honesty` — so it fires even when
-  the score is suppressed). Sets `process.exitCode` (never `process.exit()`,
-  which truncates >64KB stdout). `--out` write failure (exit 2) outranks the
-  gate. `--json` adds an additive `gate:{strict,maxFalse,false,failed,tier}`
-  object (null unless `--strict`). Precedence 2 > 3 > 4 > 0. CI must **pin the
-  version** (`npx depthfinder@1.0.1`) — `--max-false` is only stable against a
-  pinned extractor. Deferred: `--strict-docs` (until the doc corpus is zero-
-  false) and a consumer GitHub Action (fast-follow).
+  the score is suppressed). **Fail-CLOSED:** a context file that couldn't be read
+  (UTF-16/EACCES/oversize → 0 claims) also fails the gate (`gate.unverifiedFiles`)
+  — "couldn't verify" must not read as "clean". Sets `process.exitCode` (never
+  `process.exit()`, which truncates >64KB stdout). `--out` write failure (exit 2)
+  outranks the gate. `--json` adds an additive
+  `gate:{strict,maxFalse,false,tier,unverifiedFiles,failed}` object (null unless
+  `--strict`; `failed` = rot OR unverified). Precedence 2 > 3 > 20 > 0. CI must
+  **pin the version** (`npx depthfinder@1.0.1`) — `--max-false` is only stable
+  against a pinned extractor. Deferred (P1 follow-up): fail-closed on the subtler
+  oracle-degradation cases (fatal `git check-ignore`, symbol-search timeout that
+  turns would-be-false into unknown); plus `--strict-docs` (until the doc corpus
+  is zero-false) and a consumer GitHub Action (fast-follow).
 - `src/cli/extract/{path,dependency,symbol,count}.mjs` — grammars are
   deliberately conservative; the dependency grammar's guards exist because
   the self-scan false-accused `its`/`home-center`/`--lan` on day one, and
