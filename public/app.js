@@ -891,56 +891,241 @@ async function loadDrift() {
 }
 
 // ── Panel 0: summary / triage ───────────────────────────────────────────────
+// Faithful port of the Claude Design "Summary" mockup, wired to the real
+// /api/summary contract. Health hero + scroll-reveal score strip + 3 dimension
+// cards (Coherence/Weight/Coverage — the mockup's 4th "Simplicity" is omitted)
+// + the centerpiece Hotspots table built from the already-ranked `issues`.
+//
+// Honesty note: the mockup's per-row "+N health" badge and per-dimension
+// "▲N%" impact columns have NO source in the real data (issues carry only
+// severity/title/detail/tab/action). Rather than fabricate them, those columns
+// are dropped — the table keeps suggested-order #, name, severity badge, a
+// deep-link to the proving tab, and the expandable Suggested actions.
+
+// Honest health rating thresholds (shared by hero + strip).
+const ratingFor = (s) =>
+  s < 35 ? { word: "Critical", cls: "rt-crit" }
+  : s < 70 ? { word: "Caution", cls: "rt-caution" }
+  : { word: "Healthy", cls: "rt-healthy" };
+// severity → CSS suffix used by the dimension cards / strip radials
+const SEV_CLS = { high: "sev-high", medium: "sev-medium", ok: "sev-ok" };
+// issue severity → table-cell classes
+const ISSUE_BADGE = { high: "high", medium: "med", low: "low" };
+const ISSUE_BADGE_TXT = { high: "High", medium: "Medium", low: "Low" };
+const ISSUE_ROW = { high: "r-red", medium: "r-amber", low: "r-blue" };
+
+// SVG progress ring. r=15.5 → C≈97.39 (strip radials); dimension cards pass
+// r=11.5 + their own track/fill classes. Arc length = pct of circumference.
+function radialSvg(score, r, trackCls = "t", fillCls = "f") {
+  const c = 2 * Math.PI * r;
+  const fill = (Math.max(0, Math.min(100, score)) / 100) * c;
+  return `<svg viewBox="0 0 ${r * 2 + 5} ${r * 2 + 5}">
+    <circle class="${trackCls}" cx="${r + 2.5}" cy="${r + 2.5}" r="${r}"></circle>
+    <circle class="${fillCls}" cx="${r + 2.5}" cy="${r + 2.5}" r="${r}"
+      stroke-dasharray="${fill.toFixed(2)} ${(c - fill).toFixed(2)}"></circle>
+  </svg>`;
+}
+
 function renderSummary(d) {
   const body = $("#summaryBody");
-  body.className = "page";
-  const ph = d.projectHealth;
-  if (!ph) {
+  body.removeAttribute("class");
+  if (!d || d.healthScore == null || !d.dimensions) {
+    body.className = "page";
     body.innerHTML = `<p class="page-subtitle">Summary unavailable.</p>`;
     return;
   }
-  const quad = (ic, title, val) =>
-    `<div class="quad"><div class="icon-circle">${svgIcon(ic)}</div><div><div class="quad-title">${title}</div><div class="quad-value">${val}</div></div></div>`;
-  const row = (it) =>
-    `<div class="row" data-tab="${it.tab}"><div class="icon-circle">${svgIcon(it.icon)}</div><div><div class="row-title">${escapeHtml(it.title)}</div><div class="row-meta">${escapeHtml(it.meta)}</div></div><span class="badge">${escapeHtml(it.badge)}</span><span class="chev">›</span></div>`;
 
-  body.innerHTML = `
-    <section class="card health-card">
-      <div class="score-block">
-        <div class="score">${ph.score}</div>
-        <div class="score-denom">/100</div>
-        <div class="score-label">Project Health</div>
+  const rt = ratingFor(d.healthScore);
+  const dims = ["coherence", "weight", "coverage"].map((k) => d.dimensions[k]).filter(Boolean);
+  const counts = d.counts || { high: 0, medium: 0, low: 0 };
+  const issues = Array.isArray(d.issues) ? d.issues : [];
+
+  // hero radial uses the hero geometry; strip + cards use the small geometry
+  const heroRadial = `<div class="radial" role="img" aria-label="Overall health ${d.healthScore} of 100">
+    <svg viewBox="0 0 120 120">
+      <circle class="rg-track" cx="60" cy="60" r="52"></circle>
+      <circle class="rg-fill" cx="60" cy="60" r="52"
+        stroke-dasharray="${((2 * Math.PI * 52) * Math.max(0, Math.min(100, d.healthScore)) / 100).toFixed(2)} ${(2 * Math.PI * 52).toFixed(2)}"></circle>
+    </svg></div>`;
+
+  // sub-nav score strip: Health + the 3 dimensions
+  const stripItem = (label, score, sevCls, asLabel) =>
+    `<div class="snav-item ${sevCls}">
+      <span class="snav-radial">${radialSvg(score, 15.5)}</span>
+      <span class="snav-txt">${asLabel ? "" : `<span class="snav-k">${escapeHtml(label)}</span>`}<span class="snav-v tnum">${score}</span></span>
+      ${asLabel ? `<span class="snav-label">${escapeHtml(label)}</span>` : ""}
+    </div>`;
+  const strip = `<div class="df-subnav" id="dfSubnav"><div class="df-subnav-row">
+    ${stripItem("Health", d.healthScore, rt.cls === "rt-crit" ? "sev-high" : rt.cls === "rt-caution" ? "sev-medium" : "sev-ok", true)}
+    <span class="snav-desc"><span class="snav-rating ${rt.cls}">${rt.word}</span></span>
+    ${dims.map((dm) => stripItem(dm.label, dm.score, SEV_CLS[dm.sev] || "")).join("")}
+    <label class="eli10-toggle snav-eli"><input type="checkbox" class="df-eli"><span>ELI10</span></label>
+  </div></div>`;
+
+  // dimension cards (3)
+  const card = (dm) =>
+    `<div class="lcard ${SEV_CLS[dm.sev] || ""}" data-tab="${dm.tab}">
+      <div class="lc-top"><span class="lc-name">${escapeHtml(dm.label)}
+        <span class="lc-sub">${escapeHtml(dm.sub || "")}</span>
+        <span class="lc-improve"><span class="lci-tri">▲</span>Improves ${escapeHtml(dm.improves || "")}</span></span>
       </div>
-      <div class="quadrants">
-        ${quad("shield", "Critical hotspots", ph.metrics.criticalHotspots)}
-        ${quad("target", "Hotspots", ph.metrics.hotspots)}
-        ${quad("link", "Unconnected surfaces", ph.metrics.unconnectedSurfaces)}
-        ${quad("network", "Node / edge ratio", ph.metrics.nodeEdgeRatio)}
+      <div class="lc-score">
+        <span class="lc-radial">${radialSvg(dm.score, 11.5, "lcr-track", "lcr-fill")}</span>
+        <span class="lc-val tnum">${dm.score}</span>
+      </div>
+    </div>`;
+
+  // hotspot rows from the ranked issues
+  const hotspotRow = (it, i) => {
+    const badge = ISSUE_BADGE[it.severity] || "low";
+    const badgeTxt = ISSUE_BADGE_TXT[it.severity] || "Low";
+    const rowCls = ISSUE_ROW[it.severity] || "r-blue";
+    const tabName = TAB_PANEL[it.tab] ? PANEL_TO_HASH[TAB_PANEL[it.tab]] : null;
+    const link = tabName
+      ? `<span class="nm-link" data-tab="${it.tab}">${escapeHtml(tabName)}<span class="nl-arrow">→</span></span>`
+      : "";
+    // ELI10 OFF → terse title only; ELI10 ON → adds the plain-language detail
+    // line. We carry `detail` in a data attr and toggle its visibility.
+    const detail = it.detail
+      ? `<div class="de" data-eli10>${escapeHtml(it.detail)}</div>`
+      : "";
+    const action = it.action
+      ? `<button class="acts-btn" type="button">Suggested action <span class="ab-n">1</span><span class="ab-arrow">→</span></button>
+         <div class="acts-expand"><div class="acts-expand-in"><div class="ae-head">Suggested action</div>
+           <div class="ae-act"><span class="da-n">1</span><span>${escapeHtml(it.action)}</span></div></div></div>`
+      : "";
+    return `<div class="df-trow ${rowCls}">
+      <div class="hs"><div class="nm">
+        <div class="nm-r1"><span class="num tnum">${i + 1}</span><span class="nm-t">${escapeHtml(it.title)}</span></div>
+        <div class="nm-r2"><span class="sev-badge ${badge}">${badgeTxt}</span>${link}</div>
+      </div>${detail}${action}</div>
+    </div>`;
+  };
+
+  const tableInner = issues.length
+    ? issues.map(hotspotRow).join("")
+    : `<div class="df-empty"><b>All clear.</b> No ranked hotspots — your context surfaces look healthy.</div>`;
+
+  const countChips =
+    `${counts.high ? `<span class="hc high">${counts.high} high</span>` : ""}` +
+    `${counts.medium ? `<span class="hc med">${counts.medium} medium</span>` : ""}` +
+    `${!counts.high && !counts.medium && counts.low ? `<span class="hc">${counts.low} low</span>` : ""}`;
+
+  const healthy = Array.isArray(d.healthy) && d.healthy.length
+    ? `<section class="df-healthy"><span class="hh-lab">Working</span>${d.healthy
+        .map((h) => `<span class="hh">${escapeHtml(h)}</span>`)
+        .join("")}</section>`
+    : "";
+
+  body.innerHTML = `<div class="df-sum">
+    ${strip}
+    <section class="df-head"><h1>Summary</h1></section>
+
+    <section class="df-health ${rt.cls}">
+      ${heroRadial}
+      <div class="left">
+        <span class="ovl">Health</span>
+        <div class="scoreline">
+          <span class="score tnum">${d.healthScore}<span class="den">/ 100</span></span>
+          <span class="rating">${rt.word}</span>
+        </div>
+        <p class="why">Higher health = more reliable, faster, cheaper AI interactions.</p>
       </div>
     </section>
-    <section class="sections-grid">
-      <div>
-        <h2 class="section-title">Critical hotspots <span>(High impact)</span></h2>
-        <div class="card list-card">${ph.critical.map(row).join("")}</div>
-      </div>
-      <div>
-        <h2 class="section-title">Hotspots <span>(Medium impact)</span></h2>
-        <div class="card list-card">${ph.medium.map(row).join("")}</div>
-        <h2 class="section-title" style="margin-top:30px">Unconnected surfaces</h2>
-        <div class="card list-card">${row(ph.unconnected)}</div>
-      </div>
-    </section>
-    <section class="card list-card full-row">
-      <div class="row" data-tab="1"><div class="icon-circle">${svgIcon("list")}</div><div><div class="row-title">View all signals</div></div><span class="chev">›</span></div>
-    </section>`;
 
-  body.querySelectorAll("[data-tab]").forEach((b) => (b.onclick = () => activate(TAB_PANEL[b.dataset.tab])));
+    <details class="df-factors">
+      <summary><span class="factors-t">Dimensions</span><span class="chev-d">›</span></summary>
+      <section class="df-loadgrid">${dims.map(card).join("")}</section>
+    </details>
+
+    <section class="df-tsec" id="dfTsec">
+      <div class="df-tsec-head">
+        <div class="th-left">
+          <button class="hs-collapse" id="dfHsCollapse" type="button" aria-expanded="true"><span class="hs-chev">›</span>Hotspots</button>
+          <div class="hs-counts">${countChips}</div>
+        </div>
+        <div class="th-right">
+          <label class="eli10-toggle"><input type="checkbox" class="df-eli" checked><span>ELI10</span></label>
+        </div>
+      </div>
+      <div class="df-table" id="dfTable">${tableInner}</div>
+      ${healthy}
+    </section>
+  </div>`;
+
+  wireSummary(body);
 }
+
+// Wire all Summary interactions (idempotent per render).
+function wireSummary(root) {
+  // deep-links: dimension cards + per-row tab chips
+  root.querySelectorAll("[data-tab]").forEach((b) => {
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      activate(TAB_PANEL[b.dataset.tab]);
+    });
+  });
+
+  // collapse Hotspots
+  const coll = root.querySelector("#dfHsCollapse");
+  const tsec = root.querySelector("#dfTsec");
+  if (coll && tsec)
+    coll.addEventListener("click", () => {
+      const c = tsec.classList.toggle("collapsed");
+      coll.setAttribute("aria-expanded", String(!c));
+    });
+
+  // inline Suggested-action expand (one open at a time)
+  const table = root.querySelector("#dfTable");
+  if (table)
+    table.addEventListener("click", (e) => {
+      const btn = e.target.closest(".acts-btn");
+      if (!btn) return;
+      const panel = btn.parentElement.querySelector(".acts-expand");
+      if (!panel) return;
+      const isOpen = panel.classList.contains("open");
+      table.querySelectorAll(".acts-expand.open").forEach((p) => {
+        if (p !== panel) {
+          p.classList.remove("open");
+          const b = p.parentElement.querySelector(".acts-btn");
+          if (b) b.classList.remove("is-open");
+        }
+      });
+      panel.classList.toggle("open", !isOpen);
+      btn.classList.toggle("is-open", !isOpen);
+    });
+
+  // ELI10 toggle — show/hide the plain-language detail line. The two checkboxes
+  // (strip + header) stay in sync; default is ON (header box is `checked`).
+  const elis = [...root.querySelectorAll(".df-eli")];
+  const applyEli = (on) => {
+    root.querySelectorAll(".de[data-eli10]").forEach((el) => {
+      el.style.display = on ? "" : "none";
+    });
+    elis.forEach((c) => (c.checked = on));
+  };
+  elis.forEach((c) => c.addEventListener("change", () => applyEli(c.checked)));
+  applyEli(true);
+
+  // scroll-reveal the score strip once the hero scrolls past
+  const panel = $("#panel-summary");
+  const subnav = root.querySelector("#dfSubnav");
+  if (panel && subnav) {
+    const onScroll = () => subnav.classList.toggle("show", panel.scrollTop > 210);
+    panel.removeEventListener("scroll", panel.__dfSumScroll || (() => {}));
+    panel.__dfSumScroll = onScroll;
+    panel.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+  }
+}
+
 async function loadSummary() {
   try {
     renderSummary(await (await fetch("/api/summary")).json());
   } catch (e) {
-    $("#summaryBody").innerHTML = `<p class="page-subtitle">Failed to load summary: ${e}</p>`;
+    const body = $("#summaryBody");
+    body.className = "page";
+    body.innerHTML = `<p class="page-subtitle">Failed to load summary: ${escapeHtml(String(e))}</p>`;
   }
 }
 
