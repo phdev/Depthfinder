@@ -35,7 +35,14 @@ export function evaluateClaims(claims, ctx) {
     if (!known) misses.push(...paths);
   }
   const ignored = misses.length ? checkIgnored(ctx.root, misses) : new Set();
-  if (ignored === null) ctx.warn("git check-ignore failed — missing paths reported as unchecked");
+  if (ignored === null) {
+    // A FATAL git check-ignore (not "nothing matched") blinds the path oracle:
+    // every missing path is downgraded false→unknown, so a rotten file can read
+    // as "0 false". Record it as a DEGRADATION (tool failure) so --strict can
+    // fail closed — distinct from a legitimate unknown (a gitignored path).
+    ctx.warn("git check-ignore failed — missing paths reported as unchecked");
+    if (Array.isArray(ctx.degraded)) ctx.degraded.push("git check-ignore failed — path classification was blinded");
+  }
 
   for (const claim of claims) {
     const { type, args } = claim.predicate;

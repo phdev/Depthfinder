@@ -111,13 +111,16 @@ are the tax, surfaced as "the detour is the tax, every session."
   — "couldn't verify" must not read as "clean". Sets `process.exitCode` (never
   `process.exit()`, which truncates >64KB stdout). `--out` write failure (exit 2)
   outranks the gate. `--json` adds an additive
-  `gate:{strict,maxFalse,false,tier,unverifiedFiles,failed}` object (null unless
-  `--strict`; `failed` = rot OR unverified). Precedence 2 > 3 > 20 > 0. CI must
-  **pin the version** (`npx depthfinder@1.0.1`) — `--max-false` is only stable
-  against a pinned extractor. Deferred (P1 follow-up): fail-closed on the subtler
-  oracle-degradation cases (fatal `git check-ignore`, symbol-search timeout that
-  turns would-be-false into unknown); plus `--strict-docs` (until the doc corpus
-  is zero-false) and a consumer GitHub Action (fast-follow).
+  `gate:{strict,maxFalse,false,tier,unverifiedFiles,degraded,failed}` object (null
+  unless `--strict`; `failed` = rot OR unverified OR degraded). Also fail-closed on
+  **oracle DEGRADATION** — a fatal `git check-ignore` (which blinds the path oracle,
+  turning would-be-false paths into unknown) sets `ctx.degraded`/`gate.degraded` and
+  fails the gate. Precedence 2 > 3 > 20 > 0. CI must **pin the version**
+  (`npx depthfinder@1.0.1`) — `--max-false` is only stable against a pinned extractor.
+  Still deferred: the symbol-search-timeout degradation (a NORMAL budget event on
+  large repos — failing closed on it would break the gate for every big repo, so it
+  needs a per-claim "cut off by the cap" signal, not a run-level flag); plus
+  `--strict-docs` (until the doc corpus is zero-false) and a consumer GitHub Action.
 - `src/cli/extract/{path,dependency,symbol,count}.mjs` — grammars are
   deliberately conservative; the dependency grammar's guards exist because
   the self-scan false-accused `its`/`home-center`/`--lan` on day one, and

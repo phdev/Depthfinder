@@ -184,6 +184,7 @@ function run({ values, positionals }) {
     warn,
     now: new Date().toISOString(),
     dirExists: (seg) => dirSet.has(seg) || existsSync(resolve(root, seg)),
+    degraded: [], // tool-failure degradations (e.g. fatal git check-ignore) — feeds the --strict fail-closed
   };
 
   // ingest + extract. `counted` files feed Weight (per-turn load); linked
@@ -367,10 +368,16 @@ function run({ values, positionals }) {
   // degradation cases — a fatal `git check-ignore`, a symbol-search timeout that
   // turns would-be-false into unknown — are a tracked P1 follow-up.)
   const unverifiedFiles = values.strict ? scannedFiles.length - usable.length : 0;
+  // `degraded` = a TOOL FAILURE blinded an oracle (today: a fatal git
+  // check-ignore that turns would-be-false paths into unknown). Distinct from a
+  // legitimate unknown — both don't gate on their own, but under --strict a
+  // degraded run can't be trusted to say "0 false", so it fails closed.
+  const degraded = values.strict && ctx.degraded.length > 0;
   const gate = values.strict
     ? {
         strict: true, maxFalse, false: score.falseCount, tier: "context",
-        unverifiedFiles, failed: score.falseCount > maxFalse || unverifiedFiles > 0,
+        unverifiedFiles, degraded,
+        failed: score.falseCount > maxFalse || unverifiedFiles > 0 || degraded,
       }
     : null;
   // docScore is null when no docs were scanned (--no-docs, or a repo with no
@@ -470,11 +477,14 @@ function run({ values, positionals }) {
       process.exitCode = 20;
       return;
     }
-    if (unverifiedFiles > 0) {
-      // Fail-closed: we couldn't even read N context file(s), so "0 false" isn't
-      // trustworthy. Don't green-light a run we couldn't verify.
+    if (unverifiedFiles > 0 || degraded) {
+      // Fail-closed: we couldn't fully verify, so "0 false" isn't trustworthy.
+      // Don't green-light a run we couldn't actually check.
+      const reasons = [];
+      if (unverifiedFiles > 0) reasons.push(`${unverifiedFiles} context file(s) skipped/unread`);
+      if (degraded) reasons.push(ctx.degraded[0]);
       process.stderr.write(
-        `depthfinder --strict: COULD NOT VERIFY — ${unverifiedFiles} context file(s) skipped/unread, so "${score.falseCount} false" can't be trusted; failing closed (exit 20)\n`,
+        `depthfinder --strict: COULD NOT VERIFY — ${reasons.join("; ")}, so "${score.falseCount} false" can't be trusted; failing closed (exit 20)\n`,
       );
       process.exitCode = 20;
       return;

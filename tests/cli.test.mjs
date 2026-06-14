@@ -573,7 +573,7 @@ test("--strict --json: gate object + failed flag; stdout stays valid JSON; exit 
     assert.equal(r.code, 20, "exit code is independent of --json");
     const p = JSON.parse(r.stdout); // verdict went to stderr → stdout is still valid JSON
     // dirty has rot AND a skipped UTF-16 AGENTS.md (unverifiedFiles: 1); both → failed
-    assert.deepEqual(p.gate, { strict: true, maxFalse: 0, false: p.score.false, tier: "context", unverifiedFiles: 1, failed: true });
+    assert.deepEqual(p.gate, { strict: true, maxFalse: 0, false: p.score.false, tier: "context", unverifiedFiles: 1, degraded: false, failed: true });
     // a non-strict run has gate: null (additive, no inference forced on consumers)
     assert.equal(JSON.parse(runCli(dirty, ["--json"]).stdout).gate, null);
   } finally {
@@ -637,6 +637,34 @@ test("--strict --out: an --out write failure (exit 2) outranks the gate breach (
     assert.match(r.stderr, /could not write --out/);
   } finally {
     cleanup(dirty);
+  }
+});
+
+test("--strict fails CLOSED on oracle DEGRADATION: a fatal git check-ignore can't mask rot (F1)", { skip: process.platform === "win32" ? "POSIX git-shim" : false }, () => {
+  // Clean-looking repo with one dead path. A `git` shim forces check-ignore to
+  // fail (status 128) → the path oracle is blinded (the would-be-false path is
+  // downgraded to unknown). The gate must NOT pass — it fails closed.
+  const dir = makeRepo({ "CLAUDE.md": "# t\n\nEntry is `src/gone.js`.\n", "src/real.js": "export const x = 1\n" });
+  const shimDir = mkdtempSync(join(tmpdir(), "df-gitshim-"));
+  const realGit = spawnSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
+  writeFileSync(join(shimDir, "git"), `#!/bin/sh\nif [ "$1" = "check-ignore" ]; then exit 128; fi\nexec ${realGit} "$@"\n`);
+  spawnSync("chmod", ["+x", join(shimDir, "git")]);
+  const withShim = { PATH: `${shimDir}:${process.env.PATH}` };
+  try {
+    // baseline (no shim): the dead path is a normal false → exit 20 (rot)
+    assert.equal(runCli(dir, ["--strict"]).code, 20, "baseline: the dead path gates as rot");
+    // with the shim: check-ignore fatal → the false is masked to unknown, but the
+    // run is flagged degraded and the gate fails CLOSED rather than green-lighting.
+    const p = JSON.parse(runCli(dir, ["--strict", "--json"], withShim).stdout);
+    assert.equal(p.score.false, 0, "rot was masked to unknown by the blinded oracle");
+    assert.equal(p.gate.degraded, true, "the run is flagged degraded (check-ignore blinded)");
+    assert.equal(p.gate.failed, true, "gate fails closed despite 0 false");
+    const r = runCli(dir, ["--strict"], withShim);
+    assert.equal(r.code, 20, "exit 20: degradation can't green-light the build");
+    assert.match(r.stderr, /COULD NOT VERIFY|check-ignore/i);
+  } finally {
+    rmSync(shimDir, { recursive: true, force: true });
+    cleanup(dir);
   }
 });
 
