@@ -107,6 +107,8 @@ npx depthfinder --docs     # opt in to the wider-docs scan (Doc Honesty)
 npx depthfinder --burn     # run your agent against the top false claim (opt-in; calls a model)
 npx depthfinder --strict   # CI gate: exit 20 when your context has rotted (false claims)
 npx depthfinder --strict --max-false 5  # ...allow up to 5 before failing (ratchet)
+npx depthfinder --fix      # repoint paths git proves were renamed (dry run — shows the diff)
+npx depthfinder --fix --write  # ...actually apply the rename-fixes (the only write to your repo)
 npx depthfinder --version  # print the version and exit (-v); --help (-h) for usage
 ```
 

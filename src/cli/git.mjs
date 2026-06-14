@@ -100,3 +100,24 @@ export function deletionEvidence(root, relPath, shallow) {
   if (shallow) return { kind: "unknown-history" }; // absorb #2: degrade gracefully
   return { kind: "unknown-history" };
 }
+
+// Where did a renamed-away path go? (Used by --fix.) A path-filtered log reports
+// a rename as a plain DELETE of the old name, so we find the commit that removed
+// `relPath`, then re-inspect THAT commit with rename detection (-M, no path
+// filter) for an `R<sim>\told\tnew` line whose source is relPath. Returns
+// { to, sha } or null — deleted, fabricated, or shallow all mean "no safe target
+// to repoint to", and --fix declines rather than guess.
+export function renameTarget(root, relPath, shallow) {
+  if (shallow) return null;
+  const del = run(["log", "--diff-filter=DR", "--name-status", "--format=%H", "-n", "1", "--", relPath], root);
+  if (del.status !== 0) return null;
+  const sha = (del.stdout.split("\n").find((l) => /^[0-9a-f]{40}$/.test(l.trim())) || "").trim();
+  if (!sha) return null;
+  const show = run(["show", "-M", "--name-status", "--format=", sha], root);
+  if (show.status !== 0) return null;
+  for (const line of show.stdout.split("\n")) {
+    const m = line.match(/^R\d*\t([^\t]+)\t([^\t]+)$/);
+    if (m && m[1] === relPath) return { to: m[2], sha: sha.slice(0, 9) };
+  }
+  return null;
+}

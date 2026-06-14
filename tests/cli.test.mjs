@@ -2,7 +2,7 @@
 // discipline, redaction, precision gate, --out atomicity, [path] arg.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, existsSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, existsSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -703,6 +703,68 @@ test("--strict fails CLOSED when a context file is skipped/unread (F1): could-no
     assert.match(r.stderr, /COULD NOT VERIFY|skipped/i);
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ── --fix safe-fix (rename-only) ────────────────────────────────────────────
+// A two-commit repo: a file at src/old-auth.js, then renamed to src/new-auth.js
+// with CLAUDE.md referencing the OLD path.
+function makeRenameRepo(claimLine = "Auth lives in `src/old-auth.js`.") {
+  const dir = mkdtempSync(join(tmpdir(), "df-rename-"));
+  const E = {
+    GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t",
+    GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null", GIT_CONFIG_NOSYSTEM: "1",
+  };
+  const g = (args, date) => spawnSync("git", ["-C", dir, ...args], { env: { ...process.env, ...E, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date } });
+  g(["init", "-q", "-b", "main"], "2026-01-01T00:00:00Z");
+  mkdirSync(join(dir, "src"), { recursive: true });
+  writeFileSync(join(dir, "src", "old-auth.js"), "export const auth = () => true;\n// distinctive content for rename detection\n");
+  g(["add", "-A"], "2026-01-01T00:00:00Z"); g(["commit", "-q", "-m", "init"], "2026-01-01T00:00:00Z");
+  g(["mv", "src/old-auth.js", "src/new-auth.js"], "2026-01-02T00:00:00Z");
+  writeFileSync(join(dir, "CLAUDE.md"), `# t\n\n${claimLine}\n`);
+  g(["add", "-A"], "2026-01-02T00:00:00Z"); g(["commit", "-q", "-m", "rename"], "2026-01-02T00:00:00Z");
+  return dir;
+}
+
+test("--fix: dry-run previews + writes nothing; --write applies + closes the found→fixed loop", () => {
+  const dir = makeRenameRepo();
+  try {
+    assert.ok(JSON.parse(runCli(dir, ["--json"]).stdout).score.false >= 1, "baseline: the old path is a false claim");
+    const before = readFileSync(join(dir, "CLAUDE.md"), "utf8");
+    // dry run: preview names the rename, file UNCHANGED (5A holds without --write)
+    const dry = runCli(dir, ["--fix"]);
+    assert.equal(dry.code, 0);
+    assert.match(dry.stdout, /src\/old-auth\.js/);
+    assert.match(dry.stdout, /src\/new-auth\.js/);
+    assert.equal(readFileSync(join(dir, "CLAUDE.md"), "utf8"), before, "dry-run writes nothing");
+    // --fix --json shape
+    const j = JSON.parse(runCli(dir, ["--fix", "--json"]).stdout);
+    assert.equal(j.mode, "fix");
+    assert.deepEqual(j.fixes.map((f) => [f.oldPath, f.newPath]), [["src/old-auth.js", "src/new-auth.js"]]);
+    // --write applies, then the loop is closed
+    const w = runCli(dir, ["--fix", "--write"]);
+    assert.equal(w.code, 0);
+    assert.match(w.stderr, /repointed 1 renamed path/);
+    const after = readFileSync(join(dir, "CLAUDE.md"), "utf8");
+    assert.match(after, /src\/new-auth\.js/);
+    assert.doesNotMatch(after, /src\/old-auth\.js/);
+    assert.equal(JSON.parse(runCli(dir, ["--json"]).stdout).score.false, 0, "found→fixed: re-scan is clean");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("--fix: rename-ONLY — declines deletions/fabrications (no safe target); --write no-ops", () => {
+  const dir = makeRepo({ "CLAUDE.md": "# t\n\nSee `src/never-existed.js`.\n", "src/real.js": "x\n" });
+  try {
+    const r = runCli(dir, ["--fix"]);
+    assert.equal(r.code, 0);
+    assert.match(r.stderr, /nothing to fix|RENAMED/i);
+    const before = readFileSync(join(dir, "CLAUDE.md"), "utf8");
+    runCli(dir, ["--fix", "--write"]);
+    assert.equal(readFileSync(join(dir, "CLAUDE.md"), "utf8"), before, "--write changes nothing when no fix is provable");
+  } finally {
+    cleanup(dir);
   }
 });
 

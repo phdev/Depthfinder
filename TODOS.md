@@ -118,9 +118,25 @@ Build priority:
    blocking V2 gate. First workflow guarantee a model can't give.
 5. **[RETENTION] Cross-agent memory loop (V2)** — capture→freshness→recall. The moat.
 
-Reconsider: **safe-fix (rename-only diff)** — tabled earlier, but the durable
-value is *keeping context honest*, and the fix is the action that closes
-found→fixed. Stronger candidate now (close the loop); still rename-class only.
+✅ **Safe-fix (`--fix`, rename-only) — SHIPPED 2026-06-14.** `src/cli/fix.mjs` +
+`renameTarget` in git.mjs: repoints a stale path claim to the location git PROVES
+it was renamed to (find the removing commit → `git show -M` for the `R old new`
+pair, since a path-filtered log reports a rename as a plain delete). Dry-run by
+default (preview to stdout, writes nothing); `--fix --write` applies — the one
+opt-in write to the scanned repo (invariant #5 updated). Deletions/fabrications
+declined (no safe target). Drift-safe apply (claim's exact line, path-token-only,
+skips drifted lines). `--fix --json` for tooling. 75 tests incl. a found→fixed
+loop-closed proof. This is the loop-closer the durable-value thesis flagged; it's
+also the engine the future LSP / console "fix" button reuse.
+
+## Surfaces & loop-closers — status (2026-06-14)
+
+- ✅ **Web console** (`console/`) — SHIPPED + LIVE. Zero-install public demo (shallow-
+  clone any public repo → the verbatim `npx depthfinder` card in the browser). Loopback
+  + Cloudflare quick tunnel. See `console/README.md`.
+- ✅ **Safe-fix `--fix`** — SHIPPED (above) — the found→fixed loop-closer.
+- **LSP / editor extension** — DEFERRED. Surfaces the `--fix` engine inline in VS Code/
+  Cursor; build after Stage-1 validation (the console is now the validation surface).
 
 ## V1.1 Live Burn (`--burn`) — SHIPPED 2026-06-13
 

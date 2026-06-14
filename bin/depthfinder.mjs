@@ -46,6 +46,7 @@ import { buildPayload, writeOut } from "../src/cli/claims.mjs";
 import { firstSegment, resolveRelPosix } from "../src/cli/paths.mjs";
 import { directiveLinks } from "../src/cli/follow.mjs";
 import { resolveAgent, runBurn, verificationDetours } from "../src/cli/burn.mjs";
+import { collectRenameFixes, applyRenameFixes, renderFixPreview } from "../src/cli/fix.mjs";
 
 // Read once at load; a missing/corrupt package.json (only a hand-copied partial
 // tree, never a real npm install) must NOT crash the CLI before its exit-code
@@ -71,6 +72,12 @@ const USAGE = `usage: depthfinder [path] [--json] [--out <dir>] [--no-follow] [-
               threshold is stable across releases.
   --max-false N  allow up to N false Context claims before --strict fails
               (default 0). A non-negative integer; ratchet it down over time.
+  --fix       repoint stale path claims that git proves were RENAMED to their new
+              location. DRY-RUN by default (prints the proposed change, writes
+              nothing); add --write to apply. Rename-only — deletions and
+              fabrications are never auto-fixed. Context tier only.
+  --write     with --fix, apply the rename-fixes to your context files — the one
+              opt-in write to the scanned repo
   --burn      run a local agent (claude/codex) against the top false claim and
               show what it actually says — opt-in; the ONLY path that calls a
               model. Override the agent with --burn-agent "<cmd>".
@@ -97,6 +104,8 @@ function main() {
         "no-history": { type: "boolean" },
         strict: { type: "boolean" },
         "max-false": { type: "string" },
+        fix: { type: "boolean" },
+        write: { type: "boolean" },
         version: { type: "boolean", short: "v" },
         help: { type: "boolean", short: "h" },
       },
@@ -380,6 +389,33 @@ function run({ values, positionals }) {
         failed: score.falseCount > maxFalse || unverifiedFiles > 0 || degraded,
       }
     : null;
+
+  // --fix (safe-fix): repoint stale paths git PROVES were renamed. Dry-run by
+  // default (writes nothing); --write applies — the one opt-in write to the
+  // scanned repo. Short-circuits the card/json/history: its deliverable is the
+  // fix report. Context tier only (the evaluated `claims`).
+  if (values.fix) {
+    const fixes = collectRenameFixes(claims, root, shallow);
+    if (fixes.length === 0) {
+      process.stderr.write("depthfinder --fix: nothing to fix — only paths git can prove were RENAMED are auto-fixable (deletions and fabrications have no safe target)\n");
+      process.exitCode = 0;
+      return;
+    }
+    if (values.write) {
+      const applied = applyRenameFixes(root, fixes);
+      for (const f of applied) process.stderr.write(redact(`  ✎ ${f.file}:${f.line}  ${f.oldPath} → ${f.newPath}\n`));
+      const files = new Set(applied.map((f) => f.file)).size;
+      process.stderr.write(`depthfinder --fix --write: repointed ${applied.length} renamed path${applied.length === 1 ? "" : "s"} across ${files} file${files === 1 ? "" : "s"}. Review the diff before committing.\n`);
+    } else if (values.json) {
+      process.stdout.write(JSON.stringify(redactDeep({ schema: 0, tool: "depthfinder", mode: "fix", fixes }), null, 2) + "\n");
+      process.stderr.write(`depthfinder --fix: ${fixes.length} safe rename-fix(es) (dry run — add --write to apply)\n`);
+    } else {
+      process.stdout.write(redact(renderFixPreview(fixes)));
+      process.stderr.write("depthfinder --fix: dry run — nothing written. Re-run with --fix --write to apply.\n");
+    }
+    process.exitCode = 0;
+    return;
+  }
   // docScore is null when no docs were scanned (--no-docs, or a repo with no
   // doc files) — distinct from "scanned, nothing checkable" (a real score
   // object with honesty null). The render + payload both key off this.
