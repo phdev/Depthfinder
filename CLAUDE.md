@@ -12,6 +12,16 @@ Depthfinder is two things in one repo:
    tarball = `bin/` + `src/cli/` + `lib/text.mjs` + `lib/redact.mjs` only.
 2. **The dashboard (in-repo tooling, unpublished):** a local-only web
    visualizer for one repo's context surfaces.
+3. **The console (`console/`, in-repo tooling, unpublished):** a public,
+   zero-install web demo — paste any public GitHub repo, the server shallow-
+   clones it, runs the local CLI (`bin/depthfinder.mjs … --json`), renders the
+   honesty card in the browser, and shreds the clone. `npm run console`
+   (loopback :4319); expose via a Cloudflare quick tunnel (same pattern as the
+   dashboard). Safety: host hard-coded to github.com + strict `owner/repo` regex
+   via a spawn args-array (no shell/SSRF), shallow clone + timeouts + concurrency
+   cap, `--burn` never invoked, temp clone always deleted. The headline demo is
+   `All-Hands-AI/OpenHands` → Context Honesty 60 with 12 dead refs. See
+   `console/README.md`.
 
 Zero runtime dependencies everywhere (Node ≥20 built-ins; the dashboard's
 graph view loads Cytoscape from a CDN in the browser).

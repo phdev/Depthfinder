@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Depthfinder · is your AI context honest?</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font: 15px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: #0b0b0d; color: #e7e7ea; -webkit-font-smoothing: antialiased;
+    display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 0 18px;
+  }
+  a { color: #9aa7ff; }
+  header { text-align: center; margin: 56px 0 8px; }
+  h1 { font-size: 26px; letter-spacing: -0.3px; margin: 0 0 6px; }
+  .sub { color: #9b9ba3; font-size: 14px; max-width: 560px; margin: 0 auto; }
+  form { display: flex; gap: 8px; width: 100%; max-width: 620px; margin: 26px 0 6px; }
+  input {
+    flex: 1; background: #141418; border: 1px solid #2a2a31; color: #e7e7ea; border-radius: 8px;
+    padding: 12px 14px; font: inherit; outline: none;
+  }
+  input:focus { border-color: #4a4a55; }
+  button {
+    background: #e7e7ea; color: #0b0b0d; border: 0; border-radius: 8px; padding: 0 18px;
+    font: inherit; font-weight: 600; cursor: pointer;
+  }
+  button:disabled { opacity: .5; cursor: progress; }
+  .examples { color: #71717a; font-size: 12.5px; max-width: 620px; margin: 2px auto 0; width: 100%; }
+  .examples a { cursor: pointer; }
+  main { width: 100%; max-width: 620px; margin: 22px 0 60px; }
+  .card { background: #131318; border: 1px solid #26262d; border-radius: 12px; padding: 22px; }
+  .scanline { color: #8a8a93; font-size: 13px; margin: 0 0 18px; word-break: break-all; }
+  .score { display: flex; align-items: baseline; gap: 12px; }
+  .score .n { font-size: 54px; font-weight: 700; letter-spacing: -1.5px; line-height: 1; }
+  .score .label { color: #9b9ba3; font-size: 13px; }
+  .bar { height: 6px; background: #26262d; border-radius: 4px; overflow: hidden; margin: 14px 0 4px; }
+  .bar > span { display: block; height: 100%; background: #e7e7ea; }
+  .meta { color: #9b9ba3; font-size: 13px; margin: 6px 0 0; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: #8a8a93; margin: 22px 0 10px; }
+  .finding { border-top: 1px solid #222228; padding: 11px 0; }
+  .finding:first-of-type { border-top: 0; }
+  .finding .loc { color: #71717a; font-size: 12.5px; }
+  .finding .what { margin: 2px 0; }
+  .finding .what code { background: #232330; padding: 1px 6px; border-radius: 5px; color: #ffd9d9; }
+  .finding .why { color: #9b9ba3; font-size: 13px; }
+  .tag { display: inline-block; font-size: 11px; color: #71717a; border: 1px solid #2a2a31; border-radius: 5px; padding: 0 6px; margin-left: 6px; vertical-align: middle; }
+  .tax { margin: 20px 0 0; padding: 13px 14px; background: #1a1416; border: 1px solid #3a2326; border-radius: 9px; color: #e9c9c9; font-size: 13px; }
+  .clean { margin: 16px 0 0; color: #b6e3b6; font-size: 14px; }
+  .err { color: #f0b4b4; }
+  .muted { color: #71717a; font-size: 12.5px; margin-top: 14px; }
+  footer { color: #5a5a63; font-size: 12px; text-align: center; margin: auto 0 26px; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Is your AI context honest?</h1>
+    <p class="sub">Depthfinder reads a repo's <code>CLAUDE.md</code> / <code>AGENTS.md</code> and checks every claim against the actual code. Paste a public GitHub repo — no install.</p>
+  </header>
+
+  <form id="f">
+    <input id="repo" placeholder="owner/repo  ·  e.g. All-Hands-AI/OpenHands" autocomplete="off" autocapitalize="off" spellcheck="false" />
+    <button id="go" type="submit">Scan</button>
+  </form>
+  <div class="examples">Try: <a data-repo="All-Hands-AI/OpenHands">All-Hands-AI/OpenHands</a> · <a data-repo="openai/codex">openai/codex</a> · <a data-repo="microsoft/vscode">microsoft/vscode</a></div>
+
+  <main id="out"></main>
+  <footer>Deterministic · no model calls · the repo is shallow-cloned, scanned, and deleted. <a href="https://www.npmjs.com/package/depthfinder">npm i -g depthfinder</a> to run it on your own (private) repos.</footer>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const out = $("#out"), go = $("#go"), repo = $("#repo");
+
+function esc(s){ return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+// the specific claimed thing (a path/package/symbol) for a false claim
+function subject(c){
+  const a = c.predicate && c.predicate.args || {};
+  return a.path || a.name || a.symbol || a.count != null && String(a.count) || "";
+}
+
+function render(d){
+  if (d.error){ out.innerHTML = `<div class="card"><p class="err">✗ ${esc(d.error)}</p><p class="muted">Tried <code>${esc(d.repo||"")}</code>. Public repos only; this is a demo with size/time limits.</p></div>`; return; }
+  const p = d.payload, s = p.score;
+  const honest = s.honesty;
+  const falses = (p.claims||[]).filter(c => c.verdict === "false");
+  const pct = honest == null ? 0 : honest;
+  const scoreStr = honest == null ? "—" : honest;
+
+  let h = `<div class="card">`;
+  h += `<p class="scanline">Scanned ${esc((p.scanned||[]).join(", ")||"context files")} against ${(p.trackedFiles||0).toLocaleString()} tracked files in <a href="https://github.com/${esc(d.repo)}" target="_blank" rel="noopener">${esc(d.repo)}</a></p>`;
+  h += `<div class="score"><span class="n">${scoreStr}</span><span class="label">Context&nbsp;Honesty${honest==null?" · too few checkable claims to score":""}<br>${s.definite} checkable claim${s.definite===1?"":"s"} · ${s.unknown} unchecked</span></div>`;
+  h += `<div class="bar"><span style="width:${pct}%"></span></div>`;
+  h += `<p class="meta">~${(p.weight&&p.weight.approxTokens||0).toLocaleString()} tokens load into the agent every turn · ${s.false} false · ${s.stale} stale</p>`;
+
+  if (falses.length){
+    h += `<h2>${falses.length} claim${falses.length===1?"":"s"} the repo contradicts</h2>`;
+    for (const c of falses.slice(0, 12)){
+      const subj = subject(c);
+      h += `<div class="finding"><div class="loc">${esc(c.source.file)}:${c.source.line}<span class="tag">${esc(c.oracle)}</span></div>`;
+      h += `<div class="what">${subj?`<code>${esc(subj)}</code> `:""}${esc((c.evidence&&c.evidence.summary)||"does not check out")}</div>`;
+      if (c.text) h += `<div class="why">“${esc(c.text.length>140?c.text.slice(0,140)+"…":c.text)}”</div>`;
+      h += `</div>`;
+    }
+    if (falses.length > 12) h += `<p class="muted">+ ${falses.length-12} more.</p>`;
+    h += `<p class="tax">Your agent reads all of this as ground truth every call. Each false line costs it either way — it acts on the lie, or it stops trusting the file and re-derives the whole thing by hand.</p>`;
+  } else {
+    h += `<p class="clean">✓ No contradictions found — every checkable claim matches the repo.</p>`;
+  }
+  h += `</div>`;
+  out.innerHTML = h;
+}
+
+async function scan(r){
+  if (!r) return;
+  go.disabled = true; go.textContent = "Scanning…";
+  out.innerHTML = `<div class="card"><p class="muted">Cloning and scanning ${esc(r)}… (a few seconds)</p></div>`;
+  try {
+    const res = await fetch("/api/scan", { method: "POST", headers: {"content-type":"application/json"}, body: JSON.stringify({ repo: r }) });
+    render(await res.json());
+  } catch(e){ render({ error: "request failed — is the server up?", repo: r }); }
+  finally { go.disabled = false; go.textContent = "Scan"; }
+}
+
+$("#f").addEventListener("submit", (e) => { e.preventDefault(); scan(repo.value.trim()); });
+document.querySelectorAll(".examples a").forEach(a => a.addEventListener("click", () => { repo.value = a.dataset.repo; scan(a.dataset.repo); }));
+</script>
+</body>
+</html>

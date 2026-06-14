@@ -36,6 +36,7 @@
   ],
   "scripts": {
     "start": "node server.mjs",
+    "console": "node console/server.mjs",
     "map": "node scripts/context-map.mjs",
     "tokens": "node scripts/token-budget.mjs",
     "coverage": "node scripts/coverage.mjs",
