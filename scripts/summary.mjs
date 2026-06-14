@@ -18,6 +18,50 @@ function ago(iso) {
   return `${Math.round(s / 86400)}d ago`;
 }
 
+// Pure, deterministic 3-dimension Health model. Extracted so it can be unit-
+// tested with synthetic signals (no live repo). Drops the design's 4th
+// dimension ("Simplicity") as non-deterministic. Every score is honest math
+// over real signals — clamped 0–100, severity-tiered, weighted composite.
+export function computeDimensions({
+  codeDanglingCount = 0,
+  otherDanglingCount = 0,
+  dupBlocks = 0,
+  cmTokens = 0,
+  cmBudget = 0,
+  readFirstOver = false,
+  rulesInCi = 0,
+  totalRules = 0,
+  ciGaps = 0,
+  missingArtifacts = 0,
+} = {}) {
+  const clampS = (n) => Math.max(0, Math.min(100, Math.round(n)));
+  const sevOf = (s) => (s < 35 ? "high" : s < 70 ? "medium" : "ok");
+
+  // Coherence — do docs match code? Penalize dead/stale code refs + duplicate drift.
+  const coherence = clampS(
+    100 - (codeDanglingCount * 12 + Math.min(8, otherDanglingCount) + Math.min(15, dupBlocks * 3)),
+  );
+  // Weight — how much loads every turn? Penalize over-budget CLAUDE.md + read-first.
+  const overRatio = cmBudget ? Math.max(0, (cmTokens - cmBudget) / cmBudget) : 0;
+  const weight = clampS(100 - overRatio * 45 - (readFirstOver ? 15 : 0));
+  // Coverage — rules/evals actually enforced in CI.
+  const denom = totalRules || 1;
+  const coverage = clampS((100 * rulesInCi) / denom - ciGaps * 8 - missingArtifacts * 10);
+  // Health — weighted composite (honesty-leaning). Deterministic; documented here.
+  const HEALTH_WEIGHTS = { coherence: 0.4, weight: 0.3, coverage: 0.3 };
+  const healthScore = clampS(
+    HEALTH_WEIGHTS.coherence * coherence +
+      HEALTH_WEIGHTS.weight * weight +
+      HEALTH_WEIGHTS.coverage * coverage,
+  );
+  const dimensions = {
+    coherence: { key: "coherence", label: "Coherence", sub: "How well docs match code", improves: "reliability", score: coherence, sev: sevOf(coherence), tab: 1 },
+    weight: { key: "weight", label: "Weight", sub: "How much loads every turn", improves: "speed & cost", score: weight, sev: sevOf(weight), tab: 2 },
+    coverage: { key: "coverage", label: "Coverage", sub: "Rules & evals enforced in CI", improves: "reliability", score: coverage, sev: sevOf(coverage), tab: 3 },
+  };
+  return { coherence, weight, coverage, healthScore, healthWeights: HEALTH_WEIGHTS, dimensions };
+}
+
 export async function generateSummary() {
   const map = generateMap();
   const tokens = readTokens();
@@ -272,44 +316,24 @@ export async function generateSummary() {
     },
   };
 
-  // ── dimensions (3-model: Coherence / Weight / Coverage) — all deterministic ──
-  // Drops the design's 4th dimension ("Simplicity"): it was the only
-  // non-deterministic one. The three below are each computed from real signals
-  // already in scope, so the composite and every projected gain are honest math.
-  const clampS = (n) => Math.max(0, Math.min(100, Math.round(n)));
-  const sevOf = (s) => (s < 35 ? "high" : s < 70 ? "medium" : "ok");
-
-  // Coherence — do docs match code? Penalize dead/stale code refs + duplicate drift.
-  const coherence = clampS(
-    100 -
-      (codeDangling.length * 12 + Math.min(8, otherDangling.length) + Math.min(15, dupBlocks * 3)),
-  );
-  // Weight — how much loads every turn? Penalize over-budget CLAUDE.md + read-first.
-  const overRatio = cm.budget ? Math.max(0, (cm.tokens - cm.budget) / cm.budget) : 0;
-  const weight = clampS(100 - overRatio * 45 - (rf.over ? 15 : 0));
-  // Coverage — rules/evals actually enforced in CI.
-  const totalRules = coverage.rules.length || 1;
-  const missingArtifacts = coverage.rules.filter((r) => r.status === "missing-artifact").length;
-  const coverageScore = clampS(
-    (100 * rulesInCi) / totalRules - (coverage.ci.gaps?.length || 0) * 8 - missingArtifacts * 10,
-  );
-  // Health — weighted composite (honesty-leaning). Deterministic; documented here.
-  const HEALTH_WEIGHTS = { coherence: 0.4, weight: 0.3, coverage: 0.3 };
-  const healthScore = clampS(
-    HEALTH_WEIGHTS.coherence * coherence +
-      HEALTH_WEIGHTS.weight * weight +
-      HEALTH_WEIGHTS.coverage * coverageScore,
-  );
-  const dimensions = {
-    coherence: { key: "coherence", label: "Coherence", sub: "How well docs match code", improves: "reliability", score: coherence, sev: sevOf(coherence), tab: 1 },
-    weight: { key: "weight", label: "Weight", sub: "How much loads every turn", improves: "speed & cost", score: weight, sev: sevOf(weight), tab: 2 },
-    coverage: { key: "coverage", label: "Coverage", sub: "Rules & evals enforced in CI", improves: "reliability", score: coverageScore, sev: sevOf(coverageScore), tab: 3 },
-  };
+  // 3-dimension Health model (pure fn — see computeDimensions, unit-tested).
+  const { healthScore, healthWeights, dimensions } = computeDimensions({
+    codeDanglingCount: codeDangling.length,
+    otherDanglingCount: otherDangling.length,
+    dupBlocks,
+    cmTokens: cm.tokens,
+    cmBudget: cm.budget,
+    readFirstOver: rf.over,
+    rulesInCi,
+    totalRules: coverage.rules.length,
+    ciGaps: coverage.ci.gaps?.length || 0,
+    missingArtifacts: coverage.rules.filter((r) => r.status === "missing-artifact").length,
+  });
 
   return redactDeep({
     generatedAt: new Date().toISOString(),
     healthScore,
-    healthWeights: HEALTH_WEIGHTS,
+    healthWeights,
     dimensions,
     counts: {
       high: issues.filter((i) => i.severity === "high").length,
