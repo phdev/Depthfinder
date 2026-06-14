@@ -50,6 +50,15 @@
   .clean { margin: 16px 0 0; color: #b6e3b6; font-size: 14px; }
   .err { color: #f0b4b4; }
   .muted { color: #71717a; font-size: 12.5px; margin-top: 14px; }
+  .headline { display: flex; align-items: baseline; gap: 12px; margin: 0 0 14px; }
+  .headline .hn { font-size: 52px; font-weight: 700; letter-spacing: -1.5px; line-height: 1; }
+  .headline .hl { color: #9b9ba3; font-size: 13px; }
+  .cardout { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; line-height: 1.5; color: #cfcfd6; background: #0e0e12; border: 1px solid #1d1d23; border-radius: 8px; padding: 14px 12px; overflow-x: auto; }
+  .l-x { color: #f0a8a8; }
+  .l-ok { color: #a8e0a8; }
+  .l-score { color: #fff; font-weight: 600; }
+  .l-tax { color: #c9a3a3; }
+  .l-ev { color: #9b9ba3; }
   footer { color: #5a5a63; font-size: 12px; text-align: center; margin: auto 0 26px; }
 </style>
 </head>
@@ -74,40 +83,26 @@ const out = $("#out"), go = $("#go"), repo = $("#repo");
 
 function esc(s){ return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 
-// the specific claimed thing (a path/package/symbol) for a false claim
-function subject(c){
-  const a = c.predicate && c.predicate.args || {};
-  return a.path || a.name || a.symbol || a.count != null && String(a.count) || "";
+// light per-line colorize of the verbatim card (✗ findings, score, tax line)
+function colorLine(ln){
+  const e = esc(ln);
+  if (/^\s*✗/.test(ln)) return `<span class="l-x">${e}</span>`;
+  if (/^\s*✓/.test(ln)) return `<span class="l-ok">${e}</span>`;
+  if (/Context Honesty|Doc Honesty/.test(ln)) return `<span class="l-score">${e}</span>`;
+  if (/false claim|no longer exists|ground truth|detour is the tax|re-derive|re-verif/i.test(ln)) return `<span class="l-tax">${e}</span>`;
+  if (/^\s*(└|▶)/.test(ln)) return `<span class="l-ev">${e}</span>`;
+  return e;
 }
 
+// Show the EXACT card `npx depthfinder` prints, verbatim — the honest preview.
 function render(d){
   if (d.error){ out.innerHTML = `<div class="card"><p class="err">✗ ${esc(d.error)}</p><p class="muted">Tried <code>${esc(d.repo||"")}</code>. Public repos only; this is a demo with size/time limits.</p></div>`; return; }
-  const p = d.payload, s = p.score;
-  const honest = s.honesty;
-  const falses = (p.claims||[]).filter(c => c.verdict === "false");
-  const pct = honest == null ? 0 : honest;
-  const scoreStr = honest == null ? "—" : honest;
-
+  const card = (d.card || "").replace(/\n+$/, "");
+  const m = card.match(/Context Honesty\s+(\S+)/);
   let h = `<div class="card">`;
-  h += `<p class="scanline">Scanned ${esc((p.scanned||[]).join(", ")||"context files")} against ${(p.trackedFiles||0).toLocaleString()} tracked files in <a href="https://github.com/${esc(d.repo)}" target="_blank" rel="noopener">${esc(d.repo)}</a></p>`;
-  h += `<div class="score"><span class="n">${scoreStr}</span><span class="label">Context&nbsp;Honesty${honest==null?" · too few checkable claims to score":""}<br>${s.definite} checkable claim${s.definite===1?"":"s"} · ${s.unknown} unchecked</span></div>`;
-  h += `<div class="bar"><span style="width:${pct}%"></span></div>`;
-  h += `<p class="meta">~${(p.weight&&p.weight.approxTokens||0).toLocaleString()} tokens load into the agent every turn · ${s.false} false · ${s.stale} stale</p>`;
-
-  if (falses.length){
-    h += `<h2>${falses.length} claim${falses.length===1?"":"s"} the repo contradicts</h2>`;
-    for (const c of falses.slice(0, 12)){
-      const subj = subject(c);
-      h += `<div class="finding"><div class="loc">${esc(c.source.file)}:${c.source.line}<span class="tag">${esc(c.oracle)}</span></div>`;
-      h += `<div class="what">${subj?`<code>${esc(subj)}</code> `:""}${esc((c.evidence&&c.evidence.summary)||"does not check out")}</div>`;
-      if (c.text) h += `<div class="why">“${esc(c.text.length>140?c.text.slice(0,140)+"…":c.text)}”</div>`;
-      h += `</div>`;
-    }
-    if (falses.length > 12) h += `<p class="muted">+ ${falses.length-12} more.</p>`;
-    h += `<p class="tax">Your agent reads all of this as ground truth every call. Each false line costs it either way — it acts on the lie, or it stops trusting the file and re-derives the whole thing by hand.</p>`;
-  } else {
-    h += `<p class="clean">✓ No contradictions found — every checkable claim matches the repo.</p>`;
-  }
+  if (m) h += `<div class="headline"><span class="hn">${esc(m[1])}</span><span class="hl">Context Honesty · <a href="https://github.com/${esc(d.repo)}" target="_blank" rel="noopener">${esc(d.repo)}</a></span></div>`;
+  h += `<pre class="cardout">${card.split("\n").map(colorLine).join("\n")}</pre>`;
+  h += `<p class="muted">↑ exactly what <code>npx depthfinder</code> prints. Run it on your own (private) repos — nothing leaves your machine.</p>`;
   h += `</div>`;
   out.innerHTML = h;
 }

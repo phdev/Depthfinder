@@ -69,17 +69,19 @@ function cloneAndScan(slug) {
         : clone.error?.code === "ETIMEDOUT" ? "clone timed out (repo too large for the demo)" : "clone failed";
       return { error: why };
     }
-    const scan = spawnSync(process.execPath, [BIN, dir, "--json"], {
+    // Default mode (no --json): stdout is the EXACT replay card `npx depthfinder`
+    // prints — what we show, verbatim, so the demo is a faithful preview of the
+    // real tool (--no-history keeps it from touching a cache; --no-follow off so
+    // linked brain docs are scanned exactly as the CLI does by default).
+    const scan = spawnSync(process.execPath, [BIN, dir, "--no-history"], {
       timeout: SCAN_TIMEOUT_MS, encoding: "utf8", windowsHide: true, maxBuffer: 64 * 1024 * 1024,
-      env: { ...process.env, DEPTHFINDER_CACHE: join(dir, ".df-cache") }, // keep history out of the user cache
+      env: { ...process.env, DEPTHFINDER_CACHE: join(dir, ".df-cache") },
     });
     // exit 3 = no context files (a clean "this repo has no CLAUDE.md/AGENTS.md")
     if (scan.status === 3) return { error: "no AI context files found (no CLAUDE.md / AGENTS.md / .cursorrules)" };
     if (scan.status === 2) return { error: "not a scannable git repo" };
     if (!scan.stdout) return { error: scan.error?.code === "ETIMEDOUT" ? "scan timed out (repo too large for the demo)" : "scan produced no output" };
-    let payload;
-    try { payload = JSON.parse(scan.stdout); } catch { return { error: "could not parse scan output" }; }
-    return { payload };
+    return { card: scan.stdout };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
