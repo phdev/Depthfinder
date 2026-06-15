@@ -1190,11 +1190,11 @@ function wireSummary(root) {
           cp.classList.remove("copied");
         }, 1600);
       };
-      try {
-        if (navigator.clipboard?.writeText) {
-          await navigator.clipboard.writeText(text);
-          flash(true);
-        } else {
+      // hidden-textarea + execCommand — the fallback when clipboard.writeText is
+      // ABSENT (LAN http) OR THROWS (headless, blocked clipboard permission, some
+      // browsers). Returns false if even that path fails.
+      const execCopy = () => {
+        try {
           const ta = document.createElement("textarea");
           ta.value = text;
           ta.style.position = "fixed";
@@ -1203,10 +1203,20 @@ function wireSummary(root) {
           ta.select();
           const ok = document.execCommand("copy");
           ta.remove();
-          flash(ok);
+          return ok;
+        } catch {
+          return false;
         }
-      } catch {
-        flash(false);
+      };
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(text);
+          flash(true);
+        } catch {
+          flash(execCopy()); // writeText threw → don't give up, try execCommand
+        }
+      } else {
+        flash(execCopy());
       }
     });
 
