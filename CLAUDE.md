@@ -172,7 +172,16 @@ are the tax, surfaced as "the detour is the tax, every session."
   Still deferred: the symbol-search-timeout degradation (a NORMAL budget event on
   large repos — failing closed on it would break the gate for every big repo, so it
   needs a per-claim "cut off by the cap" signal, not a run-level flag); plus
-  `--strict-docs` (until the doc corpus is zero-false) and a consumer GitHub Action.
+  `--strict-docs` (until the doc corpus is zero-false).
+- **Agent-loop gate (thin loop-fit):** the `--strict` exit code doubles as the
+  termination signal for an agent that's *fixing* rot — `until npx depthfinder
+  --strict --no-history; do <fix top claim>; done` stops exactly when the context
+  is honest again (deterministic, so "0 false" is a real done-signal, not a
+  "looks finished" guess). **NO new flag** — the loop reuses `--strict` (gate) +
+  `--json` (per-pass fix targets) + `--no-history` (keeps inner passes out of the
+  score-delta history). Shipped as a first-class recipe in the README ("Use it as
+  an agent-loop gate") and the `/depthfinder` SKILL.md ("Fix it all (loop)"), so
+  an installed agent already knows the pattern — docs-only, no version bump.
 - `src/cli/extract/{path,dependency,symbol,count}.mjs` — grammars are
   deliberately conservative; the dependency grammar's guards exist because
   the self-scan false-accused `its`/`home-center`/`--lan` on day one, and

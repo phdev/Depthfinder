@@ -155,6 +155,24 @@ with a \`→ fix:\` line). Treat any claim flagged **false** (never matched the
 repo) or **stale** (git proves the target moved or was deleted) as UNRELIABLE:
 verify it against the code before acting, and prefer fixing the doc. Requires
 Node >= 20 and git.
+
+## Fix it all (loop)
+
+To clear *every* rotted claim, loop — and let depthfinder be the termination
+gate. It's deterministic, so a clean exit is a real done-signal, not a guess:
+
+\`\`\`bash
+until npx depthfinder --strict --no-history >/dev/null 2>&1; do
+  # one pass: read the worst claim, fix it, let the loop re-check.
+  npx depthfinder --json --no-history   # false/stale claims + each Hotspot's fix
+  # …edit the context file (repoint the path, drop the dead dep, fix the count)…
+done
+\`\`\`
+
+\`--strict\` exits **0** when no false claim remains and **20** while any does, so
+the \`until\` stops exactly when the context is honest again. Fix one claim per
+pass (the top Hotspot), prefer editing the doc over the code, and never invent a
+target — if a path's real home is unknown, delete the line rather than guess.
 `;
 
 main();

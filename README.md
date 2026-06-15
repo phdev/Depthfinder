@@ -212,6 +212,26 @@ jobs:
   `gate: { strict, maxFalse, false, tier, unverifiedFiles, failed }` object
   (`failed` = rot or couldn't-verify) for programmatic use.
 
+### Use it as an agent-loop gate
+
+The same exit code that gates CI also makes a clean **termination signal for an
+agent loop**. Because the scan is deterministic, "0 false claims" is a real
+done-signal — not a "looks finished" guess — so an agent fixing rot can loop
+until depthfinder passes:
+
+```bash
+until npx depthfinder --strict --no-history >/dev/null 2>&1; do
+  npx depthfinder --json --no-history   # the false/stale claims + each fix to apply
+  # …fix the top claim (repoint the path, drop the dead dep, correct the count)…
+done
+```
+
+`--strict` exits **0** once nothing is false and **20** while anything still is,
+so the loop stops exactly when the context is honest again. `--no-history` keeps
+the inner passes out of your score-delta history. This is the pattern the
+`/depthfinder` agent skill ships, so an installed agent already knows it
+(`--install-skill`).
+
 ### Exit codes
 
 | Code | Meaning |
