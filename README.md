@@ -119,6 +119,7 @@ npx depthfinder --weight-budget 8000  # token budget for the Weight dimension (h
 npx depthfinder --fix      # repoint paths git proves were renamed (dry run — shows the diff)
 npx depthfinder --fix --write  # ...actually apply the rename-fixes (the only write to your repo)
 npx depthfinder --convention >> CLAUDE.md  # add a snippet so agents self-check this file
+npx depthfinder --install-skill  # install the /depthfinder agent skill (Claude Code + Codex)
 npx depthfinder --version  # print the version and exit (-v); --help (-h) for usage
 ```
 
@@ -151,6 +152,27 @@ reading the file knows to verify the docs against the code instead of trusting a
 rotted line — no plugin and no MCP server, just the CLI it can already run. (An
 agent with a shell can run `npx depthfinder --json` directly; this snippet is the
 nudge that makes it *think* to.)
+
+### Make it a first-class skill — `--install-skill`
+
+For a more discoverable, invokable `/depthfinder` skill (vs the in-file
+convention line), install the agent skill. It's **one `SKILL.md` that works across
+harnesses** — Claude Code, Codex, OpenClaw, and Hermes all use the same format:
+
+```bash
+# Claude Code + Codex — local file install (writes ~/.claude/skills, ~/.agents/skills):
+npx depthfinder --install-skill
+
+# Hermes / Vercel open-agent-skills — install the SAME skill from this repo:
+hermes skills install phdev/Depthfinder/skills/depthfinder
+npx skills add phdev/Depthfinder/skills --skill depthfinder
+```
+
+`--install-skill` detects which harnesses you have and drops the skill into each.
+The canonical skill lives at [`skills/depthfinder/SKILL.md`](skills/depthfinder/SKILL.md)
+(byte-identical to what the flag writes — pinned by a test). MCP is deliberately
+*not* shipped: for a shell-capable agent it adds nothing over `npx depthfinder
+--json`; the skill is the discoverability layer, the CLI does the work.
 
 ### Fail CI when your context rots — `--strict`
 

@@ -51,6 +51,41 @@ test("--convention: snippet to stdout (append-safe), how-to to stderr, exit 0 (n
   assert.match(r.stderr, /--strict/, "stderr points at the CI gate");
 });
 
+test("--install-skill: writes the /depthfinder SKILL.md into each DETECTED harness; matches the committed registry copy", () => {
+  const home = mkdtempSync(join(tmpdir(), "df-home-"));
+  mkdirSync(join(home, ".claude"), { recursive: true }); // Claude Code present
+  mkdirSync(join(home, ".codex"), { recursive: true }); // Codex present
+  try {
+    const r = runCli(process.cwd(), ["--install-skill"], { HOME: home });
+    assert.equal(r.code, 0);
+    const claudeSkill = join(home, ".claude", "skills", "depthfinder", "SKILL.md");
+    const codexSkill = join(home, ".agents", "skills", "depthfinder", "SKILL.md"); // Codex uses ~/.agents/skills
+    assert.ok(existsSync(claudeSkill), "Claude Code skill written");
+    assert.ok(existsSync(codexSkill), "Codex skill written");
+    const content = readFileSync(claudeSkill, "utf8");
+    assert.ok(content.startsWith("---\nname: depthfinder\n"), "valid SKILL.md frontmatter");
+    assert.match(content, /npx depthfinder/);
+    // no-drift invariant: the CLI-written skill MUST equal the committed copy that
+    // registry installers (hermes skills install / npx skills add) pull from this repo.
+    const committed = readFileSync(new URL("../skills/depthfinder/SKILL.md", import.meta.url), "utf8");
+    assert.equal(content, committed, "CLI skill == committed skills/depthfinder/SKILL.md");
+    assert.match(r.stderr, /hermes skills install|npx skills add/, "stderr points at the registry installs");
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("--install-skill: no harness detected → defaults to the Claude Code path, exit 0", () => {
+  const home = mkdtempSync(join(tmpdir(), "df-home2-"));
+  try {
+    const r = runCli(process.cwd(), ["--install-skill"], { HOME: home });
+    assert.equal(r.code, 0);
+    assert.ok(existsSync(join(home, ".claude", "skills", "depthfinder", "SKILL.md")));
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
 // ── Health dimensions + --warn-below soft-gate (CLI dimension model) ──
 // A clean repo with ≥5 true path claims so the honesty score (and therefore the
 // dimensions) render rather than suppress.

@@ -124,7 +124,8 @@ are the tax, surfaced as "the detour is the tax, every session."
   1 internal / 2 usage·no-git / 3 no context files / **20 `--strict` gate
   breach**), stream discipline (stdout = card|JSON only; diagnostics → stderr),
   redaction at both output seams via `lib/redact.mjs`. `--version`/`-v`,
-  `--help`/`-h`, and `--convention` short-circuit before any repo work and exit 0.
+  `--help`/`-h`, `--convention`, and `--install-skill` short-circuit before any
+  repo work and exit 0.
   `--convention` prints a drop-in CLAUDE.md/AGENTS.md self-check snippet to
   **stdout** (clean markdown — `npx depthfinder --convention >> CLAUDE.md` is
   append-safe) with the how-to + `--strict` CI pointer to **stderr** (stream
@@ -134,6 +135,19 @@ are the tax, surfaced as "the detour is the tax, every session."
   the convention line — the agent reads the context file every turn, so the file
   IS the discovery point — buys the discoverability at ~zero cost. MCP was held at
   eng-review (design doc in `~/.gstack/projects/phdev-Depthfinder/`).
+- **`--install-skill` (agent-native packaging):** installs the `/depthfinder`
+  **agent skill** — ONE `SKILL.md` (a string constant in `bin/depthfinder.mjs`)
+  that works across harnesses, since Claude Code, Codex, OpenClaw, and Hermes all
+  use the same skill format now. Detects which harnesses are present and writes to
+  each: Claude Code → `~/.claude/skills/depthfinder/`, Codex → `~/.agents/skills/
+  depthfinder/` (the open-agent-skills dir); defaults to the Claude Code path if
+  neither is detected. Writes to the user's HOME, **never the scanned repo**
+  (invariant 5 holds). The committed `skills/depthfinder/SKILL.md` (for REGISTRY
+  installs — `hermes skills install phdev/Depthfinder/skills/depthfinder`, `npx
+  skills add …`, clawhub) is **byte-identical** to what the flag writes — pinned by
+  a no-drift test (`tests/cli.test.mjs`). `skills/` is NOT in the npm tarball
+  (registry installs pull from GitHub; npm users use the flag). MCP still NOT
+  shipped — the skill is the discoverability layer the guide ranks #1; MCP is #3.
 - **`--strict` CI gate (V1.5 / Phase A):** fails a build (**exit 20** — outside
   Node's reserved 1-13 range so a wrapper/Action tells rot from a crash) when the
   **Context tier** has more than `--max-false N` false claims (`N` default 0,

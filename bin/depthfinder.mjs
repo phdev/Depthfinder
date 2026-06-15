@@ -25,8 +25,9 @@
 // every diagnostic goes to stderr. Redaction (1A) wraps both outputs at the
 // stream/serializer boundary.
 import { parseArgs } from "node:util";
-import { existsSync, statSync, readFileSync } from "node:fs";
-import { resolve, sep } from "node:path";
+import { existsSync, statSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { resolve, sep, join } from "node:path";
+import { homedir } from "node:os";
 import { redact, redactDeep } from "../lib/redact.mjs";
 import { tokchars } from "../lib/text.mjs";
 import { findRoot, lsFiles, isShallow, deletionEvidence, currentBranch, GitMissingError, NotARepoError } from "../src/cli/git.mjs";
@@ -94,6 +95,11 @@ const USAGE = `usage: depthfinder [path] [--json] [--out <dir>] [--no-follow] [-
   --convention print a drop-in CLAUDE.md/AGENTS.md snippet that tells agents to
               self-check this file with depthfinder, then exit (stdout = the
               snippet, so: npx depthfinder --convention >> CLAUDE.md)
+  --install-skill  install the /depthfinder agent skill (one SKILL.md) into each
+              detected harness — Claude Code (~/.claude/skills/) and Codex
+              (~/.agents/skills/) — so the agent can self-check context honesty as
+              a first-class skill, then exit. (Hermes/OpenClaw install the same
+              skill from this repo's skills/ dir — see --help notes / README.)
   -v, --version  print the depthfinder version and exit
   -h, --help     print this usage and exit`;
 
@@ -112,6 +118,45 @@ against the actual code before acting on it, and prefer fixing the doc over
 trusting the line.
 `;
 
+// The /depthfinder agent skill — ONE SKILL.md that works across harnesses (Claude
+// Code, Codex, OpenClaw, Hermes all use this format now). Generated inline so the
+// CLI can install it with zero extra tarball files; the committed copy at
+// skills/depthfinder/SKILL.md (for registry installs — `hermes skills install`,
+// `npx skills add`, clawhub) MUST match this byte-for-byte (enforced by a test).
+const SKILL_MD = `---
+name: depthfinder
+description: Verify this repo's AI context files (CLAUDE.md / AGENTS.md / .cursorrules) are still TRUE against the code. Surfaces false and stale claims — dead paths, missing dependencies, wrong counts, absent symbols — before you trust them. Use before relying on the project docs, or when the user asks about context rot, stale docs, or drift.
+---
+
+# depthfinder — keep your AI context honest
+
+The files you read as ground truth (CLAUDE.md, AGENTS.md, .cursorrules, and the
+docs they point to) rot: paths go dead, dependency claims go stale, counts drift.
+depthfinder scans the factual claims those files make and verifies each against
+the repo — deterministically, no model calls, nothing leaves the machine.
+
+## When to use
+
+- BEFORE you rely on a factual claim in the context files (a file path, a
+  dependency, a count, an exported symbol).
+- Whenever the user asks "is my context stale?", "what's rotted?", or anything
+  about context honesty / drift.
+
+## How
+
+\`\`\`bash
+npx depthfinder            # scan the current repo; prints the honesty card
+npx depthfinder --json     # structured: score + false/stale claims + dimensions + hotspots
+npx depthfinder --strict   # CI gate: exit 20 if the context has any false claim
+\`\`\`
+
+Read the **Context Honesty** score and the **Hotspots** (each false/stale claim
+with a \`→ fix:\` line). Treat any claim flagged **false** (never matched the
+repo) or **stale** (git proves the target moved or was deleted) as UNRELIABLE:
+verify it against the code before acting, and prefer fixing the doc. Requires
+Node >= 20 and git.
+`;
+
 main();
 
 function main() {
@@ -128,6 +173,7 @@ function main() {
         "burn-agent": { type: "string" },
         "no-history": { type: "boolean" },
         convention: { type: "boolean" },
+        "install-skill": { type: "boolean" },
         strict: { type: "boolean" },
         "max-false": { type: "string" },
         "warn-below": { type: "string" },
@@ -161,6 +207,41 @@ function main() {
       `Append the snippet above to your CLAUDE.md or AGENTS.md so agents self-check\n` +
         `context honesty, e.g.:  npx depthfinder --convention >> CLAUDE.md\n` +
         `CI gate: npx depthfinder@${VERSION} --strict   (exit 20 on rotted claims)\n`,
+    );
+    process.exit(0);
+  }
+  // --install-skill: write the ONE /depthfinder SKILL.md into each DETECTED
+  // harness's skills dir (Claude Code ~/.claude/skills, Codex ~/.agents/skills).
+  // Writes to the user's home, NEVER the scanned repo (invariant 5 holds). The
+  // file content matches the committed skills/depthfinder/SKILL.md (registry path).
+  if (args.values["install-skill"]) {
+    const home = homedir();
+    const targets = [];
+    if (existsSync(join(home, ".claude"))) targets.push(join(home, ".claude", "skills", "depthfinder"));
+    if (existsSync(join(home, ".codex")) || existsSync(join(home, ".agents")))
+      targets.push(join(home, ".agents", "skills", "depthfinder"));
+    if (targets.length === 0) targets.push(join(home, ".claude", "skills", "depthfinder")); // none detected → default
+    const written = [];
+    for (const dir of targets) {
+      try {
+        mkdirSync(dir, { recursive: true });
+        const file = join(dir, "SKILL.md");
+        writeFileSync(file, SKILL_MD.trimStart());
+        written.push(file);
+        process.stdout.write(`installed ${file}\n`);
+      } catch (e) {
+        process.stderr.write(`depthfinder --install-skill: could not write ${dir}: ${e.message}\n`);
+      }
+    }
+    if (written.length === 0) {
+      process.exitCode = 2;
+      return;
+    }
+    process.stderr.write(
+      `depthfinder: /depthfinder skill installed for ${written.length} harness(es) — restart your agent to pick it up.\n` +
+        `Hermes / OpenClaw / Vercel skills install the SAME skill from this repo:\n` +
+        `  hermes skills install phdev/Depthfinder/skills/depthfinder\n` +
+        `  npx skills add phdev/Depthfinder/skills --skill depthfinder\n`,
     );
     process.exit(0);
   }
