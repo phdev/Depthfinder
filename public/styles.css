@@ -369,3 +369,19 @@ table.matrix th { background: var(--bg3); position: sticky; top: 0; }
 .drift-result pre { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 0.6rem; font-size: 0.72rem; overflow-x: auto; max-height: 400px; }
 @media (max-width: 620px) { .drift-opts { grid-template-columns: 1fr; } }
 
+/* ── pull-to-refresh indicator (mobile; created by app.js) ── */
+.ptr {
+  position: fixed; top: -46px; left: 50%; margin-left: -20px;
+  width: 40px; height: 40px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--panel); border: 1px solid var(--line);
+  color: var(--muted); font-size: 20px; line-height: 1;
+  z-index: 60; pointer-events: none;
+  backdrop-filter: blur(8px); box-shadow: var(--shadow);
+  transform: translateY(0); transition: transform 0.25s ease;
+}
+.ptr.armed { color: var(--accent); border-color: var(--accent); }
+.ptr-spin { display: inline-block; }
+.ptr.spin .ptr-spin { animation: ptr-rot 0.7s linear infinite; }
+@keyframes ptr-rot { to { transform: rotate(360deg); } }
+

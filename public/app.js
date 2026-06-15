@@ -997,10 +997,21 @@ function renderSummary(d) {
          <div class="acts-expand"><div class="acts-expand-in"><div class="ae-head">Suggested action</div>
            <div class="ae-act"><span class="da-n">1</span><span>${escapeHtml(it.action)}</span></div></div></div>`
       : "";
+    // Projected health-gain radial. The gain is computed in summary.mjs from the
+    // LIVE dimension gaps (a forecast, not a constant); the radial fills relative
+    // to the biggest gain this load. Hidden at 0 — fixing a maxed dimension's
+    // hotspot gains nothing, so we don't draw a "+0".
+    const maxHG = d.maxHealthGain || 1;
+    const hg = it.healthGain || 0;
+    const health = hg > 0
+      ? `<span class="nm-health" title="projected: fixing this recovers ~${hg} health">`
+        + `<span class="nmh-radial">${radialSvg((100 * hg) / maxHG, 9, "nmh-track", "nmh-fill")}</span>`
+        + `<span class="nmh-n">+${hg}</span><span class="nmh-lab">health</span></span>`
+      : "";
     return `<div class="df-trow ${rowCls}">
       <div class="hs"><div class="nm">
         <div class="nm-r1"><span class="num tnum">${i + 1}</span><span class="nm-t">${escapeHtml(it.title)}</span></div>
-        <div class="nm-r2"><span class="sev-badge ${badge}">${badgeTxt}</span>${link}</div>
+        <div class="nm-r2"><span class="sev-badge ${badge}">${badgeTxt}</span>${health}${link}</div>
       </div>${detail}${action}</div>
     </div>`;
   };
@@ -1168,3 +1179,75 @@ window.addEventListener("resize", () => {
   if (location.hash !== canonical) history.replaceState(null, "", canonical);
   activate(start);
 }
+
+// ── pull-to-refresh (mobile) ──────────────────────────────────────────────
+// Pull down at the top of the active panel to refresh it. Reuses the existing
+// global-refresh button (so it re-fetches live data). Inert on desktop (no
+// touch events fire). The active <section.panel> is the scroll container.
+(function () {
+  const THRESHOLD = 70; // px of pull needed to arm a refresh
+  const MAX = 100; // visual cap on the pull
+  const bar = document.createElement("div");
+  bar.className = "ptr";
+  bar.innerHTML = '<span class="ptr-spin">↻</span>';
+  document.body.appendChild(bar);
+  let startY = 0,
+    pulling = false,
+    dist = 0;
+  const activePanel = () => document.querySelector(".panel.active");
+  const place = (d, armed) => {
+    bar.style.transform = "translateY(" + d + "px)";
+    bar.classList.toggle("armed", !!armed);
+  };
+  document.addEventListener(
+    "touchstart",
+    (e) => {
+      const p = activePanel();
+      pulling =
+        !!p && p.scrollTop <= 0 && e.touches.length === 1 && !bar.classList.contains("spin");
+      if (pulling) {
+        startY = e.touches[0].clientY;
+        dist = 0;
+        bar.style.transition = "none"; // 1:1 with the finger while pulling
+      }
+    },
+    { passive: true },
+  );
+  document.addEventListener(
+    "touchmove",
+    (e) => {
+      if (!pulling) return;
+      const dy = e.touches[0].clientY - startY;
+      if (dy <= 0) {
+        pulling = false;
+        bar.style.transition = "";
+        place(0, false);
+        return;
+      }
+      dist = Math.min(MAX, dy * 0.5); // resistance
+      if (e.cancelable) e.preventDefault(); // suppress the native overscroll bounce
+      place(dist, dist >= THRESHOLD);
+    },
+    { passive: false },
+  );
+  document.addEventListener(
+    "touchend",
+    () => {
+      if (!pulling) return;
+      pulling = false;
+      bar.style.transition = "";
+      if (dist >= THRESHOLD) {
+        bar.classList.add("spin");
+        place(THRESHOLD * 0.8, false);
+        document.getElementById("globalRefresh")?.click();
+        setTimeout(() => {
+          bar.classList.remove("spin");
+          place(0, false);
+        }, 900);
+      } else {
+        place(0, false);
+      }
+    },
+    { passive: true },
+  );
+})();

@@ -334,11 +334,30 @@ export async function generateSummary() {
     missingArtifacts: coverage.rules.filter((r) => r.status === "missing-artifact").length,
   });
 
+  // ── projected health gain per hotspot (honest, deterministic — never fabricated) ──
+  // Each issue maps to a dimension (via tab). A dimension's "recoverable health" is
+  // its weight × gap-to-100; we apportion that across the issues hitting it, weighted
+  // by severity. Bounded: a dimension's gains sum to its real contribution to the
+  // health gap. If a dimension is already at 100 the gains are 0 — fixing those
+  // hotspots projects no gain. This is a forecast (the "+N health" radial), not a
+  // constant: it moves with the live dimension scores.
+  const TAB_DIM = { 1: "coherence", 2: "weight", 3: "coverage" }; // tab 4 (drift) is not a dimension
+  const SEV_W = { high: 3, medium: 2, low: 1 };
+  for (const dimKey of ["coherence", "weight", "coverage"]) {
+    const recoverable = healthWeights[dimKey] * (100 - dimensions[dimKey].score);
+    const group = issues.filter((i) => TAB_DIM[i.tab] === dimKey);
+    const totW = group.reduce((s, i) => s + (SEV_W[i.severity] || 1), 0) || 1;
+    for (const i of group) i.healthGain = Math.round((recoverable * (SEV_W[i.severity] || 1)) / totW);
+  }
+  for (const i of issues) if (i.healthGain == null) i.healthGain = 0;
+  const maxHealthGain = Math.max(1, ...issues.map((i) => i.healthGain));
+
   return redactDeep({
     generatedAt: new Date().toISOString(),
     healthScore,
     healthWeights,
     dimensions,
+    maxHealthGain,
     counts: {
       high: issues.filter((i) => i.severity === "high").length,
       medium: issues.filter((i) => i.severity === "medium").length,
