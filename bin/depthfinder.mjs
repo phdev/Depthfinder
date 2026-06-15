@@ -695,7 +695,7 @@ function run({ values, positionals }) {
     meta: { skippedLines, warnings, shallowClone: shallow },
   };
 
-  const color = !!process.stdout.isTTY && !process.env.NO_COLOR;
+  const color = (!!process.stdout.isTTY || !!process.env.FORCE_COLOR) && !process.env.NO_COLOR;
   if (values.triage) {
     // Interactive: print the colored card, then step through the hotspots and
     // hand a chosen fix to the harness. TTY-gated up front, so this never runs

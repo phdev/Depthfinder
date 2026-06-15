@@ -21,13 +21,14 @@ import { tierOf, computeFixGain } from "./dimensions.mjs";
 
 const nf = new Intl.NumberFormat("en-US"); // locale-pinned for determinism
 
-// 256-color soft palette (matches the muted product aesthetic). TTY-only.
+// Standard 16-color SGR — vivid and UNIVERSALLY supported. (The earlier soft
+// 256-color palette rendered washed-out / near-white, or not at all, on some
+// terminals — so the meters read as uncolored.) TTY-only; see `color` below.
 const RESET = "\x1b[0m";
 const DIM = "\x1b[2m";
-const c256 = (n) => `\x1b[38;5;${n}m`;
-const TIER_COLOR = { critical: c256(203), caution: c256(215), ok: c256(114), great: c256(84) };
-const CRIT_COLOR = { CRIT: c256(203), HIGH: c256(215), MED: c256(180), LOW: c256(245) };
-const GAIN_COLOR = c256(114); // green — a positive score gain
+const TIER_COLOR = { critical: "\x1b[31m", caution: "\x1b[33m", ok: "\x1b[32m", great: "\x1b[92m" };
+const CRIT_COLOR = { CRIT: "\x1b[91m", HIGH: "\x1b[33m", MED: "\x1b[36m", LOW: "\x1b[90m" };
+const GAIN_COLOR = "\x1b[32m"; // green — a positive score gain
 const BAR_W = 20;
 
 const pad3 = (n) => String(n).padStart(3);

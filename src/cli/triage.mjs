@@ -19,10 +19,10 @@ import { redact } from "../../lib/redact.mjs";
 import { fixHint, criticality } from "./templates.mjs";
 
 const RESET = "\x1b[0m";
-const c256 = (n) => `\x1b[38;5;${n}m`;
-const CRIT_COLOR = { CRIT: c256(203), HIGH: c256(215), MED: c256(180), LOW: c256(245) };
-const GAIN_COLOR = c256(114);
-const PTR_COLOR = c256(84);
+// Standard 16-color SGR — vivid + universally supported (matches render.mjs).
+const CRIT_COLOR = { CRIT: "\x1b[91m", HIGH: "\x1b[33m", MED: "\x1b[36m", LOW: "\x1b[90m" };
+const GAIN_COLOR = "\x1b[32m";
+const PTR_COLOR = "\x1b[92m";
 
 // The fix instruction handed to the harness for one hotspot. The rotted line is
 // REDACTED before it leaves the process (1A applies to the triage INPUT, like
@@ -90,7 +90,7 @@ export function runTriage(findings, {
   return new Promise((resolve) => {
     if (!findings.length) { output.write("  No hotspots to triage — your context is clean.\n"); resolve(); return; }
     const rows = triageRows(findings, gain);
-    const color = !!output.isTTY && !env.NO_COLOR;
+    const color = (!!output.isTTY || !!env.FORCE_COLOR) && !env.NO_COLOR;
     const paint = (s, code) => (color && code ? `${code}${s}${RESET}` : s);
     let idx = 0;
     let rendered = 0;
