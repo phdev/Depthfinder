@@ -463,7 +463,7 @@
   overflow: hidden;
   transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
-#panel-summary .acts-expand.open { max-height: 520px; }
+#panel-summary .acts-expand.open { max-height: 760px; }
 #panel-summary .acts-expand-in { padding-top: 16px; }
 #panel-summary .ae-head {
   font-size: 9.5px;
@@ -502,6 +502,76 @@
   margin-top: 1px;
 }
 
+/* "Copy prompt" — the full harness-neutral prompt the user pastes into their
+   OWN agent. Read-only affordance: the dashboard never executes it. */
+#panel-summary .ae-prompt-wrap { margin-top: 12px; }
+#panel-summary .ae-prompt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 8px;
+}
+#panel-summary .aeph-lab {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--df-ink-3);
+}
+#panel-summary .ae-copy {
+  flex: 0 0 auto;
+  font-family: var(--df-sans);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--df-ink-2);
+  background: var(--df-panel-3);
+  border: 1px solid var(--df-line-3);
+  border-radius: 7px;
+  padding: 5px 11px;
+  cursor: pointer;
+  transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
+}
+#panel-summary .ae-copy:hover { border-color: var(--df-pos); color: var(--df-ink); }
+#panel-summary .ae-copy.copied { color: var(--df-pos); border-color: var(--df-pos); }
+#panel-summary .aeph-acts { display: inline-flex; align-items: center; gap: 8px; }
+/* "Open in Claude Code" — the primary affordance (brighter than Copy). */
+#panel-summary .ae-open {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--df-sans);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--df-ink);
+  background: var(--df-panel-3);
+  border: 1px solid var(--df-line-3);
+  border-radius: 7px;
+  padding: 5px 11px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
+}
+#panel-summary .ae-open:hover { border-color: var(--df-accent); background: var(--df-panel-2); }
+#panel-summary .ae-open .ab-arrow { color: var(--df-ink-3); font-size: 12px; }
+#panel-summary .ae-open:hover .ab-arrow { color: var(--df-accent); }
+#panel-summary .ae-prompt {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--df-ink-2);
+  background: var(--df-panel-2);
+  border: 1px solid var(--df-line-2);
+  border-radius: 10px;
+  padding: 13px 15px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+}
+
 /* the "all clear" empty state when there are no hotspots */
 #panel-summary .df-empty {
   padding: 26px 22px;
@@ -530,4 +600,21 @@
 @media (max-width: 430px) {
   #panel-summary .df-health .score { font-size: 46px; }
   #panel-summary .df-loadgrid { grid-template-columns: 1fr; }
+}
+/* ── Mobile / touch handling ──
+   The claude-cli:// deep link and the system-terminal launch are desktop-only
+   (a phone has no URL handler and no terminal). We key off `pointer: coarse`
+   (a touch device) AND a narrow viewport — NOT width alone, so a desktop user
+   who just narrows their window keeps the working deep link. On a phone we hide
+   those actions and leave "Copy prompt" as the universal path, with a one-line
+   note so the missing button isn't a mystery. */
+@media (pointer: coarse) and (max-width: 720px) {
+  #panel-summary .ae-open { display: none; }
+  #panel-summary .ae-prompt-head .aeph-lab::after {
+    content: " — copy into your agent";
+    color: var(--df-ink-3);
+    font-weight: 500;
+    letter-spacing: normal;
+    text-transform: none;
+  }
 }

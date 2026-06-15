@@ -4,11 +4,13 @@
 // small scoring pass, and emits a severity-ranked list of the highest-priority
 // things to resolve — each deep-linked to the tab that proves it. Re-derives
 // from live data, so it never goes stale.
+import { execFileSync } from "node:child_process";
 import { generateMap } from "./context-map.mjs";
 import { generateTokens } from "./token-budget.mjs";
 import { generateCoverage } from "./coverage.mjs";
 import { driftStatus } from "./drift-refresh.mjs";
 import { redactDeep } from "../lib/redact.mjs";
+import { REPO_ROOT } from "../lib/repo.mjs";
 
 const SEV_RANK = { high: 0, medium: 1, low: 2 };
 function ago(iso) {
@@ -60,6 +62,65 @@ export function computeDimensions({
     coverage: { key: "coverage", label: "Coverage", sub: "Rules & evals enforced in CI", improves: "reliability", score: coverage, sev: sevOf(coverage), tab: 3 },
   };
   return { coherence, weight, coverage, healthScore, healthWeights: HEALTH_WEIGHTS, dimensions };
+}
+
+// Build a harness-neutral, copy-paste-ready prompt for one hotspot. Plain text
+// (no Claude/Codex-specific syntax — it must paste cleanly into ANY agent), and
+// grounded ONLY in the issue's own real data: no fabricated target numbers
+// (the unknown-never-false invariant applies here too — we say "confirm it
+// improves", never "confirm it goes 3/4 → 4/4"). The agent that receives this
+// is already cd'd into the repo, so "the repo you're working in" is unambiguous.
+// The dashboard NEVER executes this — it's handed to the user's own harness,
+// which makes the model call under the user's quota and approval. (The in-session
+// MCP-pull surface is the planned next step; this copy-paste prompt is v1.)
+const DIM_LABEL = { 1: "Coherence", 2: "Weight", 3: "Coverage" }; // tab 4 (drift) → no dimension
+export function buildActionPrompt(issue, dimLabel = null) {
+  const out = [
+    "Depthfinder (a deterministic AI-context-honesty scan) flagged this in the repo you're working in:",
+    "",
+    `Issue: ${issue.title}`,
+  ];
+  if (issue.detail) out.push(issue.detail);
+  out.push("", `Task: ${issue.action || "Resolve the issue described above."}`, "");
+  out.push(
+    "Constraints:",
+    "- Make the smallest change that resolves this; don't touch unrelated files or behavior.",
+    "- This is context hygiene: keep the docs truthful to the code. Don't add any claim you can't verify against the repo.",
+    "",
+  );
+  out.push(
+    dimLabel
+      ? `Verify: re-run \`npx depthfinder\` (or reload the Depthfinder dashboard) and confirm the ${dimLabel} score improves and this hotspot clears.`
+      : "Verify: re-run `npx depthfinder` (or reload the Depthfinder dashboard) and confirm this hotspot clears.",
+  );
+  return out.join("\n");
+}
+
+// Parse an "owner/repo" slug from a git remote URL (pure — testable without a
+// repo). Handles https, scp-style `git@host:owner/repo.git`, and ssh:// forms,
+// plus custom SSH host aliases. Returns null if it isn't a recognizable slug.
+export function parseGithubSlug(remoteUrl) {
+  if (!remoteUrl) return null;
+  const m = String(remoteUrl).trim().match(/[:/]([^/:]+)\/([^/]+?)(?:\.git)?\/?$/);
+  return m ? `${m[1]}/${m[2]}` : null;
+}
+
+// The target for the "Open in Claude Code" deep link (claude-cli://open). Prefer
+// the owner/repo SLUG (portable + leaks no absolute path over the tunnel — on-
+// brand for a privacy tool); fall back to the absolute cwd ONLY when there's no
+// parseable remote, where the path is unavoidable for the link to find the dir.
+function harnessTarget() {
+  let slug = null;
+  try {
+    const url = execFileSync("git", ["-C", REPO_ROOT, "remote", "get-url", "origin"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    slug = parseGithubSlug(url);
+  } catch {
+    /* no remote / not a repo — fall through to cwd */
+  }
+  return slug ? { repo: slug, cwd: null } : { repo: null, cwd: REPO_ROOT };
 }
 
 export async function generateSummary() {
@@ -341,6 +402,11 @@ export async function generateSummary() {
   for (const i of issues) if (i.healthGain == null) i.healthGain = 0;
   const maxHealthGain = Math.max(1, ...issues.map((i) => i.healthGain));
 
+  // Copy-paste Suggested Action: a full harness-neutral prompt per hotspot (v1).
+  // The terse `action` stays for the inline one-liner; `actionPrompt` is what the
+  // "Copy prompt" button copies for the user to paste into their own agent.
+  for (const i of issues) i.actionPrompt = buildActionPrompt(i, DIM_LABEL[i.tab] || null);
+
   return redactDeep({
     generatedAt: new Date().toISOString(),
     healthScore,
@@ -355,5 +421,6 @@ export async function generateSummary() {
     projectHealth,
     health,
     issues,
+    harness: harnessTarget(),
   });
 }

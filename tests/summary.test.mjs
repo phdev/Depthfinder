@@ -3,7 +3,7 @@
 // Backfills the dimension math added in the Summary redesign.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { computeDimensions } from "../scripts/summary.mjs";
+import { computeDimensions, buildActionPrompt, parseGithubSlug } from "../scripts/summary.mjs";
 
 test("computeDimensions: clean signals → all 100, all ok", () => {
   const d = computeDimensions({
@@ -88,4 +88,75 @@ test("computeDimensions: no args → defaults, never throws", () => {
     d = computeDimensions();
   });
   for (const k of ["coherence", "weight", "coverage", "healthScore"]) assert.equal(typeof d[k], "number");
+});
+
+// ── Suggested Action prompts (copy-paste v1) ──
+const ISSUE = {
+  severity: "high",
+  title: "AgentCI gate isn't enforced in CI",
+  detail: "Protected by agentci:gate — runs in no workflow.",
+  tab: 3,
+  action: "Add the gate/eval to a workflow (it's offline and fast).",
+};
+
+test("buildActionPrompt: grounds the prompt in the issue's real data", () => {
+  const p = buildActionPrompt(ISSUE, "Coverage");
+  assert.match(p, /AgentCI gate isn't enforced in CI/); // title
+  assert.match(p, /Protected by agentci:gate/); // detail
+  assert.match(p, /Add the gate\/eval to a workflow/); // action → Task
+  assert.match(p, /Verify:/); // closes with a verify step
+  assert.match(p, /Coverage score improves/); // dimension-aware verify
+});
+
+test("buildActionPrompt: harness-neutral — no Claude/Codex/Cursor-specific syntax", () => {
+  const p = buildActionPrompt(ISSUE, "Coverage");
+  // must paste cleanly into ANY agent: no slash-commands, no @-mentions, no
+  // tool-call fences, no harness brand names in the instruction body.
+  assert.doesNotMatch(p, /\/(plan|ship|review|qa)\b/);
+  assert.doesNotMatch(p, /@(claude|codex|cursor)\b/i);
+  assert.doesNotMatch(p, /\bclaude -p\b|\bcodex exec\b/);
+});
+
+test("buildActionPrompt: honesty — no fabricated target numbers in the verify step", () => {
+  // unknown-never-false applies here: we say "confirm it improves", never invent
+  // a precise future target like "3/4 → 4/4" the tool can't promise.
+  const p = buildActionPrompt(ISSUE, "Coverage");
+  const verifyLine = p.split("\n").find((l) => l.startsWith("Verify:"));
+  assert.ok(verifyLine);
+  assert.doesNotMatch(verifyLine, /\d+\s*\/\s*\d+/); // no "N/M" target
+  assert.doesNotMatch(verifyLine, /→|->/); // no "X → Y" promise
+});
+
+test("buildActionPrompt: drift (no dimension) → generic verify, still well-formed", () => {
+  const driftIssue = { ...ISSUE, tab: 4, title: "Packmind drift not set up" };
+  const p = buildActionPrompt(driftIssue, null);
+  assert.match(p, /Packmind drift not set up/);
+  assert.match(p, /Verify:.*this hotspot clears/);
+  assert.doesNotMatch(p, /\bscore improves\b/); // no dimension name when there isn't one
+});
+
+test("buildActionPrompt: tolerates a missing detail/action without throwing", () => {
+  let p;
+  assert.doesNotThrow(() => {
+    p = buildActionPrompt({ title: "Bare issue", tab: 1 }, "Coherence");
+  });
+  assert.match(p, /Bare issue/);
+  assert.match(p, /Task:/); // falls back to a generic task line
+});
+
+// ── claude-cli:// deep-link target (owner/repo slug, no abs-path leak) ──
+test("parseGithubSlug: handles https / scp / ssh / custom-host-alias forms", () => {
+  assert.equal(parseGithubSlug("https://github.com/phdev/Depthfinder.git"), "phdev/Depthfinder");
+  assert.equal(parseGithubSlug("git@github.com:owner/repo"), "owner/repo");
+  assert.equal(parseGithubSlug("ssh://git@github.com/owner/repo.git"), "owner/repo");
+  // custom SSH host alias (real home-center remote shape) still yields the slug
+  assert.equal(parseGithubSlug("git@github-home-center-openclaw:phdev/home-center.git"), "phdev/home-center");
+  // trailing slash tolerated
+  assert.equal(parseGithubSlug("https://github.com/owner/repo/"), "owner/repo");
+});
+
+test("parseGithubSlug: empty / unparseable → null (caller falls back to cwd)", () => {
+  assert.equal(parseGithubSlug(""), null);
+  assert.equal(parseGithubSlug(null), null);
+  assert.equal(parseGithubSlug(undefined), null);
 });

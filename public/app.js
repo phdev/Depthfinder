@@ -992,10 +992,40 @@ function renderSummary(d) {
     // Each issue carries exactly one `action` string (the summary data contract).
     // No count badge — a literal "1" would silently lie if `action` ever became a
     // list. If it does, render the real count here AND swap the da-n "1" below.
+    // The expand also carries a full harness-neutral `actionPrompt`: the dashboard
+    // is read-only and NEVER executes it — the "Copy prompt" button hands it to the
+    // user's OWN agent session (their quota, their approval). The MCP-pull surface
+    // (harness reads it in-session) is the planned next step; this is v1.
+    // "Open in Claude Code" — claude-cli://open opens a NEW CLI session with the
+    // prompt PRE-FILLED but inert until the user presses Enter (verified against
+    // the deep-link spec). The dashboard only emits the anchor; the OS + Claude
+    // Code do the rest, so this stays read-only and can't be auto-fired by a
+    // tunnel viewer. We target the repo by owner/repo SLUG when available (no
+    // absolute-path leak), else by cwd. q is capped at the scheme's 5,000 chars.
+    const ht = d.harness || {};
+    const dir = ht.repo
+      ? `repo=${encodeURIComponent(ht.repo)}`
+      : ht.cwd
+        ? `cwd=${encodeURIComponent(ht.cwd)}`
+        : "";
+    const open =
+      it.actionPrompt && it.actionPrompt.length <= 5000
+        ? escapeHtml(`claude-cli://open?${dir ? dir + "&" : ""}q=${encodeURIComponent(it.actionPrompt)}`)
+        : "";
+    const openBtn = open
+      ? `<a class="ae-open" href="${open}" title="Opens a new Claude Code session with this prompt pre-filled (you press Enter to run it)">Open in Claude Code <span class="ab-arrow">→</span></a>`
+      : "";
+    const prompt = it.actionPrompt
+      ? `<div class="ae-prompt-wrap">
+           <div class="ae-prompt-head"><span class="aeph-lab">Prompt for your agent</span>
+             <span class="aeph-acts">${openBtn}<button class="ae-copy" type="button" data-copy>Copy prompt</button></span></div>
+           <pre class="ae-prompt">${escapeHtml(it.actionPrompt)}</pre>
+         </div>`
+      : "";
     const action = it.action
       ? `<button class="acts-btn" type="button">Suggested action <span class="ab-arrow">→</span></button>
          <div class="acts-expand"><div class="acts-expand-in"><div class="ae-head">Suggested action</div>
-           <div class="ae-act"><span class="da-n">1</span><span>${escapeHtml(it.action)}</span></div></div></div>`
+           <div class="ae-act"><span class="da-n">1</span><span>${escapeHtml(it.action)}</span></div>${prompt}</div></div>`
       : "";
     // Projected health-gain radial. The gain is computed in summary.mjs from the
     // LIVE dimension gaps (a forecast, not a constant); the radial fills relative
@@ -1100,6 +1130,47 @@ function wireSummary(root) {
       });
       panel.classList.toggle("open", !isOpen);
       btn.classList.toggle("is-open", !isOpen);
+    });
+
+  // "Copy prompt" — copy the harness-neutral prompt to the clipboard. The
+  // dashboard never RUNS it; the user pastes it into their own agent session.
+  // Reads the rendered <pre> textContent (the raw prompt) so there's no double-
+  // encoding. clipboard.writeText needs a secure context (localhost + the https
+  // tunnel both qualify); LAN http falls back to a hidden-textarea execCommand.
+  if (table)
+    table.addEventListener("click", async (e) => {
+      const cp = e.target.closest(".ae-copy");
+      if (!cp) return;
+      e.stopPropagation();
+      const pre = cp.closest(".ae-prompt-wrap")?.querySelector(".ae-prompt");
+      if (!pre) return;
+      const text = pre.textContent || "";
+      const flash = (ok) => {
+        cp.textContent = ok ? "Copied ✓" : "Copy failed";
+        cp.classList.toggle("copied", ok);
+        setTimeout(() => {
+          cp.textContent = "Copy prompt";
+          cp.classList.remove("copied");
+        }, 1600);
+      };
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(text);
+          flash(true);
+        } else {
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          ta.style.position = "fixed";
+          ta.style.opacity = "0";
+          document.body.appendChild(ta);
+          ta.select();
+          const ok = document.execCommand("copy");
+          ta.remove();
+          flash(ok);
+        }
+      } catch {
+        flash(false);
+      }
     });
 
   // ELI10 toggle — show/hide the plain-language detail line. The two checkboxes

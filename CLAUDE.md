@@ -257,6 +257,36 @@ the dashboard too.
   render, `.df-healthy` CSS, and the backend `healthy[]` array) — the triage
   view is hotspots-only; "what's healthy" is implicit in the dimension scores.
 
+**Suggested Actions (copy-paste v1 + deep link).** Each hotspot's "Suggested
+action" expand carries, beyond the terse `action` hint, a full **harness-neutral
+prompt** (`buildActionPrompt`, pure + unit-tested): plain text (no Claude/Codex-
+specific syntax), grounded only in the issue's real data, with NO fabricated
+target numbers in the verify step (unknown-never-false applies — "confirm it
+improves", never "3/4 → 4/4"). Two affordances, both keeping the dashboard
+**read-only** — it NEVER executes an action:
+- **Copy prompt** — copies the prompt for the user to paste into their OWN agent
+  session (their quota, their approval). Universal; the only path on mobile.
+  `navigator.clipboard` on secure contexts (localhost + the https tunnel), with a
+  hidden-textarea `execCommand` fallback for LAN http (not a secure context).
+- **Open in Claude Code** — a `claude-cli://open?…&q=<prompt>` deep link that
+  opens a NEW Claude Code session with the prompt **pre-filled but inert until the
+  user presses Enter** (per the verified deep-link spec — so a tunnel viewer can't
+  auto-fire it; the OS + Claude Code do the work, not the server). The directory
+  is targeted by **owner/repo slug** (`harnessTarget()` → `parseGithubSlug` of the
+  origin remote) so no absolute path leaks over the tunnel; falls back to `cwd`
+  only when there's no parseable remote. `q` is URL-encoded (`%0A` newlines) and
+  the link is omitted above the scheme's 5,000-char cap.
+- **Mobile handling.** The deep link (and the planned terminal launch) are
+  desktop-only, so a `@media (pointer: coarse) and (max-width: 720px)` rule hides
+  `.ae-open` on phones (NOT width alone — a narrowed desktop window keeps the
+  working link) and annotates the label "— copy into your agent"; Copy remains.
+- **Next (not built):** an MCP-pull surface (a local `claude-cli`/Codex MCP server
+  exposing hotspots + actions as read-only tools, so the harness reads & acts
+  in-session) — slated for `/plan-eng-review` before code. A dashboard-initiated
+  terminal launch must NOT be a tunneled `:4317` execute endpoint (that's an RCE
+  through the no-auth tunnel); the safe form is a loopback-only helper (eng-review)
+  or a downloadable `.command`.
+
 ## Architecture
 
 - `server.mjs` — built-in `http` server. Binds **127.0.0.1 only** by default;
