@@ -257,13 +257,12 @@ the dashboard too.
   render, `.df-healthy` CSS, and the backend `healthy[]` array) — the triage
   view is hotspots-only; "what's healthy" is implicit in the dimension scores.
 
-**Suggested Actions (copy-paste v1 + deep link).** Each hotspot's "Suggested
-action" expand carries, beyond the terse `action` hint, a full **harness-neutral
-prompt** (`buildActionPrompt`, pure + unit-tested): plain text (no Claude/Codex-
-specific syntax), grounded only in the issue's real data, with NO fabricated
-target numbers in the verify step (unknown-never-false applies — "confirm it
-improves", never "3/4 → 4/4"). Two affordances, both keeping the dashboard
-**read-only** — it NEVER executes an action:
+**Suggested Actions.** Each hotspot's "Suggested action" expand carries, beyond
+the terse `action` hint, a full **harness-neutral prompt** (`buildActionPrompt`,
+pure + unit-tested): plain text (no Claude/Codex-specific syntax), grounded only
+in the issue's real data, with NO fabricated target numbers in the verify step
+(unknown-never-false applies — "confirm it improves", never "3/4 → 4/4"). Three
+affordances; the dashboard server itself stays **read-only** and never executes:
 - **Copy prompt** — copies the prompt for the user to paste into their OWN agent
   session (their quota, their approval). Universal; the only path on mobile.
   `navigator.clipboard` on secure contexts (localhost + the https tunnel), with a
@@ -276,23 +275,55 @@ improves", never "3/4 → 4/4"). Two affordances, both keeping the dashboard
   origin remote) so no absolute path leaks over the tunnel; falls back to `cwd`
   only when there's no parseable remote. `q` is URL-encoded (`%0A` newlines) and
   the link is omitted above the scheme's 5,000-char cap.
-- **Mobile handling.** The deep link (and the planned terminal launch) are
-  desktop-only, so a `@media (pointer: coarse) and (max-width: 720px)` rule hides
-  `.ae-open` on phones (NOT width alone — a narrowed desktop window keeps the
-  working link) and annotates the label "— copy into your agent"; Copy remains.
+- **Open in Terminal** — opens the user's own Terminal with `claude "<prompt>"`
+  **PRE-TYPED** (you press Enter to run it). Routed through the **opt-in loopback
+  helper** (`scripts/action-helper.mjs`, see below), so it's hidden unless that
+  helper is up (`#panel-summary.df-helper`, set by `probeHelper()` hitting
+  `/api/helper`). The button sends only `{issueId, titleHash}` — never the prompt
+  text; the helper derives the prompt itself. First click shows a one-time consent.
+- **Mobile handling.** The deep link and the terminal launch are desktop-only, so
+  `@media (pointer: coarse) and (max-width: 720px)` hides `.ae-open` and `.ae-term`
+  on phones (NOT width alone — a narrowed desktop window keeps them) and annotates
+  the label "— copy into your agent"; Copy remains.
 - **Next (not built):** an MCP-pull surface (a local `claude-cli`/Codex MCP server
   exposing hotspots + actions as read-only tools, so the harness reads & acts
-  in-session) — slated for `/plan-eng-review` before code. A dashboard-initiated
-  terminal launch must NOT be a tunneled `:4317` execute endpoint (that's an RCE
-  through the no-auth tunnel); the safe form is a loopback-only helper (eng-review)
-  or a downloadable `.command`.
+  in-session) — slated for a separate `/plan-eng-review` (different transport from
+  the terminal helper: stdio harness-pull vs HTTP dashboard-push).
+
+**Terminal helper (`scripts/action-helper.mjs`) — opt-in, loopback, off by
+default.** A SEPARATE process from the dashboard server, binding **127.0.0.1:4318
+only** and **never forwarded by the tunnel** (cloudflared proxies only `:4317`).
+Its one job: open the user's Terminal with a suggested-action prompt PRE-TYPED
+(never executed). Defense in depth, eng-reviewed (see the design doc in
+`~/.gstack/projects/phdev-Depthfinder/`):
+- **L1 loopback isolation** (primary remote defense): a tunnel viewer's
+  `fetch('127.0.0.1:4318')` hits THEIR own localhost, never the host's.
+- **L2 Origin allowlist**: `POST /run-in-terminal` requires `Origin:
+  http://127.0.0.1:4317`; rejects foreign/`null`.
+- **L3 per-boot token**: minted by the helper, written `0600` to
+  `.cache/helper.json`; the dashboard's `GET /api/helper` serves it same-origin
+  (CORS withholds the body from cross-origin pages); the POST must echo it as
+  `x-df-token`.
+- **L4 issueId-only**: the request carries NO command text. The helper re-runs
+  `generateSummary()` and derives the prompt from the `issueId` (+ a `titleHash`
+  sanity check for a stale scan), so a forged request can't inject a command.
+- **L5 Enter checkpoint**: `osascript` PRE-TYPES `claude "<prompt>"` via
+  `keystroke` (no trailing return); the user reviews and runs it. Nothing
+  auto-executes. macOS-only (refuses to start elsewhere); first use needs
+  Accessibility permission. Security suite: `tests/action-helper.test.mjs`.
 
 ## Architecture
 
 - `server.mjs` — built-in `http` server. Binds **127.0.0.1 only** by default;
   `LAN=1` / `--lan` / `HOST=` opts into LAN exposure. Endpoints:
-  `GET /api/{summary,map,tokens,coverage,drift}`,
+  `GET /api/{summary,map,tokens,coverage,drift}`, `GET /api/helper` (terminal-
+  helper handshake — serves the helper token same-origin, raw/un-redacted),
   `POST /api/refresh/{map,tokens,coverage,drift}`, `POST /api/run/gate`.
+- `scripts/action-helper.mjs` — the opt-in **terminal helper** (separate process,
+  loopback `:4318`, never tunneled). Documented under "Suggested Actions" above.
+  Enable: `npm run helper:enable` (installs the `dev.depthfinder.helper` launchd
+  job). This is the ONLY Depthfinder surface that can launch a process, and it
+  only ever PRE-TYPES (never runs) — execution is the user's Enter press.
 - `scripts/*.mjs` — one generator per panel; each writes its cache under
   `.cache/` (gitignored) and never writes to the analyzed repo.
 - `lib/repo.mjs` — REPO_ROOT resolution (`$REPO_ROOT` env > `.repo-root` file >
@@ -322,6 +353,13 @@ improves", never "3/4 → 4/4"). Two affordances, both keeping the dashboard
    local paths stay out of committed files (`.repo-root` is gitignored).
 6. **Bind data, don't fake it.** Panel numbers come from live analyzer
    output; anything unverifiable shows a "Not verified" state.
+7. **The terminal helper binds 127.0.0.1 only, is never tunneled, is opt-in /
+   off-by-default, derives its prompt from an `issueId` (never accepts command
+   text), and only PRE-TYPES (never executes) — the user confirms every run with
+   Enter.** A dashboard-initiated terminal launch must NEVER be a `:4317`
+   (tunnel-exposed) execute endpoint — that would be an RCE through the no-auth
+   tunnel. `server.mjs` stays read-only; execution lives only in the separate,
+   isolated, consent-gated `:4318` helper.
 
 ## Run
 
@@ -344,6 +382,15 @@ the public URL is random and rotates when cloudflared restarts or Cloudflare
 recycles it. Get the current URL with `~/bin/df-url`; if it's dead, kick it:
 `launchctl kickstart -k gui/$(id -u)/dev.depthfinder.tunnel` (truncate
 `tunnel.log` first so `df-url` doesn't read a stale URL).
+
+A third, **opt-in** agent powers "Open in Terminal": `dev.depthfinder.helper`
+(loopback `:4318`, **never tunneled**, logs in `helper.log`). It's OFF until you
+run `npm run helper:enable` (writes + loads the plist; the enable script derives
+machine paths at runtime, so nothing machine-specific is committed). Disable:
+`launchctl bootout gui/$(id -u)/dev.depthfinder.helper && rm
+~/Library/LaunchAgents/dev.depthfinder.helper.plist`. First click needs macOS
+Accessibility permission (it `keystroke`s into Terminal). `.cache/helper.json`
+(the per-boot token) is gitignored like the rest of `.cache/`.
 
 ## Workflow
 

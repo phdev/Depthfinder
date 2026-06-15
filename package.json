@@ -41,6 +41,8 @@
     "tokens": "node scripts/token-budget.mjs",
     "coverage": "node scripts/coverage.mjs",
     "drift:refresh": "node scripts/drift-refresh.mjs",
+    "helper": "node scripts/action-helper.mjs",
+    "helper:enable": "bash scripts/helper-enable.sh",
     "test": "node --test",
     "bench": "node scripts/bench.mjs",
     "corpus": "node scripts/corpus.mjs",

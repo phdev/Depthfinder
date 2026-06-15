@@ -150,6 +150,21 @@ async function handle(req, res) {
       return sendJson(res, 200, await mod.generateSummary());
     }
 
+    // "Open in Terminal" helper handshake. Reads the opt-in helper's per-boot
+    // state (written 0600 by scripts/action-helper.mjs) and hands the page its
+    // token + port. Same-origin only by the same CORS posture as every other
+    // /api route (no Access-Control-Allow-Origin → a cross-origin page can't
+    // read the body); a tunnel viewer is same-origin to :4317 but still can't
+    // reach the host's loopback :4318. Sent RAW (no redactDeep) so the token
+    // survives — it is the dashboard's own local secret, not exfiltrated data.
+    if (method === "GET" && path === "/api/helper") {
+      const h = await readCache("helper.json");
+      const out =
+        h && h.token && h.port ? { available: true, token: h.token, port: h.port } : { available: false };
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      return res.end(JSON.stringify(out));
+    }
+
     if (method === "GET" && path === "/api/map")
       return sendJson(res, 200, await getMap());
 

@@ -763,6 +763,34 @@ async function loadCoverage() {
 }
 const escapeHtml = (s) =>
   String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// "Open in Terminal" helper handshake. probeHelper() asks the dashboard whether
+// the opt-in loopback helper (:4318) is up; if so we reveal the .ae-term buttons
+// (via #panel-summary.df-helper) and remember its token+port for the POST. The
+// button is desktop-only and only meaningful on the user's own machine (the
+// POST targets 127.0.0.1, which is the viewer's loopback, not the host's).
+let helperState = null;
+async function probeHelper() {
+  try {
+    const r = await fetch("/api/helper", { cache: "no-store" });
+    helperState = await r.json();
+  } catch {
+    helperState = { available: false };
+  }
+  const panel = document.querySelector("#panel-summary");
+  if (panel) panel.classList.toggle("df-helper", !!(helperState && helperState.available));
+}
+// Must match the helper's titleHash: sha256(title) hex, first 12 chars. Best-
+// effort (crypto.subtle needs a secure context — localhost/https qualify); on a
+// non-secure origin we send no hash and the helper simply skips the mismatch check.
+async function sha256Hex12(str) {
+  try {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(str)));
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 12);
+  } catch {
+    return "";
+  }
+}
 function timeAgo(iso) {
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
   if (s < 60) return `${Math.round(s)}s ago`;
@@ -1015,10 +1043,18 @@ function renderSummary(d) {
     const openBtn = open
       ? `<a class="ae-open" href="${open}" title="Opens a new Claude Code session with this prompt pre-filled (you press Enter to run it)">Open in Claude Code <span class="ab-arrow">→</span></a>`
       : "";
+    // "Open in Terminal" — calls the opt-in loopback helper (:4318) to open the
+    // user's Terminal with the prompt PRE-TYPED (Enter to run). Hidden unless the
+    // helper is reachable (#panel-summary.df-helper, set by probeHelper) and on
+    // desktop only. Carries issueId + raw title (for the helper's titleHash
+    // mismatch check) — NEVER the prompt text (the helper derives it: L4).
+    const termBtn = it.actionPrompt
+      ? `<button class="ae-term" type="button" data-issue="${i}" data-title="${escapeHtml(it.title)}" title="Opens your Terminal with this prompt pre-typed (you press Enter to run it)">Open in Terminal <span class="ab-arrow">→</span></button>`
+      : "";
     const prompt = it.actionPrompt
       ? `<div class="ae-prompt-wrap">
            <div class="ae-prompt-head"><span class="aeph-lab">Prompt for your agent</span>
-             <span class="aeph-acts">${openBtn}<button class="ae-copy" type="button" data-copy>Copy prompt</button></span></div>
+             <span class="aeph-acts">${openBtn}${termBtn}<button class="ae-copy" type="button" data-copy>Copy prompt</button></span></div>
            <pre class="ae-prompt">${escapeHtml(it.actionPrompt)}</pre>
          </div>`
       : "";
@@ -1091,6 +1127,7 @@ function renderSummary(d) {
   </div>`;
 
   wireSummary(body);
+  probeHelper(); // async — reveals .ae-term buttons if the loopback helper is up
 }
 
 // Wire all Summary interactions (idempotent per render).
@@ -1170,6 +1207,48 @@ function wireSummary(root) {
         }
       } catch {
         flash(false);
+      }
+    });
+
+  // "Open in Terminal" — POST {issueId, titleHash} to the loopback helper (:4318),
+  // which opens the user's Terminal with `claude "<prompt>"` PRE-TYPED (Enter to
+  // run). NO prompt text is sent — the helper derives it from the issueId (L4).
+  // First use shows a one-time consent. The dashboard never executes anything.
+  if (table)
+    table.addEventListener("click", async (e) => {
+      const tb = e.target.closest(".ae-term");
+      if (!tb) return;
+      e.stopPropagation();
+      if (!helperState || !helperState.available) return;
+      const flash = (txt, ok) => {
+        const prev = tb.innerHTML;
+        tb.textContent = txt;
+        tb.classList.toggle("ok", !!ok);
+        setTimeout(() => {
+          tb.innerHTML = prev;
+          tb.classList.remove("ok");
+        }, 1900);
+      };
+      try {
+        if (!localStorage.getItem("df-term-consent")) {
+          const ok = window.confirm(
+            "Open in Terminal opens your Terminal with the Depthfinder prompt PRE-TYPED. " +
+              "Nothing runs until you review it and press Enter yourself. Continue?",
+          );
+          if (!ok) return;
+          localStorage.setItem("df-term-consent", "1");
+        }
+        const issueId = Number(tb.dataset.issue);
+        const titleHash = await sha256Hex12(tb.dataset.title || "");
+        const r = await fetch(`http://127.0.0.1:${helperState.port}/run-in-terminal`, {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-df-token": helperState.token },
+          body: JSON.stringify({ issueId, titleHash }),
+        });
+        const j = await r.json().catch(() => ({}));
+        flash(r.ok ? "Opening Terminal…" : j.error || "helper error", r.ok);
+      } catch {
+        flash("helper unreachable", false);
       }
     });
 

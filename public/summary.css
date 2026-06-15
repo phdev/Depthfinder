@@ -557,6 +557,29 @@
 #panel-summary .ae-open:hover { border-color: var(--df-accent); background: var(--df-panel-2); }
 #panel-summary .ae-open .ab-arrow { color: var(--df-ink-3); font-size: 12px; }
 #panel-summary .ae-open:hover .ab-arrow { color: var(--df-accent); }
+/* "Open in Terminal" — hidden until probeHelper confirms the loopback helper is
+   up (#panel-summary.df-helper). Same treatment as the deep link. */
+#panel-summary .ae-term {
+  display: none;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--df-sans);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--df-ink);
+  background: var(--df-panel-3);
+  border: 1px solid var(--df-line-3);
+  border-radius: 7px;
+  padding: 5px 11px;
+  cursor: pointer;
+  transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
+}
+#panel-summary.df-helper .ae-term { display: inline-flex; }
+#panel-summary .ae-term:hover { border-color: var(--df-accent); background: var(--df-panel-2); }
+#panel-summary .ae-term.ok { border-color: var(--df-pos); color: var(--df-pos); }
+#panel-summary .ae-term .ab-arrow { color: var(--df-ink-3); font-size: 12px; }
+#panel-summary .ae-term:hover .ab-arrow { color: var(--df-accent); }
 #panel-summary .ae-prompt {
   margin: 0;
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
@@ -610,6 +633,8 @@
    note so the missing button isn't a mystery. */
 @media (pointer: coarse) and (max-width: 720px) {
   #panel-summary .ae-open { display: none; }
+  /* match the .df-helper reveal specificity so the helper button stays hidden on phones */
+  #panel-summary.df-helper .ae-term { display: none; }
   #panel-summary .ae-prompt-head .aeph-lab::after {
     content: " — copy into your agent";
     color: var(--df-ink-3);
