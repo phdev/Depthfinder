@@ -10,7 +10,7 @@
 <style>
   :root{
     --bg:#07090d; --panel:#0d1117; --panel2:#11161f; --line:#1d2735;
-    --ink:#e8edf4; --ink2:#9aa7b8; --ink3:#5d6878; --pos:#3fd09a; --warn:#e8b059; --bad:#e8746b;
+    --ink:#e8edf4; --ink2:#9aa7b8; --ink3:#7a8699; --pos:#3fd09a; --warn:#e8b059; --bad:#e8746b;
     --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
     --sans:"Helvetica Neue",Inter,ui-sans-serif,Arial,sans-serif;
   }
@@ -20,7 +20,7 @@
   a{color:var(--pos);text-decoration:none}
   a:hover{text-decoration:underline}
   header{padding:64px 0 30px}
-  .logo{display:flex;align-items:center;gap:11px;font-weight:800;font-size:19px;letter-spacing:-.01em}
+  .logo{display:flex;align-items:center;gap:12px;font-weight:800;font-size:19px;letter-spacing:-.01em}
   .logo .dot{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--pos);display:grid;place-items:center;color:var(--pos);font-size:12px}
   h1{font-size:46px;line-height:1.08;letter-spacing:-.025em;margin:30px 0 14px;font-weight:800}
   h1 .em{color:var(--pos)}
@@ -29,7 +29,7 @@
   .cta code{font-family:var(--mono);background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:11px 15px;font-size:14px;color:var(--ink)}
   .cta .gh{display:inline-flex;align-items:center;padding:11px 16px;border:1px solid var(--line);border-radius:9px;color:var(--ink);font-weight:600;font-size:14px}
   .cta .gh:hover{border-color:var(--pos);text-decoration:none}
-  .card{margin:40px 0;background:#05070a;border:1px solid var(--line);border-radius:14px;padding:22px 20px;font-family:var(--mono);font-size:12.5px;line-height:1.55;overflow-x:auto;color:var(--ink2)}
+  .card{margin:40px 0;background:#05070a;border:1px solid var(--line);border-radius:14px;padding:22px 20px;font-family:var(--mono);font-size:12.5px;line-height:1.55;white-space:pre;overflow-x:auto;color:var(--ink2)}
   .card .h{color:var(--warn);font-weight:700}
   .card .dim{color:var(--ink3)}
   .card .x{color:var(--bad)}
@@ -40,14 +40,15 @@
   .proof{font-size:21px;line-height:1.4;letter-spacing:-.01em;margin:0;max-width:680px}
   .proof b{color:var(--ink)}
   .proof .n{color:var(--bad);font-weight:800}
+  .proof .note{display:block;margin-top:10px;font-size:13px;color:var(--ink3);max-width:560px}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px}
-  .feat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 17px}
+  .feat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
   .feat h3{margin:0 0 6px;font-size:15px;color:var(--ink)}
-  .feat p{margin:0;color:var(--ink2);font-size:13.5px}
+  .feat p{margin:0;color:var(--ink2);font-size:13px}
   pre{font-family:var(--mono);background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:15px 16px;overflow-x:auto;font-size:13px;color:var(--ink);margin:8px 0}
   pre .c{color:var(--ink3)}
   footer{padding:34px 0 70px;color:var(--ink3);font-size:13px;border-top:1px solid var(--line);margin-top:6px}
-  @media(max-width:600px){h1{font-size:34px}.grid{grid-template-columns:1fr}.proof{font-size:18px}}
+  @media(max-width:600px){h1{font-size:34px}.grid{grid-template-columns:1fr}.proof{font-size:18px}.cta code,.cta .gh{padding-top:13px;padding-bottom:13px}.card{font-size:11px;padding:16px 14px}}
 </style>
 </head>
 <body>
@@ -63,7 +64,7 @@
     </div>
   </header>
 
-  <div class="card" aria-label="Example depthfinder output">
+  <div class="card" aria-label="Example depthfinder output"><span class="dim"># sample output</span>
 $ npx depthfinder
 
   Scanning CLAUDE.md against 1,204 tracked files…
@@ -90,7 +91,7 @@ $ npx depthfinder
   <section>
     <h2>The problem is already in the wild</h2>
     <p class="proof"><b>All-Hands-AI/OpenHands</b> — a top agent framework — ships an <code>AGENTS.md</code> that scores <b>Context Honesty 60</b>, with <span class="n">12 dead references</span> the agent reads as truth. Most fast-moving AI repos have the same rot. Depthfinder finds it, deterministically, with git evidence.
-      <span style="display:block;margin-top:12px;font-size:13px;color:var(--ink3)">Scanned 2026-06-15 at commit <code>f941ba5</code> (6 references never existed, 6 git-proven stale). Reproduce it: <code>npx depthfinder</code> on a fresh clone. We date-stamp this on purpose — a number that quietly rots is exactly what Depthfinder exists to catch.</span></p>
+      <span class="note">Scanned 2026-06-15 at commit <code>f941ba5</code> (6 references never existed, 6 git-proven stale). Reproduce it: <code>npx depthfinder</code> on a fresh clone. We date-stamp this on purpose — a number that quietly rots is exactly what Depthfinder exists to catch.</span></p>
   </section>
 
   <section>
@@ -115,7 +116,7 @@ npx depthfinder --install-skill
 - uses: phdev/Depthfinder@v1
   with:
     max-false: 0</pre>
-    <p style="color:var(--ink2);font-size:13.5px;margin:10px 0 0">Requires Node ≥ 20 and git. Zero runtime dependencies. <a href="https://github.com/phdev/Depthfinder#readme">Full docs →</a></p>
+    <p style="color:var(--ink2);font-size:13px;margin:10px 0 0">Requires Node ≥ 20 and git. Zero runtime dependencies. <a href="https://github.com/phdev/Depthfinder#readme">Full docs →</a></p>
   </section>
 
   <footer>

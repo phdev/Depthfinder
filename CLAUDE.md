@@ -289,9 +289,19 @@ can't OTP); OIDC sidesteps that for every release after.
 - **`docs/index.html` — one-page landing (GitHub Pages).** Static, zero-dep,
   on-brand (near-black + the `--pos` green), the dirty card as the hero + the
   All-Hands-AI/OpenHands "Context Honesty 60 · 12 dead refs" proof + install
-  (CLI / `--install-skill` / the Action). Enable via repo Settings → Pages →
-  branch `main` / `/docs`. The grounding destination for the Stage-1 outreach.
-  Keep it ONE page (deliberately not a marketing site). NOT in the npm tarball.
+  (CLI / `--install-skill` / the Action). LIVE at https://phdev.github.io/Depthfinder/
+  (Pages source = `main` / `/docs`, legacy build; the API default had it on `/` +
+  `workflow` build_type, which 404'd — fixed via `gh api -X PUT repos/phdev/Depthfinder/pages`
+  setting `source[path]=/docs` + `build_type=legacy`). The grounding destination for
+  the Stage-1 outreach. **Design-reviewed 2026-06-15** (Codex + Claude subagent +
+  rendered screenshots): fixed a CRITICAL hero bug — `.card` was a `<div>` with no
+  `white-space:pre`, so the example terminal output COLLAPSED to a run-on blob in
+  every browser (source-read missed it; rendering caught it) → added `white-space:pre`;
+  fixed a WCAG-AA contrast fail (`--ink3` #5d6878 = 3.53:1 on the bg → #7a8699, ≥4.9:1
+  on every surface it's used on); mobile CTA 44px touch targets + 11px card font; a
+  `# sample output` label so the card's fictional numbers aren't mistaken for the real
+  OpenHands proof right below. Keep it ONE page (deliberately not a marketing site).
+  NOT in the npm tarball.
 
 Five tabs, each with a hash route for deep-linking:
 
