@@ -20,8 +20,10 @@ Depthfinder is two things in one repo:
    dashboard). Safety: host hard-coded to github.com + strict `owner/repo` regex
    via a spawn args-array (no shell/SSRF), shallow clone + timeouts + concurrency
    cap, `--burn` never invoked, temp clone always deleted. The headline demo is
-   `All-Hands-AI/OpenHands` → Context Honesty 60 with 12 dead refs. See
-   `console/README.md`.
+   `All-Hands-AI/OpenHands` → Context Honesty 60 with 12 dead refs (verified
+   2026-06-15 at HEAD `f941ba5`: 6 never-existed false + 6 git-proven stale =
+   12; `--strict` → exit 20). The landing page (`docs/index.html`) date-stamps
+   this number on purpose so it can't silently rot. See `console/README.md`.
 
 Zero runtime dependencies everywhere (Node ≥20 built-ins; the dashboard's
 graph view loads Cytoscape from a CDN in the browser).

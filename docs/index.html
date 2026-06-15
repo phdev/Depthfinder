@@ -89,7 +89,8 @@ $ npx depthfinder
 
   <section>
     <h2>The problem is already in the wild</h2>
-    <p class="proof"><b>All-Hands-AI/OpenHands</b> — a top agent framework — ships an <code>AGENTS.md</code> that scores <b>Context Honesty 60</b>, with <span class="n">12 dead references</span> the agent reads as truth. Most fast-moving AI repos have the same rot. Depthfinder finds it, deterministically, with git evidence.</p>
+    <p class="proof"><b>All-Hands-AI/OpenHands</b> — a top agent framework — ships an <code>AGENTS.md</code> that scores <b>Context Honesty 60</b>, with <span class="n">12 dead references</span> the agent reads as truth. Most fast-moving AI repos have the same rot. Depthfinder finds it, deterministically, with git evidence.
+      <span style="display:block;margin-top:12px;font-size:13px;color:var(--ink3)">Scanned 2026-06-15 at commit <code>f941ba5</code> (6 references never existed, 6 git-proven stale). Reproduce it: <code>npx depthfinder</code> on a fresh clone. We date-stamp this on purpose — a number that quietly rots is exactly what Depthfinder exists to catch.</span></p>
   </section>
 
   <section>
