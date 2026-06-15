@@ -107,6 +107,8 @@ npx depthfinder --docs     # opt in to the wider-docs scan (Doc Honesty)
 npx depthfinder --burn     # run your agent against the top false claim (opt-in; calls a model)
 npx depthfinder --strict   # CI gate: exit 20 when your context has rotted (false claims)
 npx depthfinder --strict --max-false 5  # ...allow up to 5 before failing (ratchet)
+npx depthfinder --warn-below 80  # warn if a Health dimension scores < 80 (advisory; gates under --strict)
+npx depthfinder --weight-budget 8000  # token budget for the Weight dimension (heuristic; default 10000)
 npx depthfinder --fix      # repoint paths git proves were renamed (dry run — shows the diff)
 npx depthfinder --fix --write  # ...actually apply the rename-fixes (the only write to your repo)
 npx depthfinder --convention >> CLAUDE.md  # add a snippet so agents self-check this file

@@ -39,6 +39,7 @@ import { extractSymbolClaims } from "../src/cli/extract/symbol.mjs";
 import { extractCountClaims } from "../src/cli/extract/count.mjs";
 import { evaluateClaims } from "../src/cli/evaluate.mjs";
 import { computeScore, deadTokens, SCORING_SCHEMA } from "../src/cli/score.mjs";
+import { computeCliDimensions, DEFAULT_WEIGHT_BUDGET } from "../src/cli/dimensions.mjs";
 import { repoIdentity, cacheFile, readLast, append } from "../src/cli/history.mjs";
 import { selectFindings } from "../src/cli/select.mjs";
 import { renderCard } from "../src/cli/render.mjs";
@@ -72,6 +73,12 @@ const USAGE = `usage: depthfinder [path] [--json] [--out <dir>] [--no-follow] [-
               threshold is stable across releases.
   --max-false N  allow up to N false Context claims before --strict fails
               (default 0). A non-negative integer; ratchet it down over time.
+  --warn-below N  warn when a Health dimension (Coherence/Weight/Coverage/Health)
+              scores below N (0-100). Advisory by default (stderr, exit 0);
+              gating under --strict (a breach fails the build, exit 20).
+  --weight-budget N  token budget for the Weight dimension (default ${DEFAULT_WEIGHT_BUDGET});
+              a HEURISTIC, not a derived constant — Weight = 100 within budget,
+              penalized above. Coherence (=honesty) and Coverage need no budget.
   --fix       repoint stale path claims that git proves were RENAMED to their new
               location. DRY-RUN by default (prints the proposed change, writes
               nothing); add --write to apply. Rename-only — deletions and
@@ -123,6 +130,8 @@ function main() {
         convention: { type: "boolean" },
         strict: { type: "boolean" },
         "max-false": { type: "string" },
+        "warn-below": { type: "string" },
+        "weight-budget": { type: "string" },
         fix: { type: "boolean" },
         write: { type: "boolean" },
         version: { type: "boolean", short: "v" },
@@ -188,6 +197,33 @@ function run({ values, positionals }) {
       process.stderr.write(`depthfinder: --max-false is too large (got "${values["max-false"]}" — that would silently disable the gate)\n${USAGE}\n`);
       process.exit(2);
     }
+  }
+
+  // --warn-below N: per-dimension soft-gate threshold (an integer 0-100). Same
+  // strict validation as --max-false; a value outside 0-100 is a usage error
+  // (a threshold can't exceed the 0-100 dimension scale).
+  let warnBelow = null;
+  if (values["warn-below"] !== undefined) {
+    const raw = String(values["warn-below"]).trim();
+    const n = /^\d+$/.test(raw) ? parseInt(raw, 10) : NaN;
+    if (!Number.isSafeInteger(n) || n > 100) {
+      process.stderr.write(`depthfinder: --warn-below must be an integer 0-100 (got "${values["warn-below"]}")\n${USAGE}\n`);
+      process.exit(2);
+    }
+    warnBelow = n;
+  }
+  // --weight-budget N: the HEURISTIC token budget for the Weight dimension (a
+  // positive integer; default DEFAULT_WEIGHT_BUDGET). Labeled a heuristic, not a
+  // derived constant, wherever it surfaces.
+  let weightBudget = DEFAULT_WEIGHT_BUDGET;
+  if (values["weight-budget"] !== undefined) {
+    const raw = String(values["weight-budget"]).trim();
+    const n = /^\d+$/.test(raw) ? parseInt(raw, 10) : NaN;
+    if (!Number.isSafeInteger(n) || n === 0) {
+      process.stderr.write(`depthfinder: --weight-budget must be a positive integer (got "${values["weight-budget"]}")\n${USAGE}\n`);
+      process.exit(2);
+    }
+    weightBudget = n;
   }
 
   const startDir = resolve(positionals[0] || ".");
@@ -412,13 +448,8 @@ function run({ values, positionals }) {
   // legitimate unknown — both don't gate on their own, but under --strict a
   // degraded run can't be trusted to say "0 false", so it fails closed.
   const degraded = values.strict && ctx.degraded.length > 0;
-  const gate = values.strict
-    ? {
-        strict: true, maxFalse, false: score.falseCount, tier: "context",
-        unverifiedFiles, degraded,
-        failed: score.falseCount > maxFalse || unverifiedFiles > 0 || degraded,
-      }
-    : null;
+  // NOTE: the --strict `gate` object is built lower down, AFTER the Health
+  // dimensions it now carries (it needs weight → dimensions → breached).
 
   // --fix (safe-fix): repoint stale paths git PROVES were renamed. Dry-run by
   // default (writes nothing); --write applies — the one opt-in write to the
@@ -452,6 +483,40 @@ function run({ values, positionals }) {
   const docScore = docFiles.length ? computeScore(docClaims) : null;
   const dead = deadTokens(fileParagraphs, claims, tokchars);
   const weight = Math.round(weightChars / 4);
+
+  // CLI Health model (Coherence / Weight / Coverage → composite). Pure transform
+  // over data already computed; null when the honesty score is suppressed
+  // (< 5 definite) — the same unknown-never-false guard, so no fabricated 0.
+  const dimensions = computeCliDimensions({
+    honesty: score.honesty,
+    definite: score.definite,
+    unknownCount: score.unknownCount,
+    weight,
+    budget: weightBudget,
+  });
+  // --warn-below soft-gate: which dimensions fall below the threshold. Empty
+  // unless --warn-below is set AND the dimensions rendered (honesty not suppressed).
+  const DIM_KEYS = ["coherence", "weight", "coverage", "health"];
+  const breached =
+    warnBelow != null && dimensions ? DIM_KEYS.filter((k) => dimensions[k] < warnBelow) : [];
+
+  // --strict gate verdict over the CONTEXT tier (built HERE, after dimensions —
+  // it now carries the dim scores + the --warn-below breach). null unless
+  // --strict. Fail-closed on unread files + oracle degradation; a --warn-below
+  // breach also fails it. `--json` consumers read gate.failed directly.
+  const gate = values.strict
+    ? {
+        strict: true, maxFalse, false: score.falseCount, tier: "context",
+        unverifiedFiles, degraded,
+        warnBelow,
+        dimensions: dimensions
+          ? { coherence: dimensions.coherence, weight: dimensions.weight, coverage: dimensions.coverage, health: dimensions.health }
+          : null,
+        breached,
+        failed:
+          score.falseCount > maxFalse || unverifiedFiles > 0 || degraded || breached.length > 0,
+      }
+    : null;
 
   // Score-history (V1.2): delta vs the last COMPARABLE run, then record this
   // run — to the user cache dir, never the scanned repo (5A holds). Suppressed
@@ -497,6 +562,7 @@ function run({ values, positionals }) {
     findings,
     score,
     gate,
+    dimensions,
     docScore,
     delta: scoreDelta,
     dead,
@@ -555,7 +621,25 @@ function run({ values, positionals }) {
       process.exitCode = 20;
       return;
     }
+    // Soft-gate becomes a hard gate ONLY under --strict: a dimension below the
+    // --warn-below threshold fails the build (exit 20), after the false-claim and
+    // verifiability checks above.
+    if (breached.length > 0) {
+      const detail = breached.map((k) => `${k} ${dimensions[k]}`).join(", ");
+      process.stderr.write(
+        `depthfinder --strict --warn-below ${warnBelow}: FAIL — ${breached.length} dimension${breached.length === 1 ? "" : "s"} below ${warnBelow} — ${detail} (exit 20)\n`,
+      );
+      process.exitCode = 20;
+      return;
+    }
     process.stderr.write(`depthfinder --strict: PASS — ${score.falseCount} false ≤ --max-false ${maxFalse} (Context Honesty)\n`);
+  }
+  // --warn-below WITHOUT --strict is advisory: warn on a breach, but exit stays 0.
+  if (!values.strict && breached.length > 0) {
+    const detail = breached.map((k) => `${k} ${dimensions[k]}`).join(", ");
+    process.stderr.write(
+      `depthfinder: ${breached.length} dimension${breached.length === 1 ? "" : "s"} below --warn-below ${warnBelow} — ${detail} (advisory; add --strict to fail the build)\n`,
+    );
   }
   // No process.exit() here: payloads >64KB are still buffered in the stdout
   // pipe, and exit() would truncate them mid-write (caught live on a

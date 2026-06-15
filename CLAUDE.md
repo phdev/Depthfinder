@@ -71,7 +71,36 @@ clean enough to accuse by default. Flip to default-on once the corpus gate runs 
 false. Context-tier FPs the corpus already fixed: nested-monorepo path resolution
 (applies to ALL tiers now) and PascalCase-type-as-dependency rejection.
 
-Card anatomy below the findings: the `Context Honesty` score line (`N ·
+**Health hero (CLI dimension model, `src/cli/dimensions.mjs`).** The card LEADS
+with a dashboard-style `Health N · <Healthy|Caution|Critical>` hero + a
+`Coherence C · Weight W · Coverage V` line (all 0-100), then the findings, then
+the honesty score. `computeCliDimensions()` is a pure transform over data the CLI
+already computes: **Coherence** = Context Honesty; **Weight** = `clamp(100 −
+over-budget penalty)` vs `--weight-budget` (default `DEFAULT_WEIGHT_BUDGET`, a
+labeled HEURISTIC not a derived constant); **Coverage** = `definite/(definite +
+unknown)` (CLI-native — deliberately DIFFERENT from the dashboard's rules-in-CI
+Coverage); **Health** = `0.4·Coherence + 0.3·Weight + 0.3·Coverage` (matches the
+dashboard's `computeDimensions`). Suppressed as a unit (renders nothing) when the
+honesty score is suppressed (< 5 definite) — the unknown-never-false guard, no
+fabricated 0. **HEADLINE NOTE (reversed invariant, 2026-06-15):** the status word
+comes from the COMPOSITE Health, by explicit user choice for dashboard parity —
+this REVERSED the original "honesty-led headline, no status word" invariant, so a
+low-Context-Honesty repo CAN read `Health 79 · Healthy` (the dirty golden shows
+exactly this). The honesty score line below still tells the unvarnished truth. The
+soft-gate: `--warn-below N` warns (advisory, exit 0) when a dimension < N, and
+GATES (exit 20) under `--strict`; the `gate{}` JSON carries `warnBelow` +
+per-dimension scores + `breached[]`. `dimensions` is an additive `--json` field.
+
+**Hotspots + fix lines.** Below the hero, the findings render as a numbered
+**Hotspots** list (the existing top-3 by confidence+severity from `select.mjs`),
+each closing with a deterministic **`→ fix:`** line (`fixHint()` in
+`templates.mjs`, same cut-rule as `consequence`: literal slots, no guessed
+intent). The path hint mentions `--fix` GENERICALLY (it auto-repoints only
+git-proven renames) so it never falsely promises a fix for a deletion or
+fabrication. The CLI's hotspots are the **honesty findings only** — the dashboard's
+broader hotspots (weight/coverage/drift) come from generators the CLI lacks.
+
+Card anatomy below the hero + findings: the `Context Honesty` score line (`N ·
 M checkable claims · K unchecked`); the `Doc Honesty` line (`N · M checkable
 claims · K docs · J dead refs`, or `— · K docs · too few checkable claims` when
 suppressed; omitted when no docs); the **Weight** line (~chars/4 of the Context

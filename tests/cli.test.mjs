@@ -51,6 +51,92 @@ test("--convention: snippet to stdout (append-safe), how-to to stderr, exit 0 (n
   assert.match(r.stderr, /--strict/, "stderr points at the CI gate");
 });
 
+// ── Health dimensions + --warn-below soft-gate (CLI dimension model) ──
+// A clean repo with ≥5 true path claims so the honesty score (and therefore the
+// dimensions) render rather than suppress.
+function dimRepo() {
+  const f = { "package.json": '{"name":"t","version":"1.0.0"}' };
+  for (const x of ["a", "b", "c", "d", "e", "f"]) f[`src/${x}.js`] = `// ${x}\n`;
+  f["CLAUDE.md"] = "# T\nSee `src/a.js`, `src/b.js`, `src/c.js`, `src/d.js`, `src/e.js`, `src/f.js`.\n";
+  return makeRepo(f);
+}
+
+test("--warn-below / --weight-budget: usage validation (exit 2, before repo work)", () => {
+  for (const bad of [["--warn-below", "200"], ["--warn-below", "-1"], ["--warn-below", "x"], ["--weight-budget", "0"], ["--weight-budget", "x"]])
+    assert.equal(runCli(process.cwd(), bad).code, 2, bad.join(" "));
+});
+
+test("dimensions render in --json when honesty is scored (≥5 definite)", () => {
+  const root = dimRepo();
+  try {
+    const j = JSON.parse(runCli(root, ["--json"]).stdout);
+    assert.ok(j.score.honesty != null, "fixture yields a real honesty score");
+    assert.ok(j.dimensions, "dimensions present");
+    assert.equal(j.dimensions.coherence, j.score.honesty); // Coherence = Context Honesty
+    assert.equal(typeof j.dimensions.health, "number");
+    assert.ok(["Critical", "Caution", "Healthy"].includes(j.dimensions.rating));
+    assert.equal(j.gate, null); // no --strict
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("--warn-below advisory (no --strict): warns on a breach, exit stays 0", () => {
+  const root = dimRepo();
+  try {
+    // a tiny budget forces Weight down so there's a real breach to warn about
+    const r = runCli(root, ["--weight-budget", "1", "--warn-below", "90"]);
+    assert.equal(r.code, 0, "advisory never changes the exit code");
+    assert.match(r.stderr, /below --warn-below 90/);
+    assert.match(r.stderr, /advisory/);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("--strict --warn-below: a dimension breach fails the build (exit 20); no breach passes", () => {
+  const root = dimRepo();
+  try {
+    const fail = runCli(root, ["--strict", "--weight-budget", "1", "--warn-below", "90"]);
+    assert.equal(fail.code, 20, "breach under --strict → exit 20");
+    assert.match(fail.stderr, /FAIL.*dimension/);
+    const pass = runCli(root, ["--strict", "--warn-below", "10"]); // default budget → all 100
+    assert.equal(pass.code, 0);
+    assert.match(pass.stderr, /PASS/);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("--strict --json: gate carries warnBelow + per-dimension scores + breached", () => {
+  const root = dimRepo();
+  try {
+    const g = JSON.parse(runCli(root, ["--strict", "--weight-budget", "1", "--warn-below", "90", "--json"]).stdout).gate;
+    assert.equal(g.warnBelow, 90);
+    assert.ok(g.dimensions && typeof g.dimensions.health === "number");
+    assert.ok(Array.isArray(g.breached) && g.breached.includes("weight"));
+    assert.equal(g.failed, true);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("dimensions suppressed (<5 definite) → null + no --warn-below breach", () => {
+  const root = makeRepo({
+    "package.json": '{"name":"t","version":"1.0.0"}',
+    "src/a.js": "//a\n",
+    "CLAUDE.md": "# T\nSee `src/a.js`.\n", // 1 claim < 5 → honesty null
+  });
+  try {
+    const r = runCli(root, ["--warn-below", "90"]);
+    assert.equal(r.code, 0);
+    assert.doesNotMatch(r.stderr, /below --warn-below/); // nothing to gate on
+    assert.equal(JSON.parse(runCli(root, ["--json"]).stdout).dimensions, null);
+  } finally {
+    cleanup(root);
+  }
+});
+
 test("exit 3: repo with no context files", () => {
   const root = makeRepo({ "src/a.js": "x\n" });
   try {
@@ -585,7 +671,17 @@ test("--strict --json: gate object + failed flag; stdout stays valid JSON; exit 
     assert.equal(r.code, 20, "exit code is independent of --json");
     const p = JSON.parse(r.stdout); // verdict went to stderr → stdout is still valid JSON
     // dirty has rot AND a skipped UTF-16 AGENTS.md (unverifiedFiles: 1); both → failed
-    assert.deepEqual(p.gate, { strict: true, maxFalse: 0, false: p.score.false, tier: "context", unverifiedFiles: 1, degraded: false, failed: true });
+    assert.equal(p.gate.strict, true);
+    assert.equal(p.gate.maxFalse, 0);
+    assert.equal(p.gate.false, p.score.false);
+    assert.equal(p.gate.tier, "context");
+    assert.equal(p.gate.unverifiedFiles, 1);
+    assert.equal(p.gate.degraded, false);
+    assert.equal(p.gate.failed, true);
+    // additive soft-gate fields (no --warn-below on this run)
+    assert.equal(p.gate.warnBelow, null);
+    assert.deepEqual(p.gate.breached, []);
+    assert.ok(p.gate.dimensions === null || typeof p.gate.dimensions.health === "number");
     // a non-strict run has gate: null (additive, no inference forced on consumers)
     assert.equal(JSON.parse(runCli(dirty, ["--json"]).stdout).gate, null);
   } finally {

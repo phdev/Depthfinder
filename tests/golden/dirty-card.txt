@@ -1,17 +1,25 @@
 
   Scanning CLAUDE.md against 7 tracked files…
 
-  ✗ CLAUDE.md:5  "Auth flows live in `src/auth/oauth.ts` (legacy token: «redacted»)."
+  Health 79 · Healthy
+  Coherence 57 · Weight 100 · Coverage 88
+
+  Hotspots
+
+  1. ✗ CLAUDE.md:5  "Auth flows live in `src/auth/oauth.ts` (legacy token: «redacted»)."
       └ no such tracked file — deleted at fccd7c9, 1 commit ago
       └ an agent following this reference will find nothing at src/auth/oauth.ts, and guess
+      → fix: repoint or remove this path — `npx depthfinder --fix --write` auto-repoints any git-proven rename
 
-  ✗ CLAUDE.md:7  "Wake word handled by `openWakeWord`."
+  2. ✗ CLAUDE.md:7  "Wake word handled by `openWakeWord`."
       └ not in any package.json (checked 1 manifest)
       └ an agent will write code against openWakeWord, which isn't installed
+      → fix: remove the line, or add `openWakeWord` to your dependencies
 
-  ✗ CLAUDE.md:9  "Model routing uses 4 tiers (see `router/config.js`)."
+  3. ✗ CLAUDE.md:9  "Model routing uses 4 tiers (see `router/config.js`)."
       └ router/config.js defines 3 tiers, not 4
       └ an agent reasoning about "4 tiers" will plan against a structure that has 3 in `router/config.js`
+      → fix: update the count to 3
 
   Context Honesty   57 · 7 checkable claims · 1 unchecked
   Weight   ~77 tokens load every turn

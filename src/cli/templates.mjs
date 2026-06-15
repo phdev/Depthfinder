@@ -25,3 +25,28 @@ export function consequence(claim) {
     .replace("{noun}", a.noun ?? "")
     .replace("{actual}", claim.evidence.actual ? claim.evidence.actual.replace(/^= /, "") : "a different count");
 }
+
+// Suggested-action ("→ fix:") line per hotspot. DETERMINISTIC from the claim's
+// oracle + literal args + evidence — same cut-rule as the consequence templates:
+// no guessed intent. The path hint mentions --fix GENERICALLY (it auto-repoints
+// only git-proven renames), never falsely promising it for a deletion/fabrication.
+export const FIX_HINTS = {
+  path: "repoint or remove this path — `npx depthfinder --fix --write` auto-repoints any git-proven rename",
+  dependency: "remove the line, or add `{name}` to your dependencies",
+  symbol: "remove or correct the reference to `{symbol}`",
+  count: "update the count to {actual}",
+};
+
+export function fixHint(claim) {
+  const t = FIX_HINTS[claim.oracle];
+  if (!t) return null;
+  const a = claim.predicate.args;
+  // count "actual" reads like "3 in `router/config.js`" — keep just the number.
+  const actual = claim.evidence?.actual
+    ? claim.evidence.actual.replace(/^= /, "").replace(/\s+in\s+.*$/, "")
+    : "the real value";
+  return t
+    .replace("{name}", a.name ?? "")
+    .replace("{symbol}", a.symbol ?? "")
+    .replace("{actual}", actual);
+}

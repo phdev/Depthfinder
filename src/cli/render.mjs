@@ -1,22 +1,26 @@
 // Terminal card render (design doc "The render" — golden-snapshot locked).
 //
-// Render decisions (approved): replay-led (findings before score), findings
-// cap 3, score always shows its denominator, NO status word, all token
-// figures ~-prefixed, unknown count shown when > 0. Below the score: the
+// Render decisions: a dashboard-style Health hero LEADS the card (Health N +
+// status word + the Coherence/Weight/Coverage line) — a 2026-06-15 product
+// decision that reversed the original "no status word / honesty-led headline"
+// invariant (the user chose dashboard parity with the dishonest-headline tradeoff
+// in view). Below the hero: replay (findings, cap 3), then the Context Honesty
+// score (always shows its denominator), all token figures ~-prefixed, unknown
+// count shown when > 0. The honesty score line stays the source of truth. Below it: the
 // Weight line (what these files load into the agent every turn) and the
 // breakdown line — false (fabricated/never existed) · stale (was true once,
 // git history proves it) · dead tokens. Stream discipline (8A): this module
 // RETURNS strings; bin writes the card to stdout and ALL diagnostics to
 // stderr. Redaction (1A) is applied by the caller at the stream/serializer
 // boundary.
-import { consequence } from "./templates.mjs";
+import { consequence, fixHint } from "./templates.mjs";
 
 const nf = new Intl.NumberFormat("en-US"); // locale-pinned for determinism
 
 export function renderCard(model) {
   const {
     scannedFiles, linkedFiles = [], trackedCount, findings, score, docScore, docFiles = [],
-    delta, dead, weight, claimsTotal,
+    delta, dead, weight, claimsTotal, dimensions,
   } = model;
   const L = [];
   L.push("");
@@ -26,8 +30,29 @@ export function renderCard(model) {
   L.push(`  Scanning ${scannedFiles.join(", ")}${linkNote} against ${nf.format(trackedCount)} tracked files…`);
   L.push("");
 
+  // Health hero — dashboard-style headline (explicit product decision 2026-06-15,
+  // reversing the earlier "no status word / honesty-led headline" invariant). The
+  // STATUS WORD comes from the COMPOSITE Health per the user's dashboard-parity
+  // choice: a low-honesty repo CAN read "Healthy" here — the accepted tradeoff —
+  // and the Context Honesty line below still tells the unvarnished truth. Renders
+  // ONLY when the honesty score is scored (dimensions non-null); suppressed below
+  // 5 definite claims, same guard as the score (unknown-never-false).
+  if (dimensions) {
+    L.push(`  Health ${dimensions.health} · ${dimensions.rating}`);
+    L.push(`  Coherence ${dimensions.coherence} · Weight ${dimensions.weight} · Coverage ${dimensions.coverage}`);
+    L.push("");
+  }
+
+  // Hotspots — the ranked findings (top-3 by confidence+severity, select.mjs).
+  // Numbered + headed, each closing with a deterministic "→ fix:" line.
+  if (findings.length) {
+    L.push("  Hotspots");
+    L.push("");
+  }
+  let hotspotN = 0;
   for (const f of findings) {
-    L.push(`  ✗ ${f.source.file}:${f.source.line}  "${truncate(f.text, 88)}"`);
+    hotspotN++;
+    L.push(`  ${hotspotN}. ✗ ${f.source.file}:${f.source.line}  "${truncate(f.text, 88)}"`);
     L.push(`      └ ${f.evidence.summary}`);
     if (f.burn && !f.burn.error) {
       // The moment, undeniable: a real agent's words, then the cost. Either it
@@ -48,6 +73,8 @@ export function renderCard(model) {
       if (f.evidence.actual && !(why && why.includes(f.evidence.actual)))
         L.push(`      └ actual: ${f.evidence.actual}`);
     }
+    const fix = fixHint(f);
+    if (fix) L.push(`      → fix: ${fix}`);
     L.push("");
   }
 

@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { readContextFile, MAX_LINE_CHARS } from "../src/cli/ingest.mjs";
 import { computeScore, deadTokens, MIN_DEFINITE_FOR_SCORE } from "../src/cli/score.mjs";
 import { selectFindings } from "../src/cli/select.mjs";
-import { TEMPLATES, consequence } from "../src/cli/templates.mjs";
+import { TEMPLATES, consequence, fixHint, FIX_HINTS } from "../src/cli/templates.mjs";
 import { verificationDetours } from "../src/cli/burn.mjs";
 
 test("verificationDetours: counts dedup'd verification steps in agent output", () => {
@@ -133,6 +133,28 @@ test("templates: consequence is the verbatim template with literal slots (6A)", 
     evidence: { actual: "3 in `router/config.js`" },
   });
   assert.ok(!/\{\w+\}/.test(filled), "no unfilled slots");
+});
+
+test("fixHint: deterministic suggested-action per oracle (no false --fix promise, no unfilled slots)", () => {
+  // path → mentions --fix GENERICALLY (auto-repoints git-proven renames); never
+  // claims THIS path is a rename (it might be a deletion/fabrication).
+  const p = fixHint({ oracle: "path", predicate: { args: { path: "src/x.ts" } }, evidence: {} });
+  assert.match(p, /--fix/);
+  assert.match(p, /git-proven rename/);
+  // dependency → names the missing package verbatim
+  assert.equal(
+    fixHint({ oracle: "dependency", predicate: { args: { name: "openWakeWord" } }, evidence: {} }),
+    FIX_HINTS.dependency.replace("{name}", "openWakeWord"),
+  );
+  // count → the bare actual number, stripped of the " in <anchor>" suffix
+  assert.equal(
+    fixHint({ oracle: "count", predicate: { args: { n: 4, noun: "tiers" } }, evidence: { actual: "3 in `router/config.js`" } }),
+    "update the count to 3",
+  );
+  // no unfilled {slots} for any real oracle; an unknown oracle → null (no fabricated fix)
+  for (const o of ["path", "dependency", "symbol", "count"])
+    assert.ok(!/\{\w+\}/.test(fixHint({ oracle: o, predicate: { args: { name: "x", symbol: "y" } }, evidence: { actual: "5" } })));
+  assert.equal(fixHint({ oracle: "mystery", predicate: { args: {} }, evidence: {} }), null);
 });
 
 test("boundary (2A): the CLI module graph never imports lib/repo.mjs", () => {
