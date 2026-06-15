@@ -188,8 +188,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4   # fetch-depth:0 if you want stale/rename evidence
-      - run: npx depthfinder@1.2.0 --strict   # PIN the version (see below)
+      - uses: phdev/Depthfinder@v1   # the reusable context-honesty gate
+        with:
+          max-false: 0     # ratchet down over time; warn-below / docs also supported
 ```
+
+(Or run it directly without the Action: `- run: npx depthfinder@1.2.0 --strict`.)
 
 - **Gates the Context tier only** (your convention files + nested + the "read
   first" links they follow, minus `--no-follow`). `--docs` (Doc Honesty) is

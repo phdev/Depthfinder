@@ -265,6 +265,23 @@ npm (v1.0.0, published 2026-06-13). v1.0.0 was published manually (a
 token-based CI publish hit `EOTP` — account 2FA-for-writes blocks tokens CI
 can't OTP); OIDC sidesteps that for every release after.
 
+## Distribution (beyond the npm CLI)
+
+- **`action.yml` (repo root) — reusable GitHub Action.** A composite action
+  wrapping `npx depthfinder@<version> --strict` (inputs: path/max-false/warn-below/
+  weight-budget/docs/version; passed via env + bash array, never string-interpolated
+  → no shell injection). Consumers use `- uses: phdev/Depthfinder@v1`. NOT in
+  the npm tarball (it's a GitHub artifact). To list on the GitHub Actions
+  Marketplace: repo → a release → "Publish this Action to Marketplace" (a one-time
+  UI step). Built to make "add `--strict` to CI" a one-liner — the Stage-1
+  demand-validation adoption bar.
+- **`docs/index.html` — one-page landing (GitHub Pages).** Static, zero-dep,
+  on-brand (near-black + the `--pos` green), the dirty card as the hero + the
+  All-Hands-AI/OpenHands "Context Honesty 60 · 12 dead refs" proof + install
+  (CLI / `--install-skill` / the Action). Enable via repo Settings → Pages →
+  branch `main` / `/docs`. The grounding destination for the Stage-1 outreach.
+  Keep it ONE page (deliberately not a marketing site). NOT in the npm tarball.
+
 Five tabs, each with a hash route for deep-linking:
 
 | Tab | Hash | Backend |

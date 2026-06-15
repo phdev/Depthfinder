@@ -1,0 +1,64 @@
+# Depthfinder — reusable GitHub Action for the context-honesty CI gate.
+#
+# Wraps `npx depthfinder --strict`: fails the build (exit 20) when your AI
+# context files (CLAUDE.md / AGENTS.md / .cursorrules + the docs they point to)
+# drift out of sync with the repo. Composite action — zero build, just runs the
+# published npm CLI. Pin `version` for a stable gate (the false count is
+# extractor-dependent). Inputs are passed via env + a bash array, never
+# string-interpolated, so a workflow input can't inject shell.
+#
+# Usage:
+#   - uses: phdev/Depthfinder@v1
+#     with:
+#       max-false: 0          # ratchet down over time
+#       warn-below: 80        # also gate if any Health dimension < 80 (optional)
+name: "Depthfinder context-honesty gate"
+description: "Fail CI when your AI context files (CLAUDE.md / AGENTS.md / .cursorrules) drift out of sync with the code."
+author: "phdev"
+branding:
+  icon: "check-circle"
+  color: "green"
+inputs:
+  path:
+    description: "Directory to scan (default: repo root)."
+    required: false
+    default: "."
+  max-false:
+    description: "Allow up to N false Context claims before failing (default 0)."
+    required: false
+    default: "0"
+  warn-below:
+    description: "Also fail if any Health dimension (Coherence/Weight/Coverage/Health) scores below N (0-100). Empty = off."
+    required: false
+    default: ""
+  weight-budget:
+    description: "Token budget for the Weight dimension (heuristic). Empty = default (10000)."
+    required: false
+    default: ""
+  docs:
+    description: "Also scan the wider repo docs for an advisory Doc Honesty score (never gated). true/false."
+    required: false
+    default: "false"
+  version:
+    description: "depthfinder npm version to pin. Pinning keeps the gate stable across releases."
+    required: false
+    default: "1.2.0"
+runs:
+  using: "composite"
+  steps:
+    - name: Depthfinder context-honesty gate
+      shell: bash
+      env:
+        DF_PATH: ${{ inputs.path }}
+        DF_MAXFALSE: ${{ inputs.max-false }}
+        DF_WARNBELOW: ${{ inputs.warn-below }}
+        DF_WEIGHTBUDGET: ${{ inputs.weight-budget }}
+        DF_DOCS: ${{ inputs.docs }}
+        DF_VERSION: ${{ inputs.version }}
+      run: |
+        args=(--strict --max-false "$DF_MAXFALSE")
+        [ -n "$DF_WARNBELOW" ] && args+=(--warn-below "$DF_WARNBELOW")
+        [ -n "$DF_WEIGHTBUDGET" ] && args+=(--weight-budget "$DF_WEIGHTBUDGET")
+        [ "$DF_DOCS" = "true" ] && args+=(--docs)
+        echo "depthfinder@$DF_VERSION $DF_PATH ${args[*]}"
+        npx -y "depthfinder@$DF_VERSION" "$DF_PATH" "${args[@]}"

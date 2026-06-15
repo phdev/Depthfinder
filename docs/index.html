@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Depthfinder — keep your AI context honest</title>
+<meta name="description" content="Depthfinder scans CLAUDE.md / AGENTS.md / .cursorrules and verifies their claims against your repo. Deterministic, no model calls, nothing leaves your machine. npx depthfinder." />
+<meta property="og:title" content="Depthfinder — keep your AI context honest" />
+<meta property="og:description" content="Your agent reads CLAUDE.md / AGENTS.md as ground truth, and those files rot. Depthfinder verifies every claim against the code. npx depthfinder." />
+<style>
+  :root{
+    --bg:#07090d; --panel:#0d1117; --panel2:#11161f; --line:#1d2735;
+    --ink:#e8edf4; --ink2:#9aa7b8; --ink3:#5d6878; --pos:#3fd09a; --warn:#e8b059; --bad:#e8746b;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --sans:"Helvetica Neue",Inter,ui-sans-serif,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:860px;margin:0 auto;padding:0 22px}
+  a{color:var(--pos);text-decoration:none}
+  a:hover{text-decoration:underline}
+  header{padding:64px 0 30px}
+  .logo{display:flex;align-items:center;gap:11px;font-weight:800;font-size:19px;letter-spacing:-.01em}
+  .logo .dot{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--pos);display:grid;place-items:center;color:var(--pos);font-size:12px}
+  h1{font-size:46px;line-height:1.08;letter-spacing:-.025em;margin:30px 0 14px;font-weight:800}
+  h1 .em{color:var(--pos)}
+  .lede{font-size:18px;color:var(--ink2);max-width:640px;margin:0}
+  .cta{display:flex;flex-wrap:wrap;gap:10px;margin:26px 0 6px}
+  .cta code{font-family:var(--mono);background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:11px 15px;font-size:14px;color:var(--ink)}
+  .cta .gh{display:inline-flex;align-items:center;padding:11px 16px;border:1px solid var(--line);border-radius:9px;color:var(--ink);font-weight:600;font-size:14px}
+  .cta .gh:hover{border-color:var(--pos);text-decoration:none}
+  .card{margin:40px 0;background:#05070a;border:1px solid var(--line);border-radius:14px;padding:22px 20px;font-family:var(--mono);font-size:12.5px;line-height:1.55;overflow-x:auto;color:var(--ink2)}
+  .card .h{color:var(--warn);font-weight:700}
+  .card .dim{color:var(--ink3)}
+  .card .x{color:var(--bad)}
+  .card .fix{color:var(--pos)}
+  .card .ev{color:var(--ink3)}
+  section{padding:26px 0;border-top:1px solid var(--line)}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.13em;color:var(--ink3);font-weight:700;margin:0 0 14px}
+  .proof{font-size:21px;line-height:1.4;letter-spacing:-.01em;margin:0;max-width:680px}
+  .proof b{color:var(--ink)}
+  .proof .n{color:var(--bad);font-weight:800}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px}
+  .feat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 17px}
+  .feat h3{margin:0 0 6px;font-size:15px;color:var(--ink)}
+  .feat p{margin:0;color:var(--ink2);font-size:13.5px}
+  pre{font-family:var(--mono);background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:15px 16px;overflow-x:auto;font-size:13px;color:var(--ink);margin:8px 0}
+  pre .c{color:var(--ink3)}
+  footer{padding:34px 0 70px;color:var(--ink3);font-size:13px;border-top:1px solid var(--line);margin-top:6px}
+  @media(max-width:600px){h1{font-size:34px}.grid{grid-template-columns:1fr}.proof{font-size:18px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"><span class="dot">!</span> Depthfinder</div>
+    <h1>Keep your AI context <span class="em">honest</span>.</h1>
+    <p class="lede">Your agent reads <code>CLAUDE.md</code>, <code>AGENTS.md</code>, and <code>.cursorrules</code> as ground truth — and those files rot. Paths go dead, dependency claims go stale, counts drift. Depthfinder scans the claims your context files make and verifies them against the repo itself.</p>
+    <div class="cta">
+      <code>npx depthfinder</code>
+      <a class="gh" href="https://github.com/phdev/Depthfinder">GitHub →</a>
+      <a class="gh" href="https://www.npmjs.com/package/depthfinder">npm →</a>
+    </div>
+  </header>
+
+  <div class="card" aria-label="Example depthfinder output">
+$ npx depthfinder
+
+  Scanning CLAUDE.md against 1,204 tracked files…
+
+  <span class="h">Health 67 · Caution</span>
+  <span class="dim">Coherence 41 · Weight 80 · Coverage 88</span>
+
+  Hotspots
+
+  1. <span class="x">✗ CLAUDE.md:67  "auth flows live in `src/auth/oauth.ts`"</span>
+      <span class="ev">└ no such tracked file — deleted at a1b3f2e, 38 commits ago</span>
+      <span class="fix">→ fix: repoint or remove this path</span>
+  2. <span class="x">✗ CLAUDE.md:41  "wake word handled by `openWakeWord`"</span>
+      <span class="ev">└ not in any package.json</span>
+      <span class="fix">→ fix: remove the line, or add the dependency</span>
+  3. <span class="x">✗ CLAUDE.md:23  "model routing uses 4 tiers"</span>
+      <span class="ev">└ router/config.js defines 3 tiers, not 4</span>
+      <span class="fix">→ fix: update the count to 3</span>
+
+  Context Honesty   41 · 22 checkable claims · 3 unchecked
+  10 false claims · 3 stale · ~8,100 tokens describe code that no longer exists
+  </div>
+
+  <section>
+    <h2>The problem is already in the wild</h2>
+    <p class="proof"><b>All-Hands-AI/OpenHands</b> — a top agent framework — ships an <code>AGENTS.md</code> that scores <b>Context Honesty 60</b>, with <span class="n">12 dead references</span> the agent reads as truth. Most fast-moving AI repos have the same rot. Depthfinder finds it, deterministically, with git evidence.</p>
+  </section>
+
+  <section>
+    <h2>How it works</h2>
+    <div class="grid">
+      <div class="feat"><h3>Deterministic, offline</h3><p>No model calls by default. Nothing leaves your machine. If it can't decide a claim safely, it says <code>unknown</code> — it never guesses and never false-accuses.</p></div>
+      <div class="feat"><h3>Evidence, not vibes</h3><p>Every false claim cites git history. <b>Stale</b> = the file existed and was deleted/moved. <b>False</b> = it never matched. The split tells you whether your docs rot or lie.</p></div>
+      <div class="feat"><h3>The rot tax</h3><p>A false line costs your agent either way: it acts on the lie, or it stops trusting the file and re-derives everything by hand. <code>--burn</code> shows a real agent getting fooled.</p></div>
+      <div class="feat"><h3>Gate it in CI</h3><p><code>--strict</code> fails the build (exit 20) when your context rots, so a PR can't quietly drift <code>CLAUDE.md</code> out of sync with the code.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Get started</h2>
+    <pre><span class="c"># scan the repo you're in</span>
+npx depthfinder
+
+<span class="c"># install the /depthfinder agent skill (Claude Code + Codex)</span>
+npx depthfinder --install-skill
+
+<span class="c"># fail CI when your context rots — drop into any workflow:</span>
+- uses: phdev/Depthfinder@v1
+  with:
+    max-false: 0</pre>
+    <p style="color:var(--ink2);font-size:13.5px;margin:10px 0 0">Requires Node ≥ 20 and git. Zero runtime dependencies. <a href="https://github.com/phdev/Depthfinder#readme">Full docs →</a></p>
+  </section>
+
+  <footer>
+    Depthfinder is open source (MIT) · <a href="https://github.com/phdev/Depthfinder">github.com/phdev/Depthfinder</a> · <code>npx depthfinder</code>
+  </footer>
+</div>
+</body>
+</html>

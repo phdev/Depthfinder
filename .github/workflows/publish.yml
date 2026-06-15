@@ -14,7 +14,10 @@ name: Publish to npm
 # fully automated again.
 on:
   push:
-    tags: ["v*"]
+    # Full semver tags only (vX.Y.Z) publish to npm. The moving `v1` major tag
+    # that the reusable GitHub Action (action.yml) is referenced by does NOT
+    # match (no dots), so moving it never triggers a pointless npm republish.
+    tags: ["v*.*.*"]
 
 jobs:
   publish:
