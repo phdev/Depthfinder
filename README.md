@@ -12,21 +12,28 @@ $ npx depthfinder
 
   Scanning CLAUDE.md against 1,204 tracked files…
 
-  ✗ CLAUDE.md:67  "auth flows live in `src/auth/oauth.ts`"
+  Health 67 · Caution
+  Coherence 41 · Weight 80 · Coverage 88
+
+  Hotspots
+
+  1. ✗ CLAUDE.md:67  "auth flows live in `src/auth/oauth.ts`"
       └ no such tracked file — deleted at a1b3f2e, 38 commits ago
       └ an agent following this reference will find nothing at src/auth/oauth.ts, and guess
+      → fix: repoint or remove this path — `npx depthfinder --fix --write` auto-repoints any git-proven rename
 
-  ✗ CLAUDE.md:41  "wake word handled by `openWakeWord`"
+  2. ✗ CLAUDE.md:41  "wake word handled by `openWakeWord`"
       └ not in any package.json (checked 3 manifests)
       └ an agent will write code against openWakeWord, which isn't installed
+      → fix: remove the line, or add `openWakeWord` to your dependencies
 
-  ✗ CLAUDE.md:23  "model routing uses 4 tiers (see `router/config.js`)"
+  3. ✗ CLAUDE.md:23  "model routing uses 4 tiers (see `router/config.js`)"
       └ router/config.js defines 3 tiers, not 4
-      └ an agent reasoning about "4 tiers" will plan against a structure that has 3
+      → fix: update the count to 3
 
-  Context Honesty   64 · 22 checkable claims · 3 unchecked
-  Weight   ~9,480 tokens load every turn
-  5 false claims · 3 stale · ~4,210 tokens describe code that no longer exists
+  Context Honesty   41 · 22 checkable claims · 3 unchecked
+  Weight   ~14,000 tokens load every turn
+  10 false claims · 3 stale · ~8,100 tokens describe code that no longer exists
 
   Your agent reads all of this as ground truth, every call.
 ```
@@ -38,7 +45,7 @@ score over the wider repo docs your agent reads on demand — runbooks,
 design notes, package READMEs:
 
 ```
-  Context Honesty   64 · 22 checkable claims · 3 unchecked
+  Context Honesty   41 · 22 checkable claims · 3 unchecked
   Doc Honesty       91 · 188 checkable claims · 34 docs · 4 dead refs
   ...
 ```
@@ -159,7 +166,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4   # fetch-depth:0 if you want stale/rename evidence
-      - run: npx depthfinder@1.0.1 --strict   # PIN the version (see below)
+      - run: npx depthfinder@1.1.0 --strict   # PIN the version (see below)
 ```
 
 - **Gates the Context tier only** (your convention files + nested + the "read
@@ -167,7 +174,7 @@ jobs:
   advisory and never fails the build.
 - **`--max-false N`** allows a budget of `N` false claims (default 0). Adopt on
   an already-rotten repo at a high `N`, then ratchet it down each sprint.
-- **Pin the npm version** (`npx depthfinder@1.0.1`, not bare `npx depthfinder`).
+- **Pin the npm version** (`npx depthfinder@1.1.0`, not bare `npx depthfinder`).
   The false count is extractor-dependent; a future release could change it and
   turn your build red with zero repo changes. Pinning makes `--max-false` stable.
 - **Fails closed.** If a context file can't be read (UTF-16, permissions), the
