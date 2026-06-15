@@ -91,18 +91,25 @@ and the unknown count is encoded in Coverage. Suppressed as a unit (renders
 nothing) when the honesty score is suppressed (< 5 definite) — the
 unknown-never-false guard, no fabricated 0.
 
-**COLOR (vivid 16-color, TTY-gated + explicit overrides).** Bars + numbers +
-criticality tags + fix-gains colorize on a 4-tier band (`tierOf`: critical <35 /
-caution <70 / ok <90 / great ≥90) using **standard 16-color SGR** — switched from
-the original soft 256-color, which rendered washed-out / unsupported ("white
-meters") on some terminals. `renderCard(model, {color})` defaults `color` **false**,
-so piped output / `--json` / tests / the golden snapshot stay PLAIN bytes (a test
-asserts no ANSI when piped — keeps the snapshot stable and CI clean). bin resolves
-color by precedence: `--no-color`/`NO_COLOR` (off) > `--color`/`FORCE_COLOR` (on) >
-`process.stdout.isTTY` (auto). The explicit-ON path matters because terminal
-MULTIPLEXERS / AI shells (tmux, **Cmux**, …) often don't present a TTY, so
-auto-detect turns color off — `--color` forces it back. Also a top-level
-`process.stdout.on("error", EPIPE → exit 0)` so `… | head` doesn't dump a trace.
+**COLOR (vivid 16-color, AUTO-detected — `src/cli/color.mjs` `resolveColor`).**
+Bars + numbers + criticality tags + fix-gains colorize on a 4-tier band (`tierOf`:
+critical <35 / caution <70 / ok <90 / great ≥90) in **standard 16-color SGR**
+(switched from soft 256-color, which rendered washed-out / unsupported — "white
+meters"). `renderCard(model, {color})` defaults `color` **false**; bin passes the
+`resolveColor({flags, env, isTTY})` decision. The ladder (OFF wins): `--no-color` /
+`NO_COLOR` → off; `--color` / `FORCE_COLOR` → on; `CI` → off; `isTTY` → on; **else a
+color-capable display advertised without a pty (`COLORTERM` / `TERM_PROGRAM` /
+`TMUX` / `STY`) → on**; else off. That last rung is what makes color "just work"
+in terminal apps / multiplexers / AI shells that CAPTURE a command's output
+instead of giving it a pty — **Cmux** (= ghostty; sets `COLORTERM=truecolor` +
+`TERM_PROGRAM=ghostty`), tmux (`TMUX`), iTerm (`TERM_PROGRAM`) — where `isTTY` is
+false even though a human is watching a color screen. Headless agents and
+`> file` redirects don't set those vars, so they stay PLAIN (good: an agent
+parsing the card, or a file, gets no escapes). `runCli` forces `NO_COLOR=1` so the
+golden snapshot + content assertions are host-independent (the host terminal
+advertises COLORTERM). `resolveColor` is unit-tested (`color.test.mjs`), the
+end-to-end flags in `cli.test.mjs`. Also a top-level `process.stdout.on("error",
+EPIPE → exit 0)` so `… | head` doesn't dump a trace.
 
 **HEADLINE NOTE (reversed invariant, 2026-06-15):** the status word comes from the
 COMPOSITE Health, by explicit user choice for dashboard parity — this REVERSED the

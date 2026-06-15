@@ -134,11 +134,12 @@ agent to fix the doc and never invent a target. `--triage` is **interactive
 only**: it needs a real terminal, so it errors (exit 2) in CI, a pipe, or
 alongside `--json` — it can't wedge a script.
 
-The colored meters and criticality tags default to **on when stdout is a
-terminal**, plain when piped (so CI / `--json` / the golden snapshot stay clean).
-Terminal multiplexers and AI shells (tmux, Cmux, …) often don't present a TTY, so
-auto-detection turns color off — pass **`--color`** (or `FORCE_COLOR=1`) to force
-it on there; `--no-color` / `NO_COLOR` force it off.
+The colored meters and criticality tags **auto-enable on a terminal** — including
+terminal apps / multiplexers (tmux, Cmux, iTerm, ghostty…) that advertise color
+via `COLORTERM` / `TERM_PROGRAM` even when they don't hand the command a TTY. They
+stay plain in CI and when redirected to a file, so `--json`, logs, and the golden
+snapshot stay clean. No flag needed in a normal terminal; override either way with
+`--color` / `--no-color` (or `FORCE_COLOR` / `NO_COLOR`) — **off always wins**.
 
 ## Run
 
@@ -158,7 +159,7 @@ npx depthfinder --weight-budget 8000  # token budget for the Weight dimension (h
 npx depthfinder --fix      # repoint paths git proves were renamed (dry run — shows the diff)
 npx depthfinder --fix --write  # ...actually apply the rename-fixes (the only write to your repo)
 npx depthfinder --triage   # interactive: arrow through hotspots, hand a fix to claude/codex
-npx depthfinder --color    # force the colored meters in tmux / a multiplexer that isn't a TTY
+npx depthfinder --no-color # force plain output (color auto-detects terminals, incl. tmux/Cmux/iTerm)
 npx depthfinder --convention >> CLAUDE.md  # add a snippet so agents self-check this file
 npx depthfinder --install-skill  # install the /depthfinder agent skill (Claude Code + Codex)
 npx depthfinder --version  # print the version and exit (-v); --help (-h) for usage

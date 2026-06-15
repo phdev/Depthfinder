@@ -45,6 +45,7 @@ import { repoIdentity, cacheFile, readLast, append } from "../src/cli/history.mj
 import { selectFindings } from "../src/cli/select.mjs";
 import { renderCard } from "../src/cli/render.mjs";
 import { runTriage } from "../src/cli/triage.mjs";
+import { resolveColor } from "../src/cli/color.mjs";
 import { buildPayload, writeOut } from "../src/cli/claims.mjs";
 import { firstSegment, resolveRelPosix } from "../src/cli/paths.mjs";
 import { directiveLinks } from "../src/cli/follow.mjs";
@@ -97,10 +98,12 @@ const USAGE = `usage: depthfinder [path] [--json] [--out <dir>] [--no-follow] [-
   --burn-agent <cmd>  the agent command for --burn (default: claude, else codex)
   --no-history do not record this run / show a "since last run" delta (the
               record lives in your cache dir, never in the scanned repo)
-  --color, --no-color  force the colored meters/criticality tags ON or OFF
-              (default: ON when stdout is a terminal). Use --color in tmux / a
-              multiplexer / an AI shell that doesn't present a TTY; NO_COLOR and
-              FORCE_COLOR env vars are also honored.
+  --color, --no-color  force the colored meters/criticality tags ON or OFF.
+              Color AUTO-enables on a terminal — including terminal apps /
+              multiplexers (tmux, Cmux, iTerm, ghostty…) that advertise color via
+              COLORTERM/TERM_PROGRAM even when they don't hand the command a TTY.
+              Plain in CI and when redirected to a file. NO_COLOR / FORCE_COLOR
+              env vars are honored; OFF always wins.
   --convention print a drop-in CLAUDE.md/AGENTS.md snippet that tells agents to
               self-check this file with depthfinder, then exit (stdout = the
               snippet, so: npx depthfinder --convention >> CLAUDE.md)
@@ -705,17 +708,10 @@ function run({ values, positionals }) {
     meta: { skippedLines, warnings, shallowClone: shallow },
   };
 
-  // Color precedence: explicit OFF wins, then explicit ON, then auto (TTY). The
-  // explicit flags exist because terminal MULTIPLEXERS / AI shells (tmux, Cmux,
-  // …) often DON'T present stdout as a TTY, so auto-detection turns color off —
-  // `--color` (or FORCE_COLOR=1) forces it back on. Piped/CI default stays plain
-  // (keeps --json + the golden snapshot byte-stable).
-  const color =
-    values["no-color"] || process.env.NO_COLOR
-      ? false
-      : values.color || process.env.FORCE_COLOR
-        ? true
-        : !!process.stdout.isTTY;
+  // Auto-detect color (resolveColor): a TTY, OR a color-capable terminal app /
+  // multiplexer relaying our output (Cmux, tmux, iTerm… advertise COLORTERM /
+  // TERM_PROGRAM / TMUX / STY), unless --no-color/NO_COLOR/CI. `--color` forces.
+  const color = resolveColor({ flags: values, env: process.env, isTTY: process.stdout.isTTY });
   if (values.triage) {
     // Interactive: print the colored card, then step through the hotspots and
     // hand a chosen fix to the harness. TTY-gated up front, so this never runs

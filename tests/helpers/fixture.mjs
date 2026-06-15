@@ -146,7 +146,10 @@ export function runCli(cwd, args = [], env = {}) {
   const res = spawnSync(process.execPath, [BIN, ...args], {
     cwd,
     encoding: "utf8",
-    env: { ...process.env, DEPTHFINDER_CACHE: cacheDir, ...env },
+    // Force plain output by default so the golden snapshot + content assertions
+    // are deterministic regardless of the host terminal (which may advertise
+    // COLORTERM=truecolor). A color test re-enables with { NO_COLOR: "" } + a flag.
+    env: { ...process.env, NO_COLOR: "1", DEPTHFINDER_CACHE: cacheDir, ...env },
   });
   return { code: res.status, stdout: res.stdout ?? "", stderr: res.stderr ?? "" };
 }

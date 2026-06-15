@@ -17,6 +17,7 @@ import readline from "node:readline";
 import { spawnSync } from "node:child_process";
 import { redact } from "../../lib/redact.mjs";
 import { fixHint, criticality } from "./templates.mjs";
+import { resolveColor } from "./color.mjs";
 
 const RESET = "\x1b[0m";
 // Standard 16-color SGR — vivid + universally supported (matches render.mjs).
@@ -90,7 +91,7 @@ export function runTriage(findings, {
   return new Promise((resolve) => {
     if (!findings.length) { output.write("  No hotspots to triage — your context is clean.\n"); resolve(); return; }
     const rows = triageRows(findings, gain);
-    const color = (!!output.isTTY || !!env.FORCE_COLOR) && !env.NO_COLOR;
+    const color = resolveColor({ env, isTTY: output.isTTY });
     const paint = (s, code) => (color && code ? `${code}${s}${RESET}` : s);
     let idx = 0;
     let rendered = 0;
