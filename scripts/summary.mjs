@@ -239,17 +239,6 @@ export async function generateSummary() {
     },
   ];
 
-  // ── positives ──
-  const healthy = [];
-  if (rulesInCi) healthy.push(`${rulesInCi}/${coverage.rules.length} rules protected & in CI`);
-  if (coverage.reminderTiming?.asserted)
-    healthy.push(`reminder-timing asserted ×${coverage.reminderTiming.assertionCount}`);
-  if (!rf.over) healthy.push("read-first bundle under budget");
-  if (coverage.gate?.ran && coverage.gate.passed)
-    healthy.push(`AgentCI gate passes ${coverage.gate.fixtures.length}/${coverage.gate.fixtures.length}`);
-  const memPop = map.nodes.filter((n) => n.type === "memory_store" && n.meta?.populated).length;
-  healthy.push(memPop ? `${memPop} memory stores populated` : "all memory stores empty (no leakage risk)");
-
   // ── project health (monochrome redesign) — all bound to live map data ──
   const ktok = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k` : String(n));
   const deg = {};
@@ -366,6 +355,5 @@ export async function generateSummary() {
     projectHealth,
     health,
     issues,
-    healthy,
   });
 }

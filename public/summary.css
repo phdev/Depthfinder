@@ -510,31 +510,6 @@
 }
 #panel-summary .df-empty b { color: var(--df-pos); font-weight: 700; }
 
-/* healthy / "what's working" footnote */
-#panel-summary .df-healthy {
-  margin-top: 22px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-#panel-summary .df-healthy .hh-lab {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--df-ink-3);
-  margin-right: 4px;
-}
-#panel-summary .df-healthy .hh {
-  font-size: 11px;
-  color: var(--df-pos);
-  border: 1px solid rgba(63, 208, 154, 0.32);
-  background: rgba(63, 208, 154, 0.1);
-  border-radius: 999px;
-  padding: 4px 10px;
-}
-
 /* =====================  RESPONSIVE  ===================== */
 @media (max-width: 900px) {
   #panel-summary .df-loadgrid { grid-template-columns: 1fr; }

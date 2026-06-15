@@ -1025,12 +1025,6 @@ function renderSummary(d) {
     `${counts.medium ? `<span class="hc med">${counts.medium} medium</span>` : ""}` +
     `${!counts.high && !counts.medium && counts.low ? `<span class="hc">${counts.low} low</span>` : ""}`;
 
-  const healthy = Array.isArray(d.healthy) && d.healthy.length
-    ? `<section class="df-healthy"><span class="hh-lab">Working</span>${d.healthy
-        .map((h) => `<span class="hh">${escapeHtml(h)}</span>`)
-        .join("")}</section>`
-    : "";
-
   body.innerHTML = `<div class="df-sum">
     ${strip}
     <section class="df-head"><h1>Summary</h1></section>
@@ -1063,7 +1057,6 @@ function renderSummary(d) {
         </div>
       </div>
       <div class="df-table" id="dfTable">${tableInner}</div>
-      ${healthy}
     </section>
   </div>`;
 

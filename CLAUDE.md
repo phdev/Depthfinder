@@ -233,8 +233,29 @@ hero (rating: <35 Critical / 35–69 Caution / ≥70 Healthy) + 3 dimension card
 ranked Hotspots table, styled by `public/summary.css` (scoped under
 `#panel-summary` so the other tabs are untouched). Every score is honest math over
 real signals — no fabricated numbers; the unknown-never-false invariant applies to
-the dashboard too (per-hotspot projected gains are omitted until they can be
-computed, never guessed).
+the dashboard too.
+
+- **Always-live, never stale-cache.** The Summary regenerates token budgets
+  **live** on every load via `generateTokens()` (the full budget scan with
+  `.callouts`, ~900ms) — it never reads the possibly-9-days-stale
+  `.cache/tokens.json` for the Weight dimension. The map + coverage panels
+  already regenerated live; this closes the last cache-staleness hole, so
+  Health always reflects the live repo. `POST /api/refresh/tokens` calls
+  `writeTokens` (which actually persists the recomputed cache — the prior
+  first-choice `generateCurrents` returned fresh data without writing, so the
+  refresh button silently no-op'd).
+- **Per-hotspot health radial.** Each Hotspot row shows a projected
+  `+N health` gain — the honest, bounded share of its dimension's *recoverable*
+  health (`dimWeight × (100 − dimScore)`, severity-weighted within the
+  dimension). It self-zeroes when a dimension is already maxed and is omitted
+  (no radial) when the gain rounds to 0 — never a fabricated constant. The
+  `maxHealthGain` field scales the radial fill.
+- **Pull-to-refresh.** On touch devices, pulling down at the top of the active
+  panel (scrollTop ≤ 0) triggers the existing `#globalRefresh` action — same
+  live-regeneration path as the header refresh button.
+- The old "Working" positives footnote was removed from the Summary (front-end
+  render, `.df-healthy` CSS, and the backend `healthy[]` array) — the triage
+  view is hotspots-only; "what's healthy" is implicit in the dimension scores.
 
 ## Architecture
 
