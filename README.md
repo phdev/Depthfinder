@@ -132,8 +132,13 @@ It **prints the exact prompt and asks before it spawns** — the same consent
 posture as `--burn`. The rotted line is redacted first, and the prompt tells the
 agent to fix the doc and never invent a target. `--triage` is **interactive
 only**: it needs a real terminal, so it errors (exit 2) in CI, a pipe, or
-alongside `--json` — it can't wedge a script. The colored meters and criticality
-tags follow the same TTY rule (plain when piped; set `NO_COLOR` to force off).
+alongside `--json` — it can't wedge a script.
+
+The colored meters and criticality tags default to **on when stdout is a
+terminal**, plain when piped (so CI / `--json` / the golden snapshot stay clean).
+Terminal multiplexers and AI shells (tmux, Cmux, …) often don't present a TTY, so
+auto-detection turns color off — pass **`--color`** (or `FORCE_COLOR=1`) to force
+it on there; `--no-color` / `NO_COLOR` force it off.
 
 ## Run
 
@@ -153,6 +158,7 @@ npx depthfinder --weight-budget 8000  # token budget for the Weight dimension (h
 npx depthfinder --fix      # repoint paths git proves were renamed (dry run — shows the diff)
 npx depthfinder --fix --write  # ...actually apply the rename-fixes (the only write to your repo)
 npx depthfinder --triage   # interactive: arrow through hotspots, hand a fix to claude/codex
+npx depthfinder --color    # force the colored meters in tmux / a multiplexer that isn't a TTY
 npx depthfinder --convention >> CLAUDE.md  # add a snippet so agents self-check this file
 npx depthfinder --install-skill  # install the /depthfinder agent skill (Claude Code + Codex)
 npx depthfinder --version  # print the version and exit (-v); --help (-h) for usage

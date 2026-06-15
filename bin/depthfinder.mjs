@@ -97,6 +97,10 @@ const USAGE = `usage: depthfinder [path] [--json] [--out <dir>] [--no-follow] [-
   --burn-agent <cmd>  the agent command for --burn (default: claude, else codex)
   --no-history do not record this run / show a "since last run" delta (the
               record lives in your cache dir, never in the scanned repo)
+  --color, --no-color  force the colored meters/criticality tags ON or OFF
+              (default: ON when stdout is a terminal). Use --color in tmux / a
+              multiplexer / an AI shell that doesn't present a TTY; NO_COLOR and
+              FORCE_COLOR env vars are also honored.
   --convention print a drop-in CLAUDE.md/AGENTS.md snippet that tells agents to
               self-check this file with depthfinder, then exit (stdout = the
               snippet, so: npx depthfinder --convention >> CLAUDE.md)
@@ -181,6 +185,10 @@ pass (the top Hotspot), prefer editing the doc over the code, and never invent a
 target — if a path's real home is unknown, delete the line rather than guess.
 `;
 
+// Exit quietly when our stdout pipe is closed early (e.g. `… | head`): a write to
+// a closed pipe raises EPIPE, which would otherwise dump a Node stack trace.
+process.stdout.on("error", (e) => { if (e?.code === "EPIPE") process.exit(0); throw e; });
+
 main();
 
 function main() {
@@ -205,6 +213,8 @@ function main() {
         fix: { type: "boolean" },
         write: { type: "boolean" },
         triage: { type: "boolean" },
+        color: { type: "boolean" },
+        "no-color": { type: "boolean" },
         version: { type: "boolean", short: "v" },
         help: { type: "boolean", short: "h" },
       },
@@ -695,7 +705,17 @@ function run({ values, positionals }) {
     meta: { skippedLines, warnings, shallowClone: shallow },
   };
 
-  const color = (!!process.stdout.isTTY || !!process.env.FORCE_COLOR) && !process.env.NO_COLOR;
+  // Color precedence: explicit OFF wins, then explicit ON, then auto (TTY). The
+  // explicit flags exist because terminal MULTIPLEXERS / AI shells (tmux, Cmux,
+  // …) often DON'T present stdout as a TTY, so auto-detection turns color off —
+  // `--color` (or FORCE_COLOR=1) forces it back on. Piped/CI default stays plain
+  // (keeps --json + the golden snapshot byte-stable).
+  const color =
+    values["no-color"] || process.env.NO_COLOR
+      ? false
+      : values.color || process.env.FORCE_COLOR
+        ? true
+        : !!process.stdout.isTTY;
   if (values.triage) {
     // Interactive: print the colored card, then step through the hotspots and
     // hand a chosen fix to the harness. TTY-gated up front, so this never runs

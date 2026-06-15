@@ -188,10 +188,17 @@ test("--triage: gated — needs a TTY (errors in a pipe) and refuses --json", ()
   }
 });
 
-test("color: piped output (non-TTY) carries NO ANSI escapes — CI/snapshots stay plain", () => {
+test("color: piped → plain by default; --color / FORCE_COLOR force it; --no-color / NO_COLOR win", () => {
   const root = materialize("dirty");
   try {
-    assert.doesNotMatch(runCli(root).stdout, /\x1b\[/, "the meters colorize only on a real TTY");
+    // default (piped, non-TTY) → plain bytes, so CI / --json / the golden snapshot stay stable
+    assert.doesNotMatch(runCli(root).stdout, /\x1b\[/, "piped (non-TTY) is plain by default");
+    // --color / FORCE_COLOR force it on even through a pipe (tmux / a multiplexer / an AI shell)
+    assert.match(runCli(root, ["--color"]).stdout, /\x1b\[/, "--color forces color through a pipe");
+    assert.match(runCli(root, [], { FORCE_COLOR: "1" }).stdout, /\x1b\[/, "FORCE_COLOR=1 forces color");
+    // OFF has the highest precedence (safest): --no-color and NO_COLOR beat --color
+    assert.doesNotMatch(runCli(root, ["--color", "--no-color"]).stdout, /\x1b\[/, "--no-color wins over --color");
+    assert.doesNotMatch(runCli(root, ["--color"], { NO_COLOR: "1" }).stdout, /\x1b\[/, "NO_COLOR wins over --color");
   } finally {
     cleanup(root);
   }
