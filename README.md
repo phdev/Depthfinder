@@ -188,7 +188,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4   # fetch-depth:0 if you want stale/rename evidence
-      - run: npx depthfinder@1.1.0 --strict   # PIN the version (see below)
+      - run: npx depthfinder@1.2.0 --strict   # PIN the version (see below)
 ```
 
 - **Gates the Context tier only** (your convention files + nested + the "read
@@ -196,7 +196,7 @@ jobs:
   advisory and never fails the build.
 - **`--max-false N`** allows a budget of `N` false claims (default 0). Adopt on
   an already-rotten repo at a high `N`, then ratchet it down each sprint.
-- **Pin the npm version** (`npx depthfinder@1.1.0`, not bare `npx depthfinder`).
+- **Pin the npm version** (`npx depthfinder@1.2.0`, not bare `npx depthfinder`).
   The false count is extractor-dependent; a future release could change it and
   turn your build red with zero repo changes. Pinning makes `--max-false` stable.
 - **Fails closed.** If a context file can't be read (UTF-16, permissions), the

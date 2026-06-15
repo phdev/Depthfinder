@@ -168,7 +168,7 @@ are the tax, surfaced as "the detour is the tax, every session."
   **oracle DEGRADATION** — a fatal `git check-ignore` (which blinds the path oracle,
   turning would-be-false paths into unknown) sets `ctx.degraded`/`gate.degraded` and
   fails the gate. Precedence 2 > 3 > 20 > 0. CI must **pin the version**
-  (`npx depthfinder@1.1.0`) — `--max-false` is only stable against a pinned extractor.
+  (`npx depthfinder@1.2.0`) — `--max-false` is only stable against a pinned extractor.
   Still deferred: the symbol-search-timeout degradation (a NORMAL budget event on
   large repos — failing closed on it would break the gate for every big repo, so it
   needs a per-claim "cut off by the cap" signal, not a run-level flag); plus
