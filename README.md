@@ -109,6 +109,7 @@ npx depthfinder --strict   # CI gate: exit 20 when your context has rotted (fals
 npx depthfinder --strict --max-false 5  # ...allow up to 5 before failing (ratchet)
 npx depthfinder --fix      # repoint paths git proves were renamed (dry run — shows the diff)
 npx depthfinder --fix --write  # ...actually apply the rename-fixes (the only write to your repo)
+npx depthfinder --convention >> CLAUDE.md  # add a snippet so agents self-check this file
 npx depthfinder --version  # print the version and exit (-v); --help (-h) for usage
 ```
 
@@ -124,6 +125,23 @@ scanned repo. It does keep a small **score history** in your cache dir
 (`~/.cache/depthfinder/…`, honoring `XDG_CACHE_HOME`) so the card can show a
 delta — `Context Honesty 95 (▼17 since last run)`. That stays on your machine;
 `--no-history` turns it off.
+
+### Make your agent self-check — the convention line
+
+The cheapest way to get an agent to *use* Depthfinder is to tell it to, right in
+the context file it already reads every turn. `--convention` prints a drop-in
+snippet for your `CLAUDE.md` / `AGENTS.md`:
+
+```bash
+npx depthfinder --convention >> CLAUDE.md   # stdout is the snippet; the how-to prints to stderr
+```
+
+It adds a short "before you trust the claims in this file, run `npx depthfinder`
+and treat anything it flags as false or stale as unreliable" rule. Now any agent
+reading the file knows to verify the docs against the code instead of trusting a
+rotted line — no plugin and no MCP server, just the CLI it can already run. (An
+agent with a shell can run `npx depthfinder --json` directly; this snippet is the
+nudge that makes it *think* to.)
 
 ### Fail CI when your context rots — `--strict`
 

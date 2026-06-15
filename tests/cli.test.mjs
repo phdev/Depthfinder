@@ -39,6 +39,18 @@ test("--version / --help: informational, stdout only, exit 0 (no repo needed)", 
   }
 });
 
+test("--convention: snippet to stdout (append-safe), how-to to stderr, exit 0 (no repo needed)", () => {
+  const r = runCli(process.cwd(), ["--convention"]);
+  assert.equal(r.code, 0);
+  assert.match(r.stdout, /## Context honesty \(depthfinder\)/, "stdout carries the snippet heading");
+  assert.match(r.stdout, /npx depthfinder/, "snippet tells the agent to run the CLI");
+  assert.ok(r.stdout.startsWith("\n"), "leads with a blank line so `>> CLAUDE.md` separates cleanly");
+  // the how-to + CI pointer must NOT pollute stdout — stdout has to stay clean for `>>`
+  assert.doesNotMatch(r.stdout, /Append the snippet|CI gate|--strict/, "how-to stays out of stdout");
+  assert.match(r.stderr, /CLAUDE\.md|AGENTS\.md/, "stderr explains where to paste it");
+  assert.match(r.stderr, /--strict/, "stderr points at the CI gate");
+});
+
 test("exit 3: repo with no context files", () => {
   const root = makeRepo({ "src/a.js": "x\n" });
   try {

@@ -84,8 +84,26 @@ const USAGE = `usage: depthfinder [path] [--json] [--out <dir>] [--no-follow] [-
   --burn-agent <cmd>  the agent command for --burn (default: claude, else codex)
   --no-history do not record this run / show a "since last run" delta (the
               record lives in your cache dir, never in the scanned repo)
+  --convention print a drop-in CLAUDE.md/AGENTS.md snippet that tells agents to
+              self-check this file with depthfinder, then exit (stdout = the
+              snippet, so: npx depthfinder --convention >> CLAUDE.md)
   -v, --version  print the depthfinder version and exit
   -h, --help     print this usage and exit`;
+
+// The "convention line" — a copy-pasteable snippet a user adds to their own
+// CLAUDE.md / AGENTS.md so any agent self-checks context honesty via the CLI it
+// already has (the cheap, zero-surface alternative to a bundled MCP server: the
+// agent reads this file every turn, so the file itself is the discovery point).
+// Printed to STDOUT alone (clean markdown, append-safe); the how-to goes to stderr.
+const CONVENTION = `
+## Context honesty (depthfinder)
+
+Before you trust the factual claims in this file — file paths, dependencies,
+counts, exported symbols — run \`npx depthfinder\` at the repo root and read the
+card. Any claim it flags as **false** or **stale** is unreliable: verify it
+against the actual code before acting on it, and prefer fixing the doc over
+trusting the line.
+`;
 
 main();
 
@@ -102,6 +120,7 @@ function main() {
         burn: { type: "boolean" },
         "burn-agent": { type: "string" },
         "no-history": { type: "boolean" },
+        convention: { type: "boolean" },
         strict: { type: "boolean" },
         "max-false": { type: "string" },
         fix: { type: "boolean" },
@@ -123,6 +142,17 @@ function main() {
   }
   if (args.values.help) {
     process.stdout.write(`${USAGE}\n`);
+    process.exit(0);
+  }
+  // --convention: print the drop-in snippet to STDOUT (append-safe) and the
+  // how-to + CI pointer to STDERR (stream discipline), then exit before repo work.
+  if (args.values.convention) {
+    process.stdout.write(`${CONVENTION}\n`);
+    process.stderr.write(
+      `Append the snippet above to your CLAUDE.md or AGENTS.md so agents self-check\n` +
+        `context honesty, e.g.:  npx depthfinder --convention >> CLAUDE.md\n` +
+        `CI gate: npx depthfinder@${VERSION} --strict   (exit 20 on rotted claims)\n`,
+    );
     process.exit(0);
   }
 

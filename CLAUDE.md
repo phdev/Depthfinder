@@ -94,8 +94,17 @@ are the tax, surfaced as "the detour is the tax, every session."
 - `bin/depthfinder.mjs` — orchestration, parseArgs, exit codes (0 ran /
   1 internal / 2 usage·no-git / 3 no context files / **20 `--strict` gate
   breach**), stream discipline (stdout = card|JSON only; diagnostics → stderr),
-  redaction at both output seams via `lib/redact.mjs`. `--version`/`-v` and
-  `--help`/`-h` short-circuit before any repo work and print to stdout (exit 0).
+  redaction at both output seams via `lib/redact.mjs`. `--version`/`-v`,
+  `--help`/`-h`, and `--convention` short-circuit before any repo work and exit 0.
+  `--convention` prints a drop-in CLAUDE.md/AGENTS.md self-check snippet to
+  **stdout** (clean markdown — `npx depthfinder --convention >> CLAUDE.md` is
+  append-safe) with the how-to + `--strict` CI pointer to **stderr** (stream
+  discipline). It's the deliberate, zero-surface alternative to a bundled MCP
+  server: an MCP `depthfinder_scan` tool adds no capability over `npx depthfinder
+  --json` for a shell-capable agent (only discoverability + a no-shell niche), so
+  the convention line — the agent reads the context file every turn, so the file
+  IS the discovery point — buys the discoverability at ~zero cost. MCP was held at
+  eng-review (design doc in `~/.gstack/projects/phdev-Depthfinder/`).
 - **`--strict` CI gate (V1.5 / Phase A):** fails a build (**exit 20** — outside
   Node's reserved 1-13 range so a wrapper/Action tells rot from a crash) when the
   **Context tier** has more than `--max-false N` false claims (`N` default 0,
