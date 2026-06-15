@@ -2,6 +2,8 @@
 
 **Keep your AI context honest.**
 
+**[phdev.github.io/Depthfinder →](https://phdev.github.io/Depthfinder/)**
+
 Your agent reads `CLAUDE.md`, `AGENTS.md`, and `.cursorrules` as ground
 truth — and those files rot. Paths go dead, dependency claims go stale,
 counts drift. Depthfinder scans the claims your context files make and
@@ -12,41 +14,45 @@ $ npx depthfinder
 
   Scanning CLAUDE.md against 1,204 tracked files…
 
-  Health 67 · Caution
-  Coherence 41 · Weight 80 · Coverage 88
+  Health       ████████████████░░░░   67 · Caution
+    ↳ Honesty  ████████░░░░░░░░░░░░   41  — share of checkable claims that still hold
+    ↳ Weight   ████████████████░░░░   80  — tokens these files load into the agent every turn
+    ↳ Coverage █████████████████░░░   88  — how much of the context is checkable vs unknown
 
-  Hotspots
+  Hotspots   10 false · 3 stale   ·   fix all → Health 67→89 · Honesty 41→100
 
-  1. ✗ CLAUDE.md:67  "auth flows live in `src/auth/oauth.ts`"
+  1. [CRIT] ✗ CLAUDE.md:67  "auth flows live in `src/auth/oauth.ts`"
       └ no such tracked file — deleted at a1b3f2e, 38 commits ago
-      └ an agent following this reference will find nothing at src/auth/oauth.ts, and guess
-      → fix: repoint or remove this path — `npx depthfinder --fix --write` auto-repoints any git-proven rename
+      → fix: repoint or remove this path           fix gain → Health +1 · Honesty +4
 
-  2. ✗ CLAUDE.md:41  "wake word handled by `openWakeWord`"
+  2. [HIGH] ✗ CLAUDE.md:41  "wake word handled by `openWakeWord`"
       └ not in any package.json (checked 3 manifests)
-      └ an agent will write code against openWakeWord, which isn't installed
-      → fix: remove the line, or add `openWakeWord` to your dependencies
+      → fix: remove the line, or add `openWakeWord`  fix gain → Health +1 · Honesty +4
 
-  3. ✗ CLAUDE.md:23  "model routing uses 4 tiers (see `router/config.js`)"
+  3. [LOW]  ✗ CLAUDE.md:23  "model routing uses 4 tiers (see `router/config.js`)"
       └ router/config.js defines 3 tiers, not 4
-      → fix: update the count to 3
+      → fix: update the count to 3                  fix gain → Health +1 · Honesty +4
 
-  Context Honesty   41 · 22 checkable claims · 3 unchecked
   Weight   ~14,000 tokens load every turn
   10 false claims · 3 stale · ~8,100 tokens describe code that no longer exists
-
-  Your agent reads all of this as ground truth, every call.
 ```
 
-**Context Honesty** scores the files your agent auto-loads every turn
-(`CLAUDE.md`, `AGENTS.md`, `.cursorrules`, and the docs they tell it to
-read first). Run with **`--docs`** to also get a separate **Doc Honesty**
-score over the wider repo docs your agent reads on demand — runbooks,
-design notes, package READMEs:
+The **meters** lead the card: the composite **Health**, then its three
+dimensions indented under it (each colored by value on a real terminal —
+Critical / Caution / OK / Great — and plain when piped or in CI). Each
+**Hotspot** carries a criticality tag and the score it returns if you fix it
+(Health first, then Honesty). Step through and apply the fixes interactively
+with **`npx depthfinder --triage`** (below).
+
+The **Honesty** meter is your **Context Honesty** score — the contract tier:
+the files your agent auto-loads every turn (`CLAUDE.md`, `AGENTS.md`,
+`.cursorrules`, and the docs they tell it to read first). Run with **`--docs`**
+to also get a separate **Doc Honesty** line over the wider repo docs your agent
+reads on demand — runbooks, design notes, package READMEs:
 
 ```
-  Context Honesty   41 · 22 checkable claims · 3 unchecked
-  Doc Honesty       91 · 188 checkable claims · 34 docs · 4 dead refs
+    ↳ Honesty  ████████░░░░░░░░░░░░   41  — share of checkable claims that still hold
+  Doc Honesty   91 · 188 checkable claims · 34 docs · 4 dead refs
   ...
 ```
 
@@ -101,6 +107,34 @@ plans (from 2026-06-15) that's the separate **Agent SDK** allotment, metered
 apart from your interactive sessions. It's one call per run, but keep it in
 mind before wiring `--burn` into CI or a loop.
 
+### `--triage`: step through the hotspots and fix them (interactive)
+
+`--triage` turns the card into a fix workflow. It draws the hotspots as a list
+you arrow through (↑/↓), and when you pick one it hands a targeted fix to the
+coding harness you already run — `claude`, else `codex`, else
+`$DEPTHFINDER_BURN_AGENT`:
+
+```
+$ npx depthfinder --triage
+
+  3 hotspots · ↑/↓ move · enter to fix · q to quit
+
+› 1. [CRIT] CLAUDE.md:67  src/auth/oauth.ts   (Honesty +4)
+  2. [HIGH] CLAUDE.md:41  openWakeWord        (Honesty +4)
+  3. [LOW]  CLAUDE.md:23  4 tiers → 3         (Honesty +4)
+
+  Will run in claude, in this repo:
+      A line in this project's AI context file (CLAUDE.md:67) is no longer true: …
+  run in claude? [y/N]
+```
+
+It **prints the exact prompt and asks before it spawns** — the same consent
+posture as `--burn`. The rotted line is redacted first, and the prompt tells the
+agent to fix the doc and never invent a target. `--triage` is **interactive
+only**: it needs a real terminal, so it errors (exit 2) in CI, a pipe, or
+alongside `--json` — it can't wedge a script. The colored meters and criticality
+tags follow the same TTY rule (plain when piped; set `NO_COLOR` to force off).
+
 ## Run
 
 ```bash
@@ -118,6 +152,7 @@ npx depthfinder --warn-below 80  # warn if a Health dimension scores < 80 (advis
 npx depthfinder --weight-budget 8000  # token budget for the Weight dimension (heuristic; default 10000)
 npx depthfinder --fix      # repoint paths git proves were renamed (dry run — shows the diff)
 npx depthfinder --fix --write  # ...actually apply the rename-fixes (the only write to your repo)
+npx depthfinder --triage   # interactive: arrow through hotspots, hand a fix to claude/codex
 npx depthfinder --convention >> CLAUDE.md  # add a snippet so agents self-check this file
 npx depthfinder --install-skill  # install the /depthfinder agent skill (Claude Code + Codex)
 npx depthfinder --version  # print the version and exit (-v); --help (-h) for usage
@@ -133,8 +168,8 @@ Requires **Node ≥ 20** and **git** (evidence comes from git history;
 shallow clones degrade gracefully). The default run writes **nothing** to the
 scanned repo. It does keep a small **score history** in your cache dir
 (`~/.cache/depthfinder/…`, honoring `XDG_CACHE_HOME`) so the card can show a
-delta — `Context Honesty 95 (▼17 since last run)`. That stays on your machine;
-`--no-history` turns it off.
+delta on the Honesty meter — `… 95  (▼17 since last run)`. That stays on your
+machine; `--no-history` turns it off.
 
 ### Make your agent self-check — the convention line
 
@@ -193,14 +228,14 @@ jobs:
           max-false: 0     # ratchet down over time; warn-below / docs also supported
 ```
 
-(Or run it directly without the Action: `- run: npx depthfinder@1.2.0 --strict`.)
+(Or run it directly without the Action: `- run: npx depthfinder@1.3.0 --strict`.)
 
 - **Gates the Context tier only** (your convention files + nested + the "read
   first" links they follow, minus `--no-follow`). `--docs` (Doc Honesty) is
   advisory and never fails the build.
 - **`--max-false N`** allows a budget of `N` false claims (default 0). Adopt on
   an already-rotten repo at a high `N`, then ratchet it down each sprint.
-- **Pin the npm version** (`npx depthfinder@1.2.0`, not bare `npx depthfinder`).
+- **Pin the npm version** (`npx depthfinder@1.3.0`, not bare `npx depthfinder`).
   The false count is extractor-dependent; a future release could change it and
   turn your build red with zero repo changes. Pinning makes `--max-false` stable.
 - **Fails closed.** If a context file can't be read (UTF-16, permissions), the

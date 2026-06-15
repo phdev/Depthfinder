@@ -35,6 +35,11 @@
   .card .x{color:var(--bad)}
   .card .fix{color:var(--pos)}
   .card .ev{color:var(--ink3)}
+  .card .warn{color:var(--warn)}
+  .card .ok{color:var(--pos)}
+  .card .crit{color:var(--bad);font-weight:700}
+  .card .high{color:var(--warn);font-weight:700}
+  .card .low{color:var(--ink3);font-weight:700}
   section{padding:26px 0;border-top:1px solid var(--line)}
   h2{font-size:13px;text-transform:uppercase;letter-spacing:.13em;color:var(--ink3);font-weight:700;margin:0 0 14px}
   .proof{font-size:21px;line-height:1.4;letter-spacing:-.01em;margin:0;max-width:680px}
@@ -69,22 +74,23 @@ $ npx depthfinder
 
   Scanning CLAUDE.md against 1,204 tracked files…
 
-  <span class="h">Health 67 · Caution</span>
-  <span class="dim">Coherence 41 · Weight 80 · Coverage 88</span>
+  Health       <span class="warn">█████████████</span><span class="dim">░░░░░░░</span>   67 · <span class="warn">Caution</span>
+    ↳ Honesty  <span class="warn">████████</span><span class="dim">░░░░░░░░░░░░</span>   41  <span class="dim">— share of checkable claims that still hold</span>
+    ↳ Weight   <span class="ok">████████████████</span><span class="dim">░░░░</span>   80  <span class="dim">— tokens these files load every turn</span>
+    ↳ Coverage <span class="ok">██████████████████</span><span class="dim">░░</span>   88  <span class="dim">— how much of the context is checkable</span>
 
-  Hotspots
+  Hotspots   10 false · 3 stale   ·   <span class="fix">fix all → Health 67→89 · Honesty 41→100</span>
 
-  1. <span class="x">✗ CLAUDE.md:67  "auth flows live in `src/auth/oauth.ts`"</span>
+  1. <span class="crit">[CRIT]</span> <span class="x">✗ CLAUDE.md:67  "auth flows live in `src/auth/oauth.ts`"</span>
       <span class="ev">└ no such tracked file — deleted at a1b3f2e, 38 commits ago</span>
-      <span class="fix">→ fix: repoint or remove this path</span>
-  2. <span class="x">✗ CLAUDE.md:41  "wake word handled by `openWakeWord`"</span>
+      <span class="fix">→ fix: repoint or remove this path</span>   <span class="fix">fix gain → Health +1 · Honesty +4</span>
+  2. <span class="high">[HIGH]</span> <span class="x">✗ CLAUDE.md:41  "wake word handled by `openWakeWord`"</span>
       <span class="ev">└ not in any package.json</span>
-      <span class="fix">→ fix: remove the line, or add the dependency</span>
-  3. <span class="x">✗ CLAUDE.md:23  "model routing uses 4 tiers"</span>
+      <span class="fix">→ fix: remove the line, or add the dependency</span>   <span class="fix">fix gain → Health +1 · Honesty +4</span>
+  3. <span class="low">[LOW]</span>  <span class="x">✗ CLAUDE.md:23  "model routing uses 4 tiers"</span>
       <span class="ev">└ router/config.js defines 3 tiers, not 4</span>
-      <span class="fix">→ fix: update the count to 3</span>
+      <span class="fix">→ fix: update the count to 3</span>   <span class="fix">fix gain → Health +1 · Honesty +4</span>
 
-  Context Honesty   41 · 22 checkable claims · 3 unchecked
   10 false claims · 3 stale · ~8,100 tokens describe code that no longer exists
   </div>
 

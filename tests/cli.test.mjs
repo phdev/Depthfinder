@@ -107,7 +107,7 @@ test("dimensions render in --json when honesty is scored (≥5 definite)", () =>
     const j = JSON.parse(runCli(root, ["--json"]).stdout);
     assert.ok(j.score.honesty != null, "fixture yields a real honesty score");
     assert.ok(j.dimensions, "dimensions present");
-    assert.equal(j.dimensions.coherence, j.score.honesty); // Coherence = Context Honesty
+    assert.equal(j.dimensions.honesty, j.score.honesty); // Honesty dimension = Context Honesty score
     assert.equal(typeof j.dimensions.health, "number");
     assert.ok(["Critical", "Caution", "Healthy"].includes(j.dimensions.rating));
     assert.equal(j.gate, null); // no --strict
@@ -172,6 +172,31 @@ test("dimensions suppressed (<5 definite) → null + no --warn-below breach", ()
   }
 });
 
+test("--triage: gated — needs a TTY (errors in a pipe) and refuses --json", () => {
+  const root = materialize("dirty");
+  try {
+    // the test harness pipes stdio, so stdout/stdin are not TTYs → usage error
+    const r = runCli(root, ["--triage"]);
+    assert.equal(r.code, 2, "non-TTY → exit 2");
+    assert.match(r.stderr, /--triage needs an interactive terminal/);
+    // mutually exclusive with --json (interactive vs machine output)
+    const j = runCli(root, ["--triage", "--json"]);
+    assert.equal(j.code, 2);
+    assert.match(j.stderr, /can't be combined with --json/);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("color: piped output (non-TTY) carries NO ANSI escapes — CI/snapshots stay plain", () => {
+  const root = materialize("dirty");
+  try {
+    assert.doesNotMatch(runCli(root).stdout, /\x1b\[/, "the meters colorize only on a real TTY");
+  } finally {
+    cleanup(root);
+  }
+});
+
 test("exit 3: repo with no context files", () => {
   const root = makeRepo({ "src/a.js": "x\n" });
   try {
@@ -188,7 +213,7 @@ test("clean fixture: no-cry-wolf — 100, 0 false, ~0 dead tokens, exit 0", () =
   try {
     const r = runCli(root);
     assert.equal(r.code, 0);
-    assert.match(r.stdout, /Context Honesty {3}100 · \d+ checkable claims/);
+    assert.match(r.stdout, /↳ Honesty\s+[█░]+\s+100\b/);
     assert.match(r.stdout, /Weight {3}~\d[\d,]* tokens load every turn/);
     assert.match(r.stdout, /0 false claims · 0 stale · ~0 tokens describe code that no longer exists/);
     assert.doesNotMatch(r.stdout, /✗/, "no findings invented on a clean repo");
@@ -202,15 +227,16 @@ test("dirty fixture: the moment — replay-led, top-3, score with denominator", 
   try {
     const r = runCli(root);
     assert.equal(r.code, 0);
-    // replay-led: first ✗ appears before the score line
-    assert.ok(r.stdout.indexOf("✗") < r.stdout.indexOf("Context Honesty"));
+    // meters lead the card (Health hero), then the Hotspots replay
+    assert.ok(r.stdout.indexOf("Health") < r.stdout.indexOf("✗"), "meters lead, hotspots follow");
     const findings = r.stdout.match(/✗/g) ?? [];
-    assert.equal(findings.length, 3, "findings cap at three");
+    assert.equal(findings.length, 3, "all three hotspots shown (uncapped)");
     assert.match(r.stdout, /src\/auth\/oauth\.ts/);
     assert.match(r.stdout, /openWakeWord/);
     assert.match(r.stdout, /tiers/);
     assert.match(r.stdout, /deleted at [0-9a-f]{7}/, "lazy git evidence on the dead path");
-    assert.match(r.stdout, /Context Honesty {3}\d+ · 7 checkable claims · 1 unchecked/);
+    assert.match(r.stdout, /↳ Honesty\s+[█░]+\s+\d+\b/, "Honesty meter renders the score");
+    assert.match(r.stdout, /↳ Coverage\s+[█░]+\s+88\b/, "Coverage 88 reflects 7 checkable · 1 unchecked");
     assert.match(r.stdout, /Weight {3}~\d[\d,]* tokens load every turn/);
     // oauth.ts existed and was deleted -> stale; openWakeWord + tier count
     // were never true -> false. The breakdown line tells them apart.
@@ -289,7 +315,7 @@ test("[path] positional: run from elsewhere against the fixture", () => {
   try {
     const r = runCli(tmpdir(), [root]);
     assert.equal(r.code, 0);
-    assert.match(r.stdout, /Context Honesty {3}100/);
+    assert.match(r.stdout, /↳ Honesty\s+[█░]+\s+100\b/);
   } finally {
     cleanup(root);
   }
@@ -542,10 +568,10 @@ test("score-history (V1.2): delta across runs; no-change; --no-history silent; s
     // run 1: records, no prior → no delta line
     assert.doesNotMatch(runCli(root, [], env).stdout, /since last run/, "first run: no delta");
     // run 2: nothing changed → "no change" (100 vs 100)
-    assert.match(runCli(root, [], env).stdout, /Context Honesty {3}100 .* \(no change since last run\)/, "2nd run, same score");
+    assert.match(runCli(root, [], env).stdout, /↳ Honesty\s+[█░]+\s+100\b.*\(no change since last run\)/, "2nd run, same score");
     // mutate: +1 dead ref → 83 (5 true / 1 false); card shows the drop (83 vs 100)
     writeFileSync(join(root, "CLAUDE.md"), files["CLAUDE.md"] + "Auth is `src/gone.js`.\n");
-    assert.match(runCli(root, [], env).stdout, /Context Honesty {3}83 .* \(▼17 since last run\)/, "3rd run shows the drop");
+    assert.match(runCli(root, [], env).stdout, /↳ Honesty\s+[█░]+\s+83\b.*\(▼17 since last run\)/, "3rd run shows the drop");
     // mutate again: +1 more dead ref → 71 (5/7); --json carries the numeric delta (71 vs 83)
     writeFileSync(join(root, "CLAUDE.md"), files["CLAUDE.md"] + "Auth is `src/gone.js`.\nConfig in `src/gone2.js`.\n");
     const p = JSON.parse(runCli(root, ["--json"], env).stdout);

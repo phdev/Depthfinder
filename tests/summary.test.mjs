@@ -1,4 +1,4 @@
-// 3-dimension Health model (Coherence / Weight / Coverage → composite).
+// 3-dimension Health model (Honesty / Weight / Coverage → composite).
 // Pure-function tests with synthetic signals — deterministic, no live repo.
 // Backfills the dimension math added in the Summary redesign.
 import { test } from "node:test";
@@ -18,20 +18,20 @@ test("computeDimensions: clean signals → all 100, all ok", () => {
     ciGaps: 0,
     missingArtifacts: 0,
   });
-  assert.equal(d.coherence, 100);
+  assert.equal(d.honesty, 100);
   assert.equal(d.weight, 100);
   assert.equal(d.coverage, 100);
   assert.equal(d.healthScore, 100);
-  for (const k of ["coherence", "weight", "coverage"]) assert.equal(d.dimensions[k].sev, "ok");
+  for (const k of ["honesty", "weight", "coverage"]) assert.equal(d.dimensions[k].sev, "ok");
 });
 
-test("computeDimensions: coherence — penalties, caps, clamp", () => {
+test("computeDimensions: honesty — penalties, caps, clamp", () => {
   // each dead code ref = -12
-  assert.equal(computeDimensions({ codeDanglingCount: 6 }).coherence, 28);
+  assert.equal(computeDimensions({ codeDanglingCount: 6 }).honesty, 28);
   // runtime dangling capped at 8 total, dup drift capped at 15
-  assert.equal(computeDimensions({ otherDanglingCount: 100, dupBlocks: 100 }).coherence, 100 - 8 - 15);
+  assert.equal(computeDimensions({ otherDanglingCount: 100, dupBlocks: 100 }).honesty, 100 - 8 - 15);
   // never below 0
-  assert.equal(computeDimensions({ codeDanglingCount: 1000 }).coherence, 0);
+  assert.equal(computeDimensions({ codeDanglingCount: 1000 }).honesty, 0);
 });
 
 test("computeDimensions: weight — budget overage, read-first, no divide-by-zero", () => {
@@ -55,29 +55,29 @@ test("computeDimensions: coverage — rulesInCi, gaps, missing, no divide-by-zer
 });
 
 test("computeDimensions: health is the 0.4/0.3/0.3 weighted composite", () => {
-  // coherence 100, weight 0 (3x over budget), coverage 0 → 0.4*100 = 40
+  // honesty 100, weight 0 (3x over budget), coverage 0 → 0.4*100 = 40
   const d = computeDimensions({ cmTokens: 4000, cmBudget: 1000, rulesInCi: 0, totalRules: 4 });
-  assert.equal(d.coherence, 100);
+  assert.equal(d.honesty, 100);
   assert.equal(d.weight, 0);
   assert.equal(d.coverage, 0);
   assert.equal(d.healthScore, 40);
-  assert.deepEqual(d.healthWeights, { coherence: 0.4, weight: 0.3, coverage: 0.3 });
+  assert.deepEqual(d.healthWeights, { honesty: 0.4, weight: 0.3, coverage: 0.3 });
 });
 
 test("computeDimensions: severity thresholds (<35 high, <70 medium, else ok)", () => {
-  const sevOfCoherence = (code, other) =>
-    computeDimensions({ codeDanglingCount: code, otherDanglingCount: other }).dimensions.coherence.sev;
-  assert.equal(sevOfCoherence(5, 6), "high"); // score 34
-  assert.equal(sevOfCoherence(5, 5), "medium"); // score 35 (boundary)
-  assert.equal(sevOfCoherence(2, 7), "medium"); // score 69
-  assert.equal(sevOfCoherence(2, 6), "ok"); // score 70 (boundary)
+  const sevOfHonesty = (code, other) =>
+    computeDimensions({ codeDanglingCount: code, otherDanglingCount: other }).dimensions.honesty.sev;
+  assert.equal(sevOfHonesty(5, 6), "high"); // score 34
+  assert.equal(sevOfHonesty(5, 5), "medium"); // score 35 (boundary)
+  assert.equal(sevOfHonesty(2, 7), "medium"); // score 69
+  assert.equal(sevOfHonesty(2, 6), "ok"); // score 70 (boundary)
 });
 
 test("computeDimensions: dimensions carry stable labels/keys/tabs", () => {
   const { dimensions } = computeDimensions({});
-  assert.equal(dimensions.coherence.label, "Coherence");
-  assert.equal(dimensions.coherence.key, "coherence");
-  assert.equal(dimensions.coherence.tab, 1);
+  assert.equal(dimensions.honesty.label, "Honesty");
+  assert.equal(dimensions.honesty.key, "honesty");
+  assert.equal(dimensions.honesty.tab, 1);
   assert.equal(dimensions.weight.tab, 2);
   assert.equal(dimensions.coverage.tab, 3);
 });
@@ -87,7 +87,7 @@ test("computeDimensions: no args → defaults, never throws", () => {
   assert.doesNotThrow(() => {
     d = computeDimensions();
   });
-  for (const k of ["coherence", "weight", "coverage", "healthScore"]) assert.equal(typeof d[k], "number");
+  for (const k of ["honesty", "weight", "coverage", "healthScore"]) assert.equal(typeof d[k], "number");
 });
 
 // ── Suggested Action prompts (copy-paste v1) ──
@@ -138,7 +138,7 @@ test("buildActionPrompt: drift (no dimension) → generic verify, still well-for
 test("buildActionPrompt: tolerates a missing detail/action without throwing", () => {
   let p;
   assert.doesNotThrow(() => {
-    p = buildActionPrompt({ title: "Bare issue", tab: 1 }, "Coherence");
+    p = buildActionPrompt({ title: "Bare issue", tab: 1 }, "Honesty");
   });
   assert.match(p, /Bare issue/);
   assert.match(p, /Task:/); // falls back to a generic task line

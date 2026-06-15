@@ -23,13 +23,14 @@ the repo — deterministically, no model calls, nothing leaves the machine.
 npx depthfinder            # scan the current repo; prints the honesty card
 npx depthfinder --json     # structured: score + false/stale claims + dimensions + hotspots
 npx depthfinder --strict   # CI gate: exit 20 if the context has any false claim
+npx depthfinder --triage   # interactive: step through hotspots, hand a fix to claude/codex
 ```
 
-Read the **Context Honesty** score and the **Hotspots** (each false/stale claim
-with a `→ fix:` line). Treat any claim flagged **false** (never matched the
-repo) or **stale** (git proves the target moved or was deleted) as UNRELIABLE:
-verify it against the code before acting, and prefer fixing the doc. Requires
-Node >= 20 and git.
+Read the **Health** meters (**Honesty / Weight / Coverage**) and the **Hotspots**
+(each false/stale claim with a criticality tag and a `→ fix:` line). Treat any
+claim flagged **false** (never matched the repo) or **stale** (git proves the
+target moved or was deleted) as UNRELIABLE: verify it against the code before
+acting, and prefer fixing the doc. Requires Node >= 20 and git.
 
 ## Fix it all (loop)
 

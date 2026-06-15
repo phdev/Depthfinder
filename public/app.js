@@ -921,7 +921,7 @@ async function loadDrift() {
 // ── Panel 0: summary / triage ───────────────────────────────────────────────
 // Faithful port of the Claude Design "Summary" mockup, wired to the real
 // /api/summary contract. Health hero + scroll-reveal score strip + 3 dimension
-// cards (Coherence/Weight/Coverage — the mockup's 4th "Simplicity" is omitted)
+// cards (Honesty/Weight/Coverage — the mockup's 4th "Simplicity" is omitted)
 // + the centerpiece Hotspots table built from the already-ranked `issues`.
 //
 // Honesty note: the mockup's per-row "+N health" badge and per-dimension
@@ -964,7 +964,7 @@ function renderSummary(d) {
   }
 
   const rt = ratingFor(d.healthScore);
-  const dims = ["coherence", "weight", "coverage"].map((k) => d.dimensions[k]).filter(Boolean);
+  const dims = ["honesty", "weight", "coverage"].map((k) => d.dimensions[k]).filter(Boolean);
   const counts = d.counts || { high: 0, medium: 0, low: 0 };
   const issues = Array.isArray(d.issues) ? d.issues : [];
 

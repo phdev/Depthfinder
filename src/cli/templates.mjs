@@ -50,3 +50,25 @@ export function fixHint(claim) {
     .replace("{symbol}", a.symbol ?? "")
     .replace("{actual}", actual);
 }
+
+// Criticality of a rotted claim — how badly a wrong claim of this shape misleads
+// an agent. A dead PATH the agent will try to open is the worst; a wrong COUNT
+// the least. A never-existed path (false) outranks a moved/deleted one (stale):
+// stale leaves a git trail and `--fix` can auto-repoint a rename. Pure; returns
+// one of CRIT / HIGH / MED / LOW — same cut-rule as the templates (no guessed
+// intent, only the claim's oracle + whether git proves it once existed).
+export const CRITICALITY_RANK = { CRIT: 0, HIGH: 1, MED: 2, LOW: 3 };
+export function criticality(claim) {
+  switch (claim.oracle) {
+    case "path":
+      return claim.evidence?.stale ? "HIGH" : "CRIT";
+    case "dependency":
+      return "HIGH";
+    case "symbol":
+      return "MED";
+    case "count":
+      return "LOW";
+    default:
+      return "MED";
+  }
+}

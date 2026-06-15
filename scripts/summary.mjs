@@ -39,8 +39,8 @@ export function computeDimensions({
   const clampS = (n) => Math.max(0, Math.min(100, Math.round(n)));
   const sevOf = (s) => (s < 35 ? "high" : s < 70 ? "medium" : "ok");
 
-  // Coherence — do docs match code? Penalize dead/stale code refs + duplicate drift.
-  const coherence = clampS(
+  // Honesty — do docs match code? Penalize dead/stale code refs + duplicate drift.
+  const honesty = clampS(
     100 - (codeDanglingCount * 12 + Math.min(8, otherDanglingCount) + Math.min(15, dupBlocks * 3)),
   );
   // Weight — how much loads every turn? Penalize over-budget CLAUDE.md + read-first.
@@ -50,18 +50,18 @@ export function computeDimensions({
   const denom = totalRules || 1;
   const coverage = clampS((100 * rulesInCi) / denom - ciGaps * 8 - missingArtifacts * 10);
   // Health — weighted composite (honesty-leaning). Deterministic; documented here.
-  const HEALTH_WEIGHTS = { coherence: 0.4, weight: 0.3, coverage: 0.3 };
+  const HEALTH_WEIGHTS = { honesty: 0.4, weight: 0.3, coverage: 0.3 };
   const healthScore = clampS(
-    HEALTH_WEIGHTS.coherence * coherence +
+    HEALTH_WEIGHTS.honesty * honesty +
       HEALTH_WEIGHTS.weight * weight +
       HEALTH_WEIGHTS.coverage * coverage,
   );
   const dimensions = {
-    coherence: { key: "coherence", label: "Coherence", sub: "How well docs match code", improves: "reliability", score: coherence, sev: sevOf(coherence), tab: 1 },
+    honesty: { key: "honesty", label: "Honesty", sub: "How well docs match code", improves: "reliability", score: honesty, sev: sevOf(honesty), tab: 1 },
     weight: { key: "weight", label: "Weight", sub: "How much loads every turn", improves: "speed & cost", score: weight, sev: sevOf(weight), tab: 2 },
     coverage: { key: "coverage", label: "Coverage", sub: "Rules & evals enforced in CI", improves: "reliability", score: coverage, sev: sevOf(coverage), tab: 3 },
   };
-  return { coherence, weight, coverage, healthScore, healthWeights: HEALTH_WEIGHTS, dimensions };
+  return { honesty, weight, coverage, healthScore, healthWeights: HEALTH_WEIGHTS, dimensions };
 }
 
 // Build a harness-neutral, copy-paste-ready prompt for one hotspot. Plain text
@@ -73,7 +73,7 @@ export function computeDimensions({
 // The dashboard NEVER executes this — it's handed to the user's own harness,
 // which makes the model call under the user's quota and approval. (The in-session
 // MCP-pull surface is the planned next step; this copy-paste prompt is v1.)
-const DIM_LABEL = { 1: "Coherence", 2: "Weight", 3: "Coverage" }; // tab 4 (drift) → no dimension
+const DIM_LABEL = { 1: "Honesty", 2: "Weight", 3: "Coverage" }; // tab 4 (drift) → no dimension
 export function buildActionPrompt(issue, dimLabel = null) {
   const out = [
     "Depthfinder (a deterministic AI-context-honesty scan) flagged this in the repo you're working in:",
@@ -391,9 +391,9 @@ export async function generateSummary() {
   // health gap. If a dimension is already at 100 the gains are 0 — fixing those
   // hotspots projects no gain. This is a forecast (the "+N health" radial), not a
   // constant: it moves with the live dimension scores.
-  const TAB_DIM = { 1: "coherence", 2: "weight", 3: "coverage" }; // tab 4 (drift) is not a dimension
+  const TAB_DIM = { 1: "honesty", 2: "weight", 3: "coverage" }; // tab 4 (drift) is not a dimension
   const SEV_W = { high: 3, medium: 2, low: 1 };
-  for (const dimKey of ["coherence", "weight", "coverage"]) {
+  for (const dimKey of ["honesty", "weight", "coverage"]) {
     const recoverable = healthWeights[dimKey] * (100 - dimensions[dimKey].score);
     const group = issues.filter((i) => TAB_DIM[i.tab] === dimKey);
     const totW = group.reduce((s, i) => s + (SEV_W[i.severity] || 1), 0) || 1;

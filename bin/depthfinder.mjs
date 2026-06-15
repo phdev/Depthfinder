@@ -40,10 +40,11 @@ import { extractSymbolClaims } from "../src/cli/extract/symbol.mjs";
 import { extractCountClaims } from "../src/cli/extract/count.mjs";
 import { evaluateClaims } from "../src/cli/evaluate.mjs";
 import { computeScore, deadTokens, SCORING_SCHEMA } from "../src/cli/score.mjs";
-import { computeCliDimensions, DEFAULT_WEIGHT_BUDGET } from "../src/cli/dimensions.mjs";
+import { computeCliDimensions, computeFixGain, DEFAULT_WEIGHT_BUDGET } from "../src/cli/dimensions.mjs";
 import { repoIdentity, cacheFile, readLast, append } from "../src/cli/history.mjs";
 import { selectFindings } from "../src/cli/select.mjs";
 import { renderCard } from "../src/cli/render.mjs";
+import { runTriage } from "../src/cli/triage.mjs";
 import { buildPayload, writeOut } from "../src/cli/claims.mjs";
 import { firstSegment, resolveRelPosix } from "../src/cli/paths.mjs";
 import { directiveLinks } from "../src/cli/follow.mjs";
@@ -74,18 +75,22 @@ const USAGE = `usage: depthfinder [path] [--json] [--out <dir>] [--no-follow] [-
               threshold is stable across releases.
   --max-false N  allow up to N false Context claims before --strict fails
               (default 0). A non-negative integer; ratchet it down over time.
-  --warn-below N  warn when a Health dimension (Coherence/Weight/Coverage/Health)
+  --warn-below N  warn when a Health dimension (Honesty/Weight/Coverage/Health)
               scores below N (0-100). Advisory by default (stderr, exit 0);
               gating under --strict (a breach fails the build, exit 20).
   --weight-budget N  token budget for the Weight dimension (default ${DEFAULT_WEIGHT_BUDGET});
               a HEURISTIC, not a derived constant — Weight = 100 within budget,
-              penalized above. Coherence (=honesty) and Coverage need no budget.
+              penalized above. Honesty and Coverage need no budget.
   --fix       repoint stale path claims that git proves were RENAMED to their new
               location. DRY-RUN by default (prints the proposed change, writes
               nothing); add --write to apply. Rename-only — deletions and
               fabrications are never auto-fixed. Context tier only.
   --write     with --fix, apply the rename-fixes to your context files — the one
               opt-in write to the scanned repo
+  --triage    INTERACTIVE: step through every hotspot (↑/↓ to move, enter to
+              fix), and hand a chosen fix to your coding harness (claude/codex) —
+              it prints the command and asks before spawning. Needs a real
+              terminal (not CI / a pipe / --json).
   --burn      run a local agent (claude/codex) against the top false claim and
               show what it actually says — opt-in; the ONLY path that calls a
               model. Override the agent with --burn-agent "<cmd>".
@@ -148,13 +153,14 @@ the repo — deterministically, no model calls, nothing leaves the machine.
 npx depthfinder            # scan the current repo; prints the honesty card
 npx depthfinder --json     # structured: score + false/stale claims + dimensions + hotspots
 npx depthfinder --strict   # CI gate: exit 20 if the context has any false claim
+npx depthfinder --triage   # interactive: step through hotspots, hand a fix to claude/codex
 \`\`\`
 
-Read the **Context Honesty** score and the **Hotspots** (each false/stale claim
-with a \`→ fix:\` line). Treat any claim flagged **false** (never matched the
-repo) or **stale** (git proves the target moved or was deleted) as UNRELIABLE:
-verify it against the code before acting, and prefer fixing the doc. Requires
-Node >= 20 and git.
+Read the **Health** meters (**Honesty / Weight / Coverage**) and the **Hotspots**
+(each false/stale claim with a criticality tag and a \`→ fix:\` line). Treat any
+claim flagged **false** (never matched the repo) or **stale** (git proves the
+target moved or was deleted) as UNRELIABLE: verify it against the code before
+acting, and prefer fixing the doc. Requires Node >= 20 and git.
 
 ## Fix it all (loop)
 
@@ -198,6 +204,7 @@ function main() {
         "weight-budget": { type: "string" },
         fix: { type: "boolean" },
         write: { type: "boolean" },
+        triage: { type: "boolean" },
         version: { type: "boolean", short: "v" },
         help: { type: "boolean", short: "h" },
       },
@@ -323,6 +330,20 @@ function run({ values, positionals }) {
       process.exit(2);
     }
     weightBudget = n;
+  }
+
+  // --triage is interactive: it needs a real terminal to draw the selector and
+  // read keystrokes, and it spawns a harness, so it can't be machine-piped.
+  // Gate up front (usage error → exit 2) before any scan work.
+  if (values.triage) {
+    if (values.json) {
+      process.stderr.write(`depthfinder: --triage is interactive and can't be combined with --json\n${USAGE}\n`);
+      process.exit(2);
+    }
+    if (!process.stdin.isTTY || !process.stdout.isTTY) {
+      process.stderr.write(`depthfinder: --triage needs an interactive terminal (it can't run in CI, a pipe, or a non-TTY agent shell)\n`);
+      process.exit(2);
+    }
   }
 
   const startDir = resolve(positionals[0] || ".");
@@ -476,7 +497,9 @@ function run({ values, positionals }) {
 
   // One evaluation pass over both tiers (single check-ignore batch).
   evaluateClaims(claims.concat(docClaims), ctx);
-  const findings = selectFindings(claims);
+  // Uncapped for the card: the user asked to see ALL hotspots. selectFindings
+  // still filters to med+ confidence false claims (low-confidence never accused).
+  const findings = selectFindings(claims, Infinity);
 
   // Lazy git history (path oracle) doubles as stale classification: a false
   // claim whose target verifiably existed — deleted or renamed in history —
@@ -583,7 +606,7 @@ function run({ values, positionals }) {
   const dead = deadTokens(fileParagraphs, claims, tokchars);
   const weight = Math.round(weightChars / 4);
 
-  // CLI Health model (Coherence / Weight / Coverage → composite). Pure transform
+  // CLI Health model (Honesty / Weight / Coverage → composite). Pure transform
   // over data already computed; null when the honesty score is suppressed
   // (< 5 definite) — the same unknown-never-false guard, so no fabricated 0.
   const dimensions = computeCliDimensions({
@@ -595,7 +618,7 @@ function run({ values, positionals }) {
   });
   // --warn-below soft-gate: which dimensions fall below the threshold. Empty
   // unless --warn-below is set AND the dimensions rendered (honesty not suppressed).
-  const DIM_KEYS = ["coherence", "weight", "coverage", "health"];
+  const DIM_KEYS = ["honesty", "weight", "coverage", "health"];
   const breached =
     warnBelow != null && dimensions ? DIM_KEYS.filter((k) => dimensions[k] < warnBelow) : [];
 
@@ -609,7 +632,7 @@ function run({ values, positionals }) {
         unverifiedFiles, degraded,
         warnBelow,
         dimensions: dimensions
-          ? { coherence: dimensions.coherence, weight: dimensions.weight, coverage: dimensions.coverage, health: dimensions.health }
+          ? { honesty: dimensions.honesty, weight: dimensions.weight, coverage: dimensions.coverage, health: dimensions.health }
           : null,
         breached,
         failed:
@@ -672,10 +695,21 @@ function run({ values, positionals }) {
     meta: { skippedLines, warnings, shallowClone: shallow },
   };
 
+  const color = !!process.stdout.isTTY && !process.env.NO_COLOR;
+  if (values.triage) {
+    // Interactive: print the colored card, then step through the hotspots and
+    // hand a chosen fix to the harness. TTY-gated up front, so this never runs
+    // in CI / a pipe / --json. Spawns the harness only after y/N consent.
+    process.stdout.write(redact(renderCard(model, { color })) + "\n");
+    const agent = resolveAgent({ agentCmd: values["burn-agent"] });
+    const gain = computeFixGain({ score, weight, budget: weightBudget });
+    runTriage(findings, { gain, agent, repoRoot: root }).then(() => process.exit(process.exitCode || 0));
+    return;
+  }
   if (values.json) {
     process.stdout.write(JSON.stringify(redactDeep(buildPayload(model)), null, 2) + "\n");
   } else {
-    process.stdout.write(redact(renderCard(model)));
+    process.stdout.write(redact(renderCard(model, { color })));
     process.stdout.write("\n");
   }
 

@@ -28,7 +28,7 @@ inputs:
     required: false
     default: "0"
   warn-below:
-    description: "Also fail if any Health dimension (Coherence/Weight/Coverage/Health) scores below N (0-100). Empty = off."
+    description: "Also fail if any Health dimension (Honesty/Weight/Coverage/Health) scores below N (0-100). Empty = off."
     required: false
     default: ""
   weight-budget:
@@ -42,7 +42,7 @@ inputs:
   version:
     description: "depthfinder npm version to pin. Pinning keeps the gate stable across releases."
     required: false
-    default: "1.2.0"
+    default: "1.3.0"
 runs:
   using: "composite"
   steps:

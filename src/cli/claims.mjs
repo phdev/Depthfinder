@@ -36,7 +36,7 @@ export function buildPayload(model) {
     score: scoreShape(score),
     delta: model.delta ?? null, // Context Honesty change vs the last comparable run (null = first run / suppressed)
     gate: model.gate ?? null, // --strict gate verdict over the Context tier; null unless --strict (consumers read gate.failed)
-    dimensions: model.dimensions ?? null, // Health model (Coherence/Weight/Coverage → composite); null when the honesty score is suppressed
+    dimensions: model.dimensions ?? null, // Health model (Honesty/Weight/Coverage → composite); null when the honesty score is suppressed
     weight: { approxTokens: model.weight, method: "chars/4 over scanned context files — loads every turn" },
     deadTokens: { approx: dead, method: "chars/4 over paragraphs containing ≥1 false path/symbol claim" },
     // Doc tier — the wider repo docs read on demand. Advisory; NEW fields.

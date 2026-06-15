@@ -1,31 +1,32 @@
 
   Scanning CLAUDE.md against 7 tracked files…
 
-  Health 79 · Healthy
-  Coherence 57 · Weight 100 · Coverage 88
+  Health       ████████████████░░░░   79 · Healthy
+    ↳ Honesty  ███████████░░░░░░░░░   57  — share of checkable claims that still hold
+    ↳ Weight   ████████████████████  100  — tokens these files load into the agent every turn
+    ↳ Coverage ██████████████████░░   88  — how much of the context is checkable vs unknown
 
-  Hotspots
+  Hotspots   2 false · 1 stale   ·   fix all → Health 79→96 · Honesty 57→100
 
-  1. ✗ CLAUDE.md:5  "Auth flows live in `src/auth/oauth.ts` (legacy token: «redacted»)."
+  1. [HIGH] ✗ CLAUDE.md:5  "Auth flows live in `src/auth/oauth.ts` (legacy token: «redacted»"
       └ no such tracked file — deleted at fccd7c9, 1 commit ago
       └ an agent following this reference will find nothing at src/auth/oauth.ts, and guess
-      → fix: repoint or remove this path — `npx depthfinder --fix --write` auto-repoints any git-proven rename
+      → fix: repoint or remove this path — `npx depthfinder --fix --write` auto-repoints any git-proven rename   fix gain → Health +6 · Honesty +14
 
-  2. ✗ CLAUDE.md:7  "Wake word handled by `openWakeWord`."
+  2. [HIGH] ✗ CLAUDE.md:7  "Wake word handled by `openWakeWord`."
       └ not in any package.json (checked 1 manifest)
       └ an agent will write code against openWakeWord, which isn't installed
-      → fix: remove the line, or add `openWakeWord` to your dependencies
+      → fix: remove the line, or add `openWakeWord` to your dependencies   fix gain → Health +6 · Honesty +14
 
-  3. ✗ CLAUDE.md:9  "Model routing uses 4 tiers (see `router/config.js`)."
+  3. [LOW] ✗ CLAUDE.md:9  "Model routing uses 4 tiers (see `router/config.js`)."
       └ router/config.js defines 3 tiers, not 4
       └ an agent reasoning about "4 tiers" will plan against a structure that has 3 in `router/config.js`
-      → fix: update the count to 3
+      → fix: update the count to 3   fix gain → Health +6 · Honesty +14
 
-  Context Honesty   57 · 7 checkable claims · 1 unchecked
   Weight   ~77 tokens load every turn
   2 false claims · 1 stale · ~21 tokens describe code that no longer exists
   → the rot tax: your agent acts on those false lines, or stops trusting the file and re-derives ~77 tokens by hand.
 
   Your agent reads all of this as ground truth, every call.
-  npx depthfinder --json for full results
+  npx depthfinder --triage to step through the fixes · --json for full results
 

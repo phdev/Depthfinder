@@ -73,34 +73,63 @@ clean enough to accuse by default. Flip to default-on once the corpus gate runs 
 false. Context-tier FPs the corpus already fixed: nested-monorepo path resolution
 (applies to ALL tiers now) and PascalCase-type-as-dependency rejection.
 
-**Health hero (CLI dimension model, `src/cli/dimensions.mjs`).** The card LEADS
-with a dashboard-style `Health N · <Healthy|Caution|Critical>` hero + a
-`Coherence C · Weight W · Coverage V` line (all 0-100), then the findings, then
-the honesty score. `computeCliDimensions()` is a pure transform over data the CLI
-already computes: **Coherence** = Context Honesty; **Weight** = `clamp(100 −
-over-budget penalty)` vs `--weight-budget` (default `DEFAULT_WEIGHT_BUDGET`, a
-labeled HEURISTIC not a derived constant); **Coverage** = `definite/(definite +
-unknown)` (CLI-native — deliberately DIFFERENT from the dashboard's rules-in-CI
-Coverage); **Health** = `0.4·Coherence + 0.3·Weight + 0.3·Coverage` (matches the
-dashboard's `computeDimensions`). Suppressed as a unit (renders nothing) when the
-honesty score is suppressed (< 5 definite) — the unknown-never-false guard, no
-fabricated 0. **HEADLINE NOTE (reversed invariant, 2026-06-15):** the status word
-comes from the COMPOSITE Health, by explicit user choice for dashboard parity —
-this REVERSED the original "honesty-led headline, no status word" invariant, so a
-low-Context-Honesty repo CAN read `Health 79 · Healthy` (the dirty golden shows
-exactly this). The honesty score line below still tells the unvarnished truth. The
-soft-gate: `--warn-below N` warns (advisory, exit 0) when a dimension < N, and
-GATES (exit 20) under `--strict`; the `gate{}` JSON carries `warnBelow` +
-per-dimension scores + `breached[]`. `dimensions` is an additive `--json` field.
+**Health meters (CLI dimension model, `src/cli/dimensions.mjs`).** The card LEADS
+with a stack of colored meters: the composite **Health** (`Health N · <Healthy|
+Caution|Critical>`) on top, then its three dimensions indented under it with a `↳`
+— **Honesty / Weight / Coverage** (each 0-100, with a one-line description after
+the number). `computeCliDimensions()` is a pure transform over data the CLI already
+computes: **Honesty** = Context Honesty (RENAMED from "Coherence" 2026-06-15 — it
+was always literally the honesty score, so the new name is the accurate one);
+**Weight** = `clamp(100 − over-budget penalty)` vs `--weight-budget` (default
+`DEFAULT_WEIGHT_BUDGET`, a labeled HEURISTIC not a derived constant); **Coverage** =
+`definite/(definite + unknown)` (CLI-native — deliberately DIFFERENT from the
+dashboard's rules-in-CI Coverage); **Health** = `0.4·Honesty + 0.3·Weight +
+0.3·Coverage` (matches the dashboard's `computeDimensions`). The old dedicated
+`Context Honesty N · …` summary line below the hotspots was REMOVED (2026-06-15):
+that number IS the Honesty meter, its since-last-run delta rides that meter line,
+and the unknown count is encoded in Coverage. Suppressed as a unit (renders
+nothing) when the honesty score is suppressed (< 5 definite) — the
+unknown-never-false guard, no fabricated 0.
 
-**Hotspots + fix lines.** Below the hero, the findings render as a numbered
-**Hotspots** list (the existing top-3 by confidence+severity from `select.mjs`),
-each closing with a deterministic **`→ fix:`** line (`fixHint()` in
-`templates.mjs`, same cut-rule as `consequence`: literal slots, no guessed
-intent). The path hint mentions `--fix` GENERICALLY (it auto-repoints only
-git-proven renames) so it never falsely promises a fix for a deletion or
-fabrication. The CLI's hotspots are the **honesty findings only** — the dashboard's
-broader hotspots (weight/coverage/drift) come from generators the CLI lacks.
+**COLOR is TTY-ONLY.** Bars + numbers + criticality tags + fix-gains colorize on a
+4-tier band (`tierOf`: critical <35 / caution <70 / ok <90 / great ≥90, soft
+256-color) ONLY when `renderCard(model, {color})` is told to — bin sets `color =
+process.stdout.isTTY && !process.env.NO_COLOR`. The `color` default is **false**,
+so piped output, tests, and the golden snapshot stay PLAIN bytes. That invariant is
+what keeps the snapshot stable and `--json`/CI clean (a test asserts no ANSI in
+piped output).
+
+**HEADLINE NOTE (reversed invariant, 2026-06-15):** the status word comes from the
+COMPOSITE Health, by explicit user choice for dashboard parity — this REVERSED the
+original "honesty-led headline, no status word" invariant, so a low-Honesty repo
+CAN read `Health 79 · Healthy` (the dirty golden shows exactly this). Soft-gate:
+`--warn-below N` warns (advisory, exit 0) when a dimension < N, GATES (exit 20)
+under `--strict`; `gate{}` carries `warnBelow` + per-dimension scores + `breached[]`.
+`dimensions` is an additive `--json` field — its key is now `honesty` (was
+`coherence`), a JSON-contract change, hence the **1.3.0** minor bump.
+
+**Hotspots + criticality + fix-gains.** Below the meters, ALL findings render
+(UNCAPPED — `selectFindings(claims, Infinity)`, still med+ confidence false claims
+only; low-confidence is never accused). Each opens with a colored **criticality**
+tag (`criticality()` in `templates.mjs`: dead path = `CRIT`, stale path / missing
+dep = `HIGH`, symbol = `MED`, count = `LOW`) and closes with a deterministic
+**`→ fix:`** line (`fixHint()`, same cut-rule as `consequence`: literal slots, no
+guessed intent) carrying the score it RETURNS if fixed — **Health first, then
+Honesty, in green** (`computeFixGain()` in `dimensions.mjs`: the marginal per-fix
+gain per hotspot + the all-fixed target in the Hotspots header). CLI hotspots are
+the **honesty findings only**.
+
+**`--triage` (interactive, `src/cli/triage.mjs`).** A HUMAN runs `npx depthfinder
+--triage` in a real terminal: arrow-key (↑/↓) through the hotspots, Enter to pick
+one, and it hands a targeted fix to the harness on PATH (`resolveAgent` from
+`burn.mjs` — claude, else codex, else `$DEPTHFINDER_BURN_AGENT`). `interactiveArgv()`
+strips the headless subcommand (`-p`/`exec`) so the harness opens an INTERACTIVE
+session in the repo, seeded with a redacted, "don't-invent-a-target" fix prompt
+(`buildFixPrompt()`). Same consent posture as `--burn`: prints the exact command +
+prompt, asks y/N, then `spawn(..., {stdio:'inherit'})`. TTY-GATED in bin (usage
+error exit 2 in CI / a pipe / with `--json`) so it can't wedge a script. Pure pieces
+(`buildFixPrompt`/`interactiveArgv`/`triageRows`) are unit-tested; the raw-mode loop
+takes injectable deps.
 
 Card anatomy below the hero + findings: the `Context Honesty` score line (`N ·
 M checkable claims · K unchecked`); the `Doc Honesty` line (`N · M checkable
@@ -170,7 +199,7 @@ are the tax, surfaced as "the detour is the tax, every session."
   **oracle DEGRADATION** — a fatal `git check-ignore` (which blinds the path oracle,
   turning would-be-false paths into unknown) sets `ctx.degraded`/`gate.degraded` and
   fails the gate. Precedence 2 > 3 > 20 > 0. CI must **pin the version**
-  (`npx depthfinder@1.2.0`) — `--max-false` is only stable against a pinned extractor.
+  (`npx depthfinder@1.3.0`) — `--max-false` is only stable against a pinned extractor.
   Still deferred: the symbol-search-timeout degradation (a NORMAL budget event on
   large repos — failing closed on it would break the gate for every big repo, so it
   needs a per-claim "cut off by the cap" signal, not a run-level flag); plus
@@ -314,8 +343,9 @@ Five tabs, each with a hash route for deep-linking:
 | Drift (Packmind context-evaluator, cached/opt-in) | `#drift` | `scripts/drift-refresh.mjs` |
 
 **Summary Health model.** `scripts/summary.mjs` emits a composite `healthScore`
-(0–100) decomposed into three **deterministic** dimensions: **Coherence** (docs
-match code — from map dangling refs + duplicate drift), **Weight** (load every
+(0–100) decomposed into three **deterministic** dimensions: **Honesty** (docs
+match code — from map dangling refs + duplicate drift; renamed from "Coherence"
+2026-06-15 to match the CLI), **Weight** (load every
 turn — from token budgets), **Coverage** (rules/evals enforced in CI — from the
 coverage matrix), weighted 0.4 / 0.3 / 0.3. The design's 4th dimension
 ("Simplicity") was dropped as non-deterministic. The Summary tab renders a health

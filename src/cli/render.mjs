@@ -1,27 +1,53 @@
 // Terminal card render (design doc "The render" — golden-snapshot locked).
 //
-// Render decisions: a dashboard-style Health hero LEADS the card (Health N +
-// status word + the Coherence/Weight/Coverage line) — a 2026-06-15 product
-// decision that reversed the original "no status word / honesty-led headline"
-// invariant (the user chose dashboard parity with the dishonest-headline tradeoff
-// in view). Below the hero: replay (findings, cap 3), then the Context Honesty
-// score (always shows its denominator), all token figures ~-prefixed, unknown
-// count shown when > 0. The honesty score line stays the source of truth. Below it: the
-// Weight line (what these files load into the agent every turn) and the
-// breakdown line — false (fabricated/never existed) · stale (was true once,
-// git history proves it) · dead tokens. Stream discipline (8A): this module
-// RETURNS strings; bin writes the card to stdout and ALL diagnostics to
-// stderr. Redaction (1A) is applied by the caller at the stream/serializer
-// boundary.
-import { consequence, fixHint } from "./templates.mjs";
+// Render decisions: a dashboard-style Health hero LEADS the card as a stack of
+// colored meters — Health (the composite) on top, then its three contributing
+// dimensions (Honesty / Weight / Coverage) indented under it with a ↳, each
+// with a one-line description and a 4-tier color (critical/caution/ok/great) on
+// the bar + number. This reversed the original "no status word / honesty-led
+// headline" invariant (the user chose dashboard parity with the dishonest-
+// headline tradeoff in view, 2026-06-15). Below the meters: ALL hotspots
+// (uncapped), each tagged with a colored criticality level and the score it
+// returns if fixed (Health first, then Honesty, in green). The old "Context
+// Honesty N · …" summary line was removed (2026-06-15) — that number now lives
+// in the Honesty meter, its delta rides the same line, unknowns are encoded in
+// Coverage. Color is OPT-IN (`{color}`, default off) and applied only when the
+// caller knows stdout is a TTY: piped output, tests, and the golden snapshot
+// stay plain bytes. Stream discipline (8A): this module RETURNS strings; bin
+// writes the card to stdout and ALL diagnostics to stderr. Redaction (1A) is
+// applied by the caller at the stream/serializer boundary.
+import { consequence, fixHint, criticality } from "./templates.mjs";
+import { tierOf, computeFixGain } from "./dimensions.mjs";
 
 const nf = new Intl.NumberFormat("en-US"); // locale-pinned for determinism
 
-export function renderCard(model) {
+// 256-color soft palette (matches the muted product aesthetic). TTY-only.
+const RESET = "\x1b[0m";
+const DIM = "\x1b[2m";
+const c256 = (n) => `\x1b[38;5;${n}m`;
+const TIER_COLOR = { critical: c256(203), caution: c256(215), ok: c256(114), great: c256(84) };
+const CRIT_COLOR = { CRIT: c256(203), HIGH: c256(215), MED: c256(180), LOW: c256(245) };
+const GAIN_COLOR = c256(114); // green — a positive score gain
+const BAR_W = 20;
+
+const pad3 = (n) => String(n).padStart(3);
+
+export function renderCard(model, { color = false } = {}) {
   const {
     scannedFiles, linkedFiles = [], trackedCount, findings, score, docScore, docFiles = [],
     delta, dead, weight, claimsTotal, dimensions,
   } = model;
+  // paint(s, code): wrap in an SGR code when color is on; otherwise identity, so
+  // every test/pipe/snapshot path is byte-for-byte the plain string.
+  const paint = (s, code) => (color && code ? `${code}${s}${RESET}` : s);
+  const bar = (n) => {
+    const v = Math.max(0, Math.min(100, n));
+    const filled = Math.round((v / 100) * BAR_W);
+    return paint("█".repeat(filled), TIER_COLOR[tierOf(v)]) + paint("░".repeat(BAR_W - filled), DIM);
+  };
+  // The score returned by fixing rot (Health-first, green) — null when suppressed.
+  const gain = computeFixGain({ score, weight, budget: dimensions?.budget });
+
   const L = [];
   L.push("");
   const linkNote = linkedFiles.length
@@ -30,29 +56,44 @@ export function renderCard(model) {
   L.push(`  Scanning ${scannedFiles.join(", ")}${linkNote} against ${nf.format(trackedCount)} tracked files…`);
   L.push("");
 
-  // Health hero — dashboard-style headline (explicit product decision 2026-06-15,
-  // reversing the earlier "no status word / honesty-led headline" invariant). The
-  // STATUS WORD comes from the COMPOSITE Health per the user's dashboard-parity
-  // choice: a low-honesty repo CAN read "Healthy" here — the accepted tradeoff —
-  // and the Context Honesty line below still tells the unvarnished truth. Renders
-  // ONLY when the honesty score is scored (dimensions non-null); suppressed below
-  // 5 definite claims, same guard as the score (unknown-never-false).
+  // Health meters — the composite on top, its three dimensions indented under it
+  // (↳) as attributes, each colored by its own value and annotated with what it
+  // means. Renders ONLY when scored (dimensions non-null); suppressed below 5
+  // definite claims, same guard as the score (unknown-never-false).
   if (dimensions) {
-    L.push(`  Health ${dimensions.health} · ${dimensions.rating}`);
-    L.push(`  Coherence ${dimensions.coherence} · Weight ${dimensions.weight} · Coverage ${dimensions.coverage}`);
+    const d = dimensions;
+    L.push(`  ${"Health".padEnd(13)}${bar(d.health)}  ${paint(pad3(d.health), TIER_COLOR[tierOf(d.health)])} · ${paint(d.rating, TIER_COLOR[tierOf(d.health)])}`);
+    const kids = [
+      ["Honesty", d.honesty, "share of checkable claims that still hold", deltaSuffix(delta)],
+      ["Weight", d.weight, "tokens these files load into the agent every turn", ""],
+      ["Coverage", d.coverage, "how much of the context is checkable vs unknown", ""],
+    ];
+    for (const [label, val, desc, suffix] of kids) {
+      L.push(`    ↳ ${label.padEnd(8)} ${bar(val)}  ${paint(pad3(val), TIER_COLOR[tierOf(val)])}  — ${desc}${suffix}`);
+    }
     L.push("");
   }
 
-  // Hotspots — the ranked findings (top-3 by confidence+severity, select.mjs).
-  // Numbered + headed, each closing with a deterministic "→ fix:" line.
+  // Hotspots — ALL the ranked findings (uncapped), each opened by a colored
+  // criticality tag and closed by a "→ fix:" line carrying the score it returns
+  // if fixed (Health first, then Honesty, green). The header carries the
+  // all-fixed target so the per-hotspot gains have a ceiling to read against.
   if (findings.length) {
-    L.push("  Hotspots");
+    const fab = score.falseCount - score.staleCount;
+    let head = "  Hotspots";
+    if (gain) {
+      const counts = `${fab} false · ${score.staleCount} stale`;
+      const allG = `fix all → Health ${gain.all.fromHealth}→${gain.all.toHealth} · Honesty ${gain.all.fromHonesty}→${gain.all.toHonesty}`;
+      head += `   ${counts}   ·   ${paint(allG, GAIN_COLOR)}`;
+    }
+    L.push(head);
     L.push("");
   }
   let hotspotN = 0;
   for (const f of findings) {
     hotspotN++;
-    L.push(`  ${hotspotN}. ✗ ${f.source.file}:${f.source.line}  "${truncate(f.text, 88)}"`);
+    const tag = criticality(f);
+    L.push(`  ${hotspotN}. ${paint(`[${tag}]`, CRIT_COLOR[tag])} ✗ ${f.source.file}:${f.source.line}  "${truncate(f.text, 80)}"`);
     L.push(`      └ ${f.evidence.summary}`);
     if (f.burn && !f.burn.error) {
       // The moment, undeniable: a real agent's words, then the cost. Either it
@@ -60,9 +101,9 @@ export function renderCard(model) {
       // tax — both are the rot tax, and we name whichever happened.
       L.push(`      ▶ ${f.burn.agent} answered (your context, no repo to check):`);
       for (const ln of wrapText(f.burn.output, 60)) L.push(`           ${ln}`);
-      const d = f.burn.detours ?? [];
-      if (d.length)
-        L.push(`      └ it caught the lie — but only after proposing ${d.length} check${d.length === 1 ? "" : "s"} (${d.slice(0, 4).join(", ")}) to route around your line. That detour is the tax, every session.`);
+      const dt = f.burn.detours ?? [];
+      if (dt.length)
+        L.push(`      └ it caught the lie — but only after proposing ${dt.length} check${dt.length === 1 ? "" : "s"} (${dt.slice(0, 4).join(", ")}) to route around your line. That detour is the tax, every session.`);
       else
         L.push(`      └ stated as fact, from a line your repo already contradicts. The tax is the wrong turn it just took.`);
     } else {
@@ -74,32 +115,33 @@ export function renderCard(model) {
         L.push(`      └ actual: ${f.evidence.actual}`);
     }
     const fix = fixHint(f);
-    if (fix) L.push(`      → fix: ${fix}`);
+    if (fix) {
+      let line = `      → fix: ${fix}`;
+      if (gain) line += `   ${paint(`fix gain → Health +${gain.perFix.health} · Honesty +${gain.perFix.honesty}`, GAIN_COLOR)}`;
+      L.push(line);
+    }
     L.push("");
   }
 
-  // Score block (edge matrix from the design doc)
+  // Score states with no headline meter (edge matrix). The normal "Context
+  // Honesty N · …" line was intentionally removed — its number is the Honesty
+  // meter above — but the no-score states still need to say SOMETHING.
   if (claimsTotal === 0) {
     L.push("  No checkable claims found in the scanned context files.");
   } else if (score.definite === 0) {
     L.push(`  ${nf.format(claimsTotal)} claims found, none decidable — see --json for details.`);
   } else if (score.suppressed) {
     L.push(`  Only ${score.definite} checkable claim${score.definite === 1 ? "" : "s"} — score withheld.`);
-  } else {
-    const unchecked = score.unknownCount > 0 ? ` · ${nf.format(score.unknownCount)} unchecked` : "";
-    L.push(`  Context Honesty   ${score.honesty} · ${nf.format(score.definite)} checkable claims${unchecked}${deltaSuffix(delta)}`);
   }
   // Doc Honesty — the wider repo docs the agent reads on demand. Advisory,
-  // separate from the contract score; its dead-refs never touch the line
-  // below. Label padded to align under "Context Honesty".
+  // separate from the contract score; its dead-refs never touch the score above.
   if (docFiles.length > 0 && docScore) {
-    const pad = "Doc Honesty".padEnd("Context Honesty".length);
     const docs = `${nf.format(docFiles.length)} doc${docFiles.length === 1 ? "" : "s"}`;
     if (docScore.honesty === null) {
-      L.push(`  ${pad}   — · ${docs} · too few checkable claims`);
+      L.push(`  Doc Honesty   — · ${docs} · too few checkable claims`);
     } else {
       const refs = docScore.falseCount > 0 ? ` · ${nf.format(docScore.falseCount)} dead ref${docScore.falseCount === 1 ? "" : "s"}` : "";
-      L.push(`  ${pad}   ${docScore.honesty} · ${nf.format(docScore.definite)} checkable claims · ${docs}${refs}`);
+      L.push(`  Doc Honesty   ${docScore.honesty} · ${nf.format(docScore.definite)} checkable claims · ${docs}${refs}`);
     }
   }
   L.push(`  Weight   ~${nf.format(weight)} tokens load every turn`);
@@ -109,19 +151,18 @@ export function renderCard(model) {
   );
   // The rot tax (deterministic, no model call): a false line costs the agent
   // either way — it acts on the lie, or it stops trusting the file and
-  // re-derives the whole Weight by hand. The cost isn't the false tokens, it's
-  // every token the agent can no longer take on faith.
+  // re-derives the whole Weight by hand.
   if (score.falseCount > 0)
     L.push(`  → the rot tax: your agent acts on those false lines, or stops trusting the file and re-derives ~${nf.format(weight)} tokens by hand.`);
   L.push("");
   L.push("  Your agent reads all of this as ground truth, every call.");
-  L.push("  npx depthfinder --json for full results");
+  L.push("  npx depthfinder --triage to step through the fixes · --json for full results");
   L.push("");
   return L.join("\n");
 }
 
-// "since last run" delta on the headline score. Null (first run / suppressed
-// score / --no-history) prints nothing, keeping the card byte-stable in tests.
+// "since last run" delta, now riding the Honesty meter line. Null (first run /
+// suppressed score / --no-history) prints nothing, keeping the card byte-stable.
 function deltaSuffix(delta) {
   if (delta == null) return "";
   if (delta > 0) return `  (▲${delta} since last run)`;

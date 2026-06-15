@@ -1,4 +1,4 @@
-// CLI-native 3-dimension Health model — Coherence / Weight / Coverage → composite.
+// CLI-native 3-dimension Health model — Honesty / Weight / Coverage → composite.
 //
 // Pure + deterministic. Mirrors the dashboard's `computeDimensions` math (same
 // 0.4 / 0.3 / 0.3 weights, same <35 / <70 rating thresholds) so the `npx
@@ -8,10 +8,13 @@
 //
 // Definitions (CLI-native; the Coverage one DIFFERS from the dashboard's
 // "rules-in-CI" on purpose — documented so the divergence is conscious):
-//   Coherence = Context Honesty            (round(100·true/(true+false)))
-//   Weight    = 100 − over-budget penalty  (vs a HEURISTIC budget, configurable)
-//   Coverage  = definite / (definite + unknown)   (how much of the context is checkable)
-//   Health    = 0.4·Coherence + 0.3·Weight + 0.3·Coverage
+//   Honesty  = Context Honesty             (round(100·true/(true+false)))
+//   Weight   = 100 − over-budget penalty   (vs a HEURISTIC budget, configurable)
+//   Coverage = definite / (definite + unknown)   (how much of the context is checkable)
+//   Health   = 0.4·Honesty + 0.3·Weight + 0.3·Coverage
+//
+// (Honesty was formerly named "Coherence"; renamed 2026-06-15 — it was always
+// literally the Context Honesty score, so the new name is the accurate one.)
 //
 // HONESTY DISCIPLINE (unknown-never-false): returns `null` — render nothing —
 // when there is no Context Honesty score (< 5 definite claims). No false 0, no
@@ -19,7 +22,7 @@
 // such in --help and the card), NOT a derived constant — override with
 // --weight-budget.
 
-export const HEALTH_WEIGHTS = { coherence: 0.4, weight: 0.3, coverage: 0.3 };
+export const HEALTH_WEIGHTS = { honesty: 0.4, weight: 0.3, coverage: 0.3 };
 // Heuristic: ~tokens of always-loaded context before it's "heavy". A placeholder,
 // not a derived constant — labeled as such wherever it surfaces, configurable.
 export const DEFAULT_WEIGHT_BUDGET = 10000;
@@ -29,6 +32,11 @@ export const DEFAULT_WEIGHT_BUDGET = 10000;
 // card lead dashboard-style; the prior "no status word / honesty-led headline"
 // invariant was deliberately reversed by the user with the tradeoff in view.
 export const rating = (h) => (h < 35 ? "Critical" : h < 70 ? "Caution" : "Healthy");
+
+// 4-tier band for the colored meters (critical / caution / ok / great). The
+// rating WORD stays 3-tier (above); the bar COLOR is finer-grained so a 72 reads
+// differently from a 96. Pure — the ANSI mapping lives in render.mjs.
+export const tierOf = (n) => (n < 35 ? "critical" : n < 70 ? "caution" : n < 90 ? "ok" : "great");
 
 export function computeCliDimensions({
   honesty = null,
@@ -41,7 +49,7 @@ export function computeCliDimensions({
   if (honesty == null) return null;
   const clamp = (n) => Math.max(0, Math.min(100, Math.round(n)));
 
-  const coherence = clamp(honesty); // = Context Honesty, already 0-100
+  const honestyScore = clamp(honesty); // = Context Honesty, already 0-100
 
   // Weight: 100 within budget; linear penalty above (−50 points per 100% over).
   // Budget guarded against 0 so a misconfigured --weight-budget can't divide.
@@ -57,18 +65,42 @@ export function computeCliDimensions({
   // Health: weighted composite. SECONDARY — never replaces the honesty score as
   // the contract; it is a triage number.
   const health = clamp(
-    HEALTH_WEIGHTS.coherence * coherence +
+    HEALTH_WEIGHTS.honesty * honestyScore +
       HEALTH_WEIGHTS.weight * weightScore +
       HEALTH_WEIGHTS.coverage * coverage,
   );
 
   return {
-    coherence,
+    honesty: honestyScore,
     weight: weightScore,
     coverage,
     health,
     rating: rating(health),
     budget,
     weights: HEALTH_WEIGHTS,
+  };
+}
+
+// Score gain from fixing rotted claims, for the triage annotations. A false
+// claim turning true moves one count from false→true with the definite
+// denominator unchanged (definite = true + false), so Coverage and Weight don't
+// move — only Honesty (and Health through it). Returns:
+//   perFix : the marginal Honesty/Health gain of fixing ONE false claim
+//   all    : the from→to for Honesty and Health if EVERY false claim is fixed
+// null when there's no score (suppressed) or nothing false to fix. Pure.
+export function computeFixGain({ score, weight = 0, budget = DEFAULT_WEIGHT_BUDGET } = {}) {
+  if (!score || score.honesty == null) return null;
+  const T = score.trueCount, F = score.falseCount, D = score.definite, U = score.unknownCount;
+  if (!(D > 0) || !(F > 0)) return null;
+  const at = (hon) => computeCliDimensions({ honesty: hon, definite: D, unknownCount: U, weight, budget });
+  const base = at(score.honesty);
+  const one = at(Math.round((100 * (T + 1)) / D)); // fix exactly one false claim
+  const all = at(100); // every false claim fixed → honesty 100
+  return {
+    perFix: { honesty: one.honesty - base.honesty, health: one.health - base.health },
+    all: {
+      fromHonesty: base.honesty, toHonesty: all.honesty,
+      fromHealth: base.health, toHealth: all.health,
+    },
   };
 }
