@@ -989,8 +989,11 @@ function renderSummary(d) {
     const detail = it.detail
       ? `<div class="de" data-eli10>${escapeHtml(it.detail)}</div>`
       : "";
+    // Each issue carries exactly one `action` string (the summary data contract).
+    // No count badge — a literal "1" would silently lie if `action` ever became a
+    // list. If it does, render the real count here AND swap the da-n "1" below.
     const action = it.action
-      ? `<button class="acts-btn" type="button">Suggested action <span class="ab-n">1</span><span class="ab-arrow">→</span></button>
+      ? `<button class="acts-btn" type="button">Suggested action <span class="ab-arrow">→</span></button>
          <div class="acts-expand"><div class="acts-expand-in"><div class="ae-head">Suggested action</div>
            <div class="ae-act"><span class="da-n">1</span><span>${escapeHtml(it.action)}</span></div></div></div>`
       : "";

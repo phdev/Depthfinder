@@ -335,20 +335,7 @@
   overflow: hidden;
   background: var(--df-panel);
 }
-#panel-summary .df-thead {
-  display: grid;
-  grid-template-columns: var(--cols);
-  align-items: center;
-  gap: 16px;
-  padding: 15px 22px;
-  border-bottom: 1px solid var(--df-line-2);
-  background: var(--df-panel-2);
-  font-size: 10px;
-  color: var(--df-ink-3);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
+/* (dead .df-thead removed — the hotspots table renders no column-header row) */
 #panel-summary .df-trow {
   display: grid;
   grid-template-columns: var(--cols);
