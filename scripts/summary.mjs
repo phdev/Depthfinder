@@ -5,7 +5,7 @@
 // things to resolve — each deep-linked to the tab that proves it. Re-derives
 // from live data, so it never goes stale.
 import { generateMap } from "./context-map.mjs";
-import { readTokens } from "./token-budget.mjs";
+import { generateTokens } from "./token-budget.mjs";
 import { generateCoverage } from "./coverage.mjs";
 import { driftStatus } from "./drift-refresh.mjs";
 import { redactDeep } from "../lib/redact.mjs";
@@ -64,7 +64,11 @@ export function computeDimensions({
 
 export async function generateSummary() {
   const map = generateMap();
-  const tokens = readTokens();
+  // LIVE scan every load (≈0.9s) — never the on-disk token cache, which can go
+  // silently stale (a 9-day-old cache once reported CLAUDE.md at 8× its real size,
+  // dragging Weight 100→23 and Health 83→60). Map + coverage already regenerate
+  // live below; tokens now matches. The dashboard always reflects the live repo.
+  const tokens = await generateTokens();
   const coverage = await generateCoverage();
   const drift = driftStatus();
 

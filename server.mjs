@@ -186,7 +186,10 @@ async function handle(req, res) {
     if (method === "POST" && path === "/api/refresh/tokens") {
       const r = await panelData(
         "./scripts/token-budget.mjs",
-        ["generateCurrents", "writeTokens"],
+        // writeTokens PERSISTS the regenerated cache; the prior first-choice
+        // returned fresh data without ever writing, so the refresh button
+        // silently no-op'd and the cache stayed stale.
+        ["writeTokens"],
         "tokens.json",
         "tokens",
       );

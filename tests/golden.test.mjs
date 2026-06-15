@@ -44,3 +44,17 @@ test("dashboard regression: generateMap + generateCurrents still run", async () 
     cleanup(root);
   }
 });
+
+// Live-repo guarantee: the Summary must regenerate every dimension from the live
+// repo each load, never an on-disk cache that can go silently stale. A 9-day-old
+// token cache once reported CLAUDE.md at 8× its real size (Weight 100→23,
+// Health 83→60). Lock the fix so a future edit can't reintroduce the cache read.
+test("dashboard: summary regenerates tokens LIVE + refresh persists (no stale cache)", () => {
+  const sum = readFileSync(join(HERE, "..", "scripts", "summary.mjs"), "utf8");
+  assert.match(sum, /generateTokens/, "summary must regenerate tokens live via generateTokens()");
+  assert.doesNotMatch(sum, /\breadTokens\b/, "summary must NOT read the token cache — it goes silently stale");
+  const srv = readFileSync(join(HERE, "..", "server.mjs"), "utf8");
+  const refresh = srv.slice(srv.indexOf("/api/refresh/tokens"), srv.indexOf("/api/refresh/tokens") + 260);
+  assert.match(refresh, /writeTokens/, "the refresh-tokens endpoint must persist via writeTokens");
+  assert.doesNotMatch(refresh, /generateCurrents/, "refresh must not call generateCurrents (returns without writing → no-op)");
+});
