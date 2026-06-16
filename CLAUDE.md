@@ -480,6 +480,45 @@ flow-node plain descriptors. Verified in browse: real source/sink values (claude
 node + hotspot highlighting, SPA-embed chrome hidden, and mobile stacking (flow
 column, ribbons hidden) — no console errors.
 
+**Design-ported Drift page ("Drift chain", `public/drift.html`, 2026-06-16).**
+Third Claude Design handoff (`api.anthropic.com/v1/design/h/PZGjAXMm5ZO5subud5Jrzg`,
+`Drift.html`) redesigns the Drift tab as a **5-column chain** —
+Hotspots · Surface · Claims · Target · Resolves — visualizing where docs claim one
+thing and the code says another, plus a **Packmind context-evaluator** install
+section. Built like Context/Tokens: full design page embedded as the SPA Drift tab
+via `<iframe id="driftFrame" src="/drift.html">`; `app.js`'s `loadDrift()`
+early-returns when `#driftFrame` exists (legacy render kept hidden);
+`body.embed-active` now also covers the Drift tab. Files: `drift.html`,
+`evals.css` (the design's `.pc-*` Protection/Drift-chain base styles — also seeds a
+future Evals page), `drift.css` (5-col grid override + `.pkm` Packmind styles), and
+`drift-chain.js` (the wiring). **Wired to REAL data, nothing fabricated:**
+- The chain is built from `/api/map` — each **danglingRef** (`{source, path}`)
+  becomes a Surface→Claim("references X")→Target(X)→Resolves(✕ does not resolve)
+  row (the target→resolve link is a RED "bad" ribbon); each **duplicate edge**
+  (`map.edges` type `duplicates`) becomes a Surface→Claim→Target→Resolves(✕
+  duplicate — should link) row. Empty state shows "✓ no doc↔code drift detected."
+- **Hotspots** column = real `/api/summary` issues, classified by `tab`: tab-1
+  (Honesty) issues that match dangling/duplicate keywords are **drift findings**
+  (linked into the chain — clicking highlights the transitive chain via `chainFrom`);
+  every other issue is **not-a-drift-finding** (rendered italic, detail shows
+  "Not a Drift finding — go to <Token Currents|Protection Chain|Context Map>" with a
+  `target="_parent"` link to `/#tokens`/`/#evals`/`/#context`). For home-center: #3
+  "2 dangling references" + #4 "1 duplicated doc block" are the 2 drift findings;
+  #1 AgentCI→Evals, #2 decisions-log→Tokens, #5 Packmind→not-finding.
+- **Packmind section** = real `/api/drift` (`installed`, `message`,
+  `instructions.{summary,repoUrl,options[]}`): when not installed, renders the 2
+  install cards (Binary / Source) with steps + repo link + a working "Re-check
+  installation" button (re-fetches `/api/drift`); installed/running/result states
+  handled (Run drift → `POST /api/refresh/drift`).
+- Health hero + Dimensions from `/api/summary` (honesty key, coherence fallback);
+  ELI10 toggle (global `df_eli10`) swaps the detail's `descEli`/`whyEli`.
+- Ribbons (`#pcRibbons`) are hidden under the design's `@media(max-width:880px)`
+  (chain stacks to one column on mobile) — at desktop width home-center draws 11
+  ribbons (3 chain rows + 2 hotspot links). Verified in browse: real surfaces
+  (decisions_log.md, gstack_home_center_examples.md), 3 claims/targets/resolves, 11
+  ribbons, drift/not-drift hotspot classification + chain highlight, Packmind 2
+  cards, health 83/Healthy, SPA-embed chrome hidden — no console errors.
+
 **Summary Health model.** `scripts/summary.mjs` emits a composite `healthScore`
 (0–100) decomposed into three **deterministic** dimensions: **Honesty** (docs
 match code — from map dangling refs + duplicate drift; renamed from "Coherence"

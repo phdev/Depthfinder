@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Depthfinder — Drift</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Arimo:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="context-base.css" />
+<link rel="stylesheet" href="context.css" />
+<link rel="stylesheet" href="evals.css?v=1" />
+<link rel="stylesheet" href="drift.css?v=1" />
+</head>
+<body>
+
+<!-- ===== TOP NAV (design's own; the SPA hides its chrome on this tab) ===== -->
+<header class="topnav">
+  <div class="wrap row">
+    <span class="burger"><i></i><i></i><i></i></span>
+    <a class="nav-logo" href="/" target="_parent"><span class="sonar"><i></i><i></i><i></i></span><b>Depthfinder</b></a>
+    <nav class="nav-tabs">
+      <a class="nav-tab" href="/#summary" target="_parent">Summary</a>
+      <a class="nav-tab" href="/#context" target="_parent">Context</a>
+      <a class="nav-tab" href="/#tokens" target="_parent">Tokens</a>
+      <div class="nav-tab on">Drift</div>
+      <a class="nav-tab" href="/#evals" target="_parent">Evals</a>
+    </nav>
+    <span class="nav-spacer"></span>
+    <span class="badge-local">local-only</span>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="head">
+    <h1>Drift</h1>
+    <p class="sub">Where the docs claim one thing and the code says another — dead refs, dangling paths, and duplicated rules that diverge.</p>
+  </section>
+
+  <!-- ===== HEALTH HERO (filled from /api/summary) ===== -->
+  <section class="health">
+    <div class="radial" role="img" aria-label="Overall health">
+      <svg viewBox="0 0 120 120">
+        <circle class="rg-track" cx="60" cy="60" r="52"></circle>
+        <circle class="rg-fill" cx="60" cy="60" r="52"></circle>
+      </svg>
+    </div>
+    <div class="left">
+      <span class="ovl">Health</span>
+      <div class="scoreline">
+        <span class="score tnum">—<span class="den">/ 100</span></span>
+        <span class="rating">—</span>
+      </div>
+      <p class="why">Higher health = more reliable, faster and cheaper AI interactions</p>
+    </div>
+  </section>
+
+  <!-- ===== DIMENSIONS (filled from /api/summary) ===== -->
+  <details class="factors-sec">
+    <summary><span class="factors-t">Dimensions</span><span class="chev-d">›</span></summary>
+  <section class="loadgrid">
+    <div class="lcard">
+      <div class="lc-top"><span class="lc-name">Honesty <span class="lc-sub">How well docs match code</span><span class="lc-improve"><span class="lci-tri">▲</span>Improves reliability</span></span></div>
+      <div class="lc-score"><span class="lc-val tnum">—</span></div>
+    </div>
+    <div class="lcard">
+      <div class="lc-top"><span class="lc-name">Weight <span class="lc-sub">How much loads every turn</span><span class="lc-improve"><span class="lci-tri">▲</span>Improves speed &amp; cost</span></span></div>
+      <div class="lc-score"><span class="lc-val tnum">—</span></div>
+    </div>
+    <div class="lcard">
+      <div class="lc-top"><span class="lc-name">Coverage <span class="lc-sub">Rules and evals enforced in CI</span><span class="lc-improve"><span class="lci-tri">▲</span>Improves reliability</span></span></div>
+      <div class="lc-score"><span class="lc-val tnum">—</span></div>
+    </div>
+  </section>
+  </details>
+
+  <!-- ===== DRIFT CHAIN (filled from /api/map danglingRefs + duplicate edges) ===== -->
+  <div class="chain-wrap">
+  <div class="ev-head">
+    <div><h2>Drift chain</h2></div>
+    <div class="th-right"><label class="eli10-toggle"><input type="checkbox" id="dcEli10" checked><span>ELI10</span></label></div>
+  </div>
+
+  <div class="pchain drift-chain">
+    <svg class="pc-ribbons" id="pcRibbons" preserveAspectRatio="none"></svg>
+    <div class="pc-grid" id="pcGrid">
+      <div class="pc-col pc-col-hs">
+        <aside class="map-hs open pc-hspanel" id="dcHs"></aside>
+        <aside class="pc-detail dc-detail" id="dcDetail"></aside>
+      </div>
+      <div class="pc-col" id="colSurface"><div class="pc-colh">Surface</div></div>
+      <div class="pc-col" id="colClaims"><div class="pc-colh">Claims</div></div>
+      <div class="pc-col" id="colTarget"><div class="pc-colh">Target</div></div>
+      <div class="pc-col" id="colResolves"><div class="pc-colh">Resolves</div></div>
+    </div>
+  </div>
+  </div>
+
+  <!-- ===== PACKMIND CONTEXT-EVALUATOR (filled from /api/drift) ===== -->
+  <div class="pkm-wrap">
+  <div class="ev-head">
+    <div><h2>Packmind context-evaluator</h2></div>
+  </div>
+  <div class="pkm" id="pkmBody"></div>
+  </div>
+
+</main>
+
+<script src="drift-chain.js?v=1"></script>
+</body>
+</html>

@@ -7,13 +7,14 @@
     <link rel="stylesheet" href="/styles.css" />
     <link rel="stylesheet" href="/summary.css" />
     <style>
-      /* Context + Tokens tabs = the FULL design pages (public/context.html,
-         public/tokens.html) in an iframe. On those tabs the SPA chrome is hidden
-         (body.embed-active) so the design's own nav/health/dimensions/ELI10 lead —
-         its nav links target _parent to drive the other SPA tabs. The legacy panel
-         bodies stay in the DOM for app.js's refs but are force-hidden. */
-      #panel-graph, #panel-tokens { padding: 0 !important; }
-      #panel-graph .panel-grid, #panel-tokens .tokens-legacy { display: none !important; }
+      /* Context + Tokens + Drift tabs = the FULL design pages (public/context.html,
+         public/tokens.html, public/drift.html) in an iframe. On those tabs the SPA
+         chrome is hidden (body.embed-active) so the design's own
+         nav/health/dimensions/ELI10 lead — its nav links target _parent to drive the
+         other SPA tabs. The legacy panel bodies stay in the DOM for app.js's refs but
+         are force-hidden. */
+      #panel-graph, #panel-tokens, #panel-drift { padding: 0 !important; }
+      #panel-graph .panel-grid, #panel-tokens .tokens-legacy, #panel-drift .drift-legacy { display: none !important; }
       .ctx-frame { width: 100%; height: 100dvh; border: 0; display: block; background: #000; }
       body.embed-active .topbar, body.embed-active .tabs { display: none !important; }
     </style>
@@ -101,8 +102,13 @@
     </section>
 
     <!-- ── Panel 4: Drift ───────────────────────────────────────────────── -->
+    <!-- The Drift tab now renders the design's "Drift chain" page
+         (public/drift.html) in an embed iframe. The legacy drift body is kept in
+         the DOM (hidden) so app.js refs (#driftBody) stay valid; loadDrift()
+         early-returns when #driftFrame exists. -->
     <section class="panel" id="panel-drift">
-      <div class="placeholder" id="driftBody">Loading…</div>
+      <iframe class="ctx-frame" id="driftFrame" src="/drift.html" title="Drift"></iframe>
+      <div class="drift-legacy"><div class="placeholder" id="driftBody">Loading…</div></div>
     </section>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.2/cytoscape.min.js"></script>

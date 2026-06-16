@@ -83,10 +83,10 @@ function activate(panel) {
     t.classList.toggle("active", t.dataset.panel === panel);
   for (const p of document.querySelectorAll(".panel"))
     p.classList.toggle("active", p.id === `panel-${panel}`);
-  // Context + Tokens tabs = full design pages in an iframe; hide the SPA chrome
-  // there so the design's own nav/health/dimensions are the top of the tab (their
-  // nav links target _parent to drive these SPA tabs).
-  document.body.classList.toggle("embed-active", panel === "graph" || panel === "tokens");
+  // Context + Tokens + Drift tabs = full design pages in an iframe; hide the SPA
+  // chrome there so the design's own nav/health/dimensions are the top of the tab
+  // (their nav links target _parent to drive these SPA tabs).
+  document.body.classList.toggle("embed-active", panel === "graph" || panel === "tokens" || panel === "drift");
   if (!loaded[panel]) {
     loaded[panel] = true;
     if (panel === "summary") loadSummary();
@@ -927,6 +927,10 @@ async function pollDrift() {
 }
 
 async function loadDrift() {
+  // The Drift tab renders the design's "Drift chain" page via an iframe
+  // (#driftFrame); skip the legacy render. The old #driftBody stays in the DOM
+  // (hidden) so the rest of app.js's element refs keep working.
+  if (document.getElementById("driftFrame")) return;
   renderDrift(await (await fetch("/api/drift")).json());
 }
 
