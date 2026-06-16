@@ -204,6 +204,9 @@ a{color:inherit;text-decoration:none;}
 }
 .health .radial{flex:0 0 auto;width:54px;height:54px;align-self:center;margin-left:4px;}
 .health .radial svg{width:100%;height:100%;transform:rotate(-90deg);}
+/* the ring stroke (r 52 + width 20) extends ~2px past the 120 viewBox — let the
+   radials draw outside it so they aren't clipped at the top of each page */
+.health .radial svg,.snav-radial svg,.nmh-radial svg,.if-radial svg{overflow:visible;}
 .health .radial .rg-track{fill:none;stroke:var(--panel-3);stroke-width:20;}
 .health .radial .rg-fill{fill:none;stroke:var(--amber);stroke-width:20;stroke-linecap:butt;
   stroke-dasharray:326.7;stroke-dashoffset:186.2;filter:drop-shadow(0 0 6px rgba(255,177,59,.4));}
