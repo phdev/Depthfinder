@@ -676,11 +676,47 @@
 }
 #panel-summary .embed-block[open] > summary.subhead::before { transform: rotate(90deg); }
 #panel-summary .embed-block > summary.subhead:hover { color: var(--df-ink-2); }
+
+/* container holds the loading skeleton (shown until the embedded view renders)
+   stacked under the iframe, which fades in once its content is drawn. --emb-h
+   (set per section inline) reserves the view's expected height so the skeleton
+   is the same size as the content — no layout jump when it loads. */
+#panel-summary .embed-wrap { position: relative; min-height: var(--emb-h, 420px); }
+#panel-summary .embed-skeleton {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--df-ink-3);
+  font-size: 13px;
+  background: linear-gradient(100deg, rgba(255, 255, 255, 0.015) 30%, rgba(255, 255, 255, 0.05) 50%, rgba(255, 255, 255, 0.015) 70%);
+  background-size: 220% 100%;
+  animation: embShimmer 1.3s linear infinite;
+  transition: opacity 0.3s ease;
+}
+@keyframes embShimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+#panel-summary .embed-spin {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  border-top-color: var(--df-ink-2);
+  border-radius: 50%;
+  animation: dfspin 0.8s linear infinite;
+}
 #panel-summary .embed-frame {
   width: 100%;
-  min-height: 180px;
+  min-height: var(--emb-h, 420px);
   border: none;
   border-radius: 12px;
   background: #000;
   display: block;
+  opacity: 0;
+  transition: opacity 0.35s ease;
 }
+#panel-summary .embed-block.loaded .embed-wrap { min-height: 0; }
+#panel-summary .embed-block.loaded .embed-frame { opacity: 1; min-height: 0; }
+#panel-summary .embed-block.loaded .embed-skeleton { opacity: 0; visibility: hidden; }

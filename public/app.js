@@ -1156,19 +1156,31 @@ function renderSummary(d) {
     <section class="embeds" id="dfEmbeds">
       <details class="embed-block" open>
         <summary class="subhead">Context Map</summary>
-        <iframe class="embed-frame" data-page="/context.html" title="Context Map" scrolling="no"></iframe>
+        <div class="embed-wrap" style="--emb-h:980px">
+          <div class="embed-skeleton" aria-hidden="true"><span class="embed-spin"></span><span class="embed-lab">Loading Context Map…</span></div>
+          <iframe class="embed-frame" data-page="/context.html" title="Context Map" scrolling="no"></iframe>
+        </div>
       </details>
       <details class="embed-block" open>
         <summary class="subhead">Token Currents</summary>
-        <iframe class="embed-frame" data-page="/tokens.html" title="Token Currents" scrolling="no"></iframe>
+        <div class="embed-wrap" style="--emb-h:580px">
+          <div class="embed-skeleton" aria-hidden="true"><span class="embed-spin"></span><span class="embed-lab">Loading Token Currents…</span></div>
+          <iframe class="embed-frame" data-page="/tokens.html" title="Token Currents" scrolling="no"></iframe>
+        </div>
       </details>
       <details class="embed-block" open>
         <summary class="subhead">Drift Chain</summary>
-        <iframe class="embed-frame" data-page="/drift.html" data-params="section=chain" title="Drift Chain" scrolling="no"></iframe>
+        <div class="embed-wrap" style="--emb-h:600px">
+          <div class="embed-skeleton" aria-hidden="true"><span class="embed-spin"></span><span class="embed-lab">Loading Drift Chain…</span></div>
+          <iframe class="embed-frame" data-page="/drift.html" data-params="section=chain" title="Drift Chain" scrolling="no"></iframe>
+        </div>
       </details>
       <details class="embed-block" open>
         <summary class="subhead">Protection Chain</summary>
-        <iframe class="embed-frame" data-page="/evals.html" title="Protection Chain" scrolling="no"></iframe>
+        <div class="embed-wrap" style="--emb-h:760px">
+          <div class="embed-skeleton" aria-hidden="true"><span class="embed-spin"></span><span class="embed-lab">Loading Protection Chain…</span></div>
+          <iframe class="embed-frame" data-page="/evals.html" title="Protection Chain" scrolling="no"></iframe>
+        </div>
       </details>
     </section>
   </div>`;
@@ -1196,36 +1208,83 @@ function wireSummary(root) {
       coll.setAttribute("aria-expanded", String(!c));
     });
 
-  // embedded views: load each design page with ?embed=1 and auto-fit the iframe
-  // height to its (same-origin) content. The retries cover late layout/ribbon
-  // draws inside the chains.
+  // Embedded views (Context Map / Token Currents / Drift Chain / Protection
+  // Chain): each iframes a design page with ?embed=1. To stay fast we LAZY-load
+  // each one as its block nears the viewport (so the Summary is interactive
+  // immediately instead of blocking on four heavy pages), show a loading skeleton
+  // until the embedded view's content actually renders, then auto-fit height.
   const fitFrame = (f) => {
     try {
       const d = f.contentDocument;
       if (!d || !d.body) return;
       const h = Math.max(d.body.scrollHeight, d.documentElement.scrollHeight);
       if (h > 0) f.style.height = h + "px";
+      // reveal once the embedded view has actually drawn its nodes (the chains
+      // render async after their API fetch — revealing on the iframe 'load' event
+      // alone would flash an empty frame). Fallback: any real height after settle.
+      const block = f.closest(".embed-block");
+      if (block && !block.classList.contains("loaded") && (d.querySelector(".pc-node, .flow-node, .gnode") || h > 240))
+        block.classList.add("loaded");
     } catch (e) {}
   };
-  root.querySelectorAll(".embed-frame").forEach((f) => {
-    if (!f.dataset.page || f.src) return;
-    f.addEventListener("load", () => {
-      fitFrame(f);
-      [250, 800, 1600].forEach((t) => setTimeout(() => fitFrame(f), t));
-      // The embedded chains render async (fetch → build → ribbon draw), so a
-      // ResizeObserver keeps the iframe sized to its content as it grows, rather
-      // than relying on fixed timers alone.
-      try {
-        const d = f.contentDocument;
-        if (d && window.ResizeObserver) {
-          const ro = new ResizeObserver(() => fitFrame(f));
-          ro.observe(d.body);
-          ro.observe(d.documentElement);
-        }
-      } catch (e) {}
-    });
-    f.src = f.dataset.page + "?embed=1" + (f.dataset.params ? "&" + f.dataset.params : "");
-  });
+  const attachRO = (f) => {
+    try {
+      const d = f.contentDocument;
+      if (d && window.ResizeObserver) {
+        const ro = new ResizeObserver(() => fitFrame(f));
+        ro.observe(d.body);
+        ro.observe(d.documentElement);
+      }
+    } catch (e) {}
+  };
+  // Throttle the loads. Iframes share the parent's main thread, so loading four
+  // heavy pages at once thrashes it (each chain runs a layout/ribbon pass; the
+  // Context Map runs a force layout). Cap concurrency at 2 — much less contention
+  // than the old all-at-once, while still finishing quickly — and reveal each as
+  // soon as its content draws. A timeout keeps a slow frame from stalling the rest.
+  const queue = [];
+  const MAX_CONCURRENT = 2;
+  let loadingCount = 0;
+  const pump = () => {
+    while (loadingCount < MAX_CONCURRENT && queue.length) {
+      const f = queue.shift();
+      if (!f || f.src) continue;
+      loadingCount++;
+      let advanced = false;
+      const next = () => { if (advanced) return; advanced = true; loadingCount--; pump(); };
+      const block = f.closest(".embed-block");
+      f.addEventListener("load", () => {
+        fitFrame(f);
+        [200, 600, 1400, 2600].forEach((t) => setTimeout(() => fitFrame(f), t));
+        setTimeout(() => { if (block) block.classList.add("loaded"); }, 4000); // safety reveal
+        attachRO(f);
+        setTimeout(next, 250); // brief head start before pulling the next frame
+      });
+      setTimeout(next, 3000); // never let a stuck frame block the queue
+      f.src = f.dataset.page + "?embed=1" + (f.dataset.params ? "&" + f.dataset.params : "");
+    }
+  };
+  const enqueue = (f) => { if (!f || f.src || queue.indexOf(f) >= 0) return; queue.push(f); pump(); };
+  const frames = [].slice.call(root.querySelectorAll(".embed-frame"));
+  if (window.IntersectionObserver) {
+    const io = new IntersectionObserver(
+      (entries, obs) => {
+        entries.forEach((en) => {
+          if (!en.isIntersecting) return;
+          enqueue(en.target.querySelector(".embed-frame"));
+          obs.unobserve(en.target);
+        });
+      },
+      { rootMargin: "400px 0px" },
+    );
+    frames.forEach((f) => { const w = f.closest(".embed-wrap"); if (w) io.observe(w); });
+  } else {
+    frames.forEach(enqueue); // no IO support → still serialized, just all queued
+  }
+  // also queue on expand, in case a collapsed block is opened above the fold
+  root.querySelectorAll(".embed-block").forEach((b) =>
+    b.addEventListener("toggle", () => { if (b.open) enqueue(b.querySelector(".embed-frame")); }),
+  );
   if (!window.__embFitWired) {
     window.__embFitWired = true;
     let rt;

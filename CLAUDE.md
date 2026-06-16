@@ -592,6 +592,20 @@ Context Map 997px/113 nodes, Token Currents 585px, Drift 596px, Protection 755px
 collapse/expand. The embedded views stay fully interactive and their `target="_parent"`
 cross-links drive the SPA tabs.
 
+*Loading perf + skeletons (2026-06-16):* each `.embed-wrap` holds an `.embed-skeleton`
+(spinner + label + shimmer) shown until the embedded view's content actually draws
+(`fitFrame` reveals on `.pc-node/.flow-node/.gnode` present or height>240, RO-driven +
+a 4s safety) — the iframe is `opacity:0` until its block gets `.loaded`. The container
+is the **same size as the view**: each block sets `--emb-h` inline (980/580/600/760px)
+so the skeleton reserves the view's height — no layout jump on reveal. Loads are
+**throttled to 2 concurrent** via a queue (iframes share the parent's main thread; the
+old all-4-at-once thrashed it) and gated by an IntersectionObserver. Biggest raw win:
+`context-graph.js` `layout()` now **caches its deterministic force-layout** in
+`sessionStorage` (`df_ctxlo_v1_<n>_<hash>`, keyed by node ids + token sizes; bump the
+`v1` if the algorithm changes) — re-renders (the embed, the Context tab, refreshes)
+skip the ~1300-iteration pass and restore positions instantly. Cache-hit reload
+produces the identical viewBox (verified). Script cache-bust `context-graph.js?v=15`.
+
 **Summary Health model.** `scripts/summary.mjs` emits a composite `healthScore`
 (0–100) decomposed into three **deterministic** dimensions: **Honesty** (docs
 match code — from map dangling refs + duplicate drift; renamed from "Coherence"

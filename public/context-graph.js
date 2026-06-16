@@ -124,6 +124,20 @@
   var GAP = 22; // minimum clear space between any two node circles (label room)
   function layout() {
     var area = { w: 1180, h: 820 }; W = area.w; H = area.h;
+    // The layout is deterministic (fixed seed), so cache the computed positions in
+    // sessionStorage — re-renders (the Summary embed, the Context tab, refreshes)
+    // then skip the heavy ~1300-iteration force + de-overlap pass. Keyed by the
+    // node set + token sizes (+ a version, bump if the algorithm changes).
+    var ckey = "df_ctxlo_v1_" + nodes.length + "_";
+    (function () { var h = 0, s = nodes.map(function (n) { return n.id + ":" + (n.tokens || 0); }).join(","); for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; ckey += h; })();
+    try {
+      var cached = JSON.parse(sessionStorage.getItem(ckey) || "null");
+      if (cached && cached.p && Object.keys(cached.p).length === nodes.length) {
+        nodes.forEach(function (n) { var p = cached.p[n.id]; if (p) { n.x = p[0]; n.y = p[1]; } });
+        baseVB = cached.vb;
+        return;
+      }
+    } catch (e) {}
     var cx = area.w / 2, cy = area.h / 2, R = Math.min(area.w, area.h) * 0.32;
     var order = ["core", "design", "code", "ci", "mem", "flags", "bottom"], seeds = {};
     order.forEach(function (c, i) { var a = (i / order.length) * Math.PI * 2; seeds[c] = [cx + R * Math.cos(a), cy + R * Math.sin(a)]; });
@@ -170,6 +184,7 @@
     // scales this to fill the area, so the node cloud renders as large as it can.
     var pad = 50;
     baseVB = { x: minX - pad, y: minY - pad, w: (maxX - minX) + pad * 2, h: (maxY - minY) + pad * 2 };
+    try { var pp = {}; nodes.forEach(function (n) { pp[n.id] = [Math.round(n.x * 10) / 10, Math.round(n.y * 10) / 10]; }); sessionStorage.setItem(ckey, JSON.stringify({ p: pp, vb: baseVB })); } catch (e) {}
   }
 
   // ── render ──
