@@ -401,7 +401,16 @@ clutter, 78→35; the label shows in the inspect panel on click), and the top-ho
 auto-select was REMOVED so the full spaced graph shows on load (it had zoomed into
 one cluster and dimmed the rest). home-center: 113 nodes → 0 overlaps, ~19px min-gap,
 readable. `context.html` cache-busts the script (`context-graph.js?v=N`) so reloads
-pick up layout changes. The
+pick up layout changes. **Spread/fill refinements (2026-06-16):** the SVG was
+inset `left:372px` to clear the sidebar — changed to full-width (`inset:0`) so the
+map spans the WHOLE container and the hotspots panel/detail OVERLAY it (request:
+"canvas extends across the entire container"); GAP raised to 22; after de-overlap
+the cloud is X-stretched to `TARGET_AR 1.7` (stretching X only grows gaps → no new
+overlap) so it fills the now-wide canvas and gives the horizontal labels room;
+labels truncated to 20 chars (full name in the inspect panel on click); and
+`setDefaultView()` zooms to a READABLE floor (scale ≥ 0.85 — measured off the live
+SVG px) instead of fitting every node tiny, centred on the cloud (pan / zoom-out
+for the periphery). The
 legacy Cytoscape grid is KEPT in the DOM but force-hidden
 (`#panel-graph .panel-grid{display:none!important}` — its `display:grid` beat the
 `hidden` attr), so every app.js element ref (`#cy`, `#refreshMap`, …) stays valid;

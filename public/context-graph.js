@@ -95,13 +95,29 @@
     render();
     wireInteractions();
     fillRail(map);
+    setDefaultView();
+  }
+
+  // Default to a READABLE zoom rather than fitting every node (which made them
+  // tiny). If the whole cloud already renders at a legible scale, keep the fit;
+  // otherwise zoom to the readable floor centred on the cloud and let the user
+  // pan / zoom-out to reach the periphery.
+  function setDefaultView() {
+    var rect = svg.getBoundingClientRect(), px = rect.width, py = rect.height;
+    if (!px || !py) return;
+    var fitScale = Math.min(px / baseVB.w, py / baseVB.h), minScale = 0.85;
+    if (fitScale >= minScale) return;
+    var ccx = baseVB.x + baseVB.w / 2, ccy = baseVB.y + baseVB.h / 2, vbw = px / minScale, vbh = py / minScale;
+    baseVB = { x: ccx - vbw / 2, y: ccy - vbh / 2, w: vbw, h: vbh };
+    curVB = { x: baseVB.x, y: baseVB.y, w: baseVB.w, h: baseVB.h };
+    svg.setAttribute("viewBox", baseVB.x + " " + baseVB.y + " " + baseVB.w + " " + baseVB.h);
   }
 
   // ── force layout — tuned for REAL data (the design's hand-assigned clusters
   // aren't available, so spacing comes from stronger repulsion + a hard collision
   // pass + free spread, then the viewBox is fitted to the result so nothing is
   // cramped or clipped). Deterministic jitter → stable across reloads.
-  var GAP = 13; // minimum clear space between any two node circles
+  var GAP = 22; // minimum clear space between any two node circles (label room)
   function layout() {
     var area = { w: 1180, h: 820 }; W = area.w; H = area.h;
     var cx = area.w / 2, cy = area.h / 2, R = Math.min(area.w, area.h) * 0.32;
@@ -136,6 +152,14 @@
       }
       if (!any) break;
     }
+    // Widen the cloud to ~the container's landscape aspect so it FILLS the (now
+    // full-width) canvas and the horizontal labels get more room. Stretching X
+    // only grows gaps, so it can't introduce new overlaps.
+    var sxs = nodes.map(function (n) { return n.x; }), sys = nodes.map(function (n) { return n.y; });
+    var bcx = (Math.min.apply(null, sxs) + Math.max.apply(null, sxs)) / 2;
+    var curAR = (Math.max.apply(null, sxs) - Math.min.apply(null, sxs)) / ((Math.max.apply(null, sys) - Math.min.apply(null, sys)) || 1);
+    var TARGET_AR = 1.7;
+    if (curAR < TARGET_AR) { var sxf = TARGET_AR / curAR; nodes.forEach(function (n) { n.x = bcx + (n.x - bcx) * sxf; }); }
     var xs = nodes.map(function (n) { return n.x; }), ys = nodes.map(function (n) { return n.y; });
     var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs), minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
     // Tight fit (no aspect forcing) — the SVG's preserveAspectRatio="xMidYMid meet"
@@ -161,7 +185,10 @@
       c.style.setProperty("--nc", TYPE[n.type].c);
       if (!single) {
         var fs = Math.max(8.5, Math.min(12, n.r * 0.62));
-        var t = el("text", { x: n.x, y: n.y + n.r + 11, "text-anchor": "middle", "font-size": fs }); t.textContent = n.label;
+        var t = el("text", { x: n.x, y: n.y + n.r + 11, "text-anchor": "middle", "font-size": fs });
+        // truncate long filenames so labels don't collide (full name in the
+        // inspect panel on click)
+        t.textContent = n.label.length > 20 ? n.label.slice(0, 19) + "…" : n.label;
         g.appendChild(c); g.appendChild(t);
       } else {
         // deg≤1 → dot only (no label) to cut text clutter; the label shows in the
