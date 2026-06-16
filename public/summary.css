@@ -643,3 +643,44 @@
     text-transform: none;
   }
 }
+
+/* ── Embedded views ───────────────────────────────────────────────────────
+   Context Map / Token Currents / Drift Chain / Protection Chain. Each is a
+   collapsible <details> that iframes its design page with ?embed=1 (html.embed
+   strips that page's nav/health/dimensions to leave just the view; app.js
+   auto-fits the iframe height). The subheads mirror the Hotspots collapse
+   header so these read as the same kind of section. */
+#panel-summary .embeds { display: flex; flex-direction: column; gap: 4px; margin-top: 34px; }
+#panel-summary .embed-block { border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 24px; margin-top: 10px; }
+#panel-summary .embed-block:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+#panel-summary .embed-block > summary.subhead {
+  font-family: inherit;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #838d9a;
+  cursor: pointer;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+}
+#panel-summary .embed-block > summary.subhead::-webkit-details-marker { display: none; }
+#panel-summary .embed-block > summary.subhead::before {
+  content: "\203a";
+  font-size: 20px;
+  color: var(--df-ink-3);
+  transition: transform 0.2s ease;
+  display: inline-block;
+}
+#panel-summary .embed-block[open] > summary.subhead::before { transform: rotate(90deg); }
+#panel-summary .embed-block > summary.subhead:hover { color: var(--df-ink-2); }
+#panel-summary .embed-frame {
+  width: 100%;
+  min-height: 180px;
+  border: none;
+  border-radius: 12px;
+  background: #000;
+  display: block;
+}

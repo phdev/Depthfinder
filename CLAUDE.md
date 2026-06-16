@@ -570,6 +570,28 @@ fabricated** — from `/api/coverage`:
   satisfied rule highlights the whole in-CI cluster — inherent to the shared sink +
   transitive `chainFrom`, and matches the design.
 
+**Summary embedded views (2026-06-16).** Below the Hotspots table the Summary tab
+now has four collapsible subheaders — **Context Map · Token Currents · Drift Chain ·
+Protection Chain** — each a `<details class="embed-block">` (styled to match the
+Hotspots collapse header) whose body is an `<iframe class="embed-frame">` that loads
+the corresponding design page with **`?embed=1`** (Drift also `&section=chain`). The
+pages already ship an embed-detection script
+(`location.search` has `embed` → `documentElement.classList.add("embed")` +
+`data-section`) and `context-base.css`'s `html.embed` rules strip that page's
+nav/health/dimensions/title/inner-subhead, leaving just the view; `drift.css`'s
+`html[data-section="chain"] .pkm-wrap{display:none}` drops Packmind. (context.html
+already had the script; added it to tokens/drift/evals.html.) `app.js`'s
+`wireSummary()` builds each iframe `src` and auto-fits its height to the (same-origin)
+content via `fitFrame` + timed retries AND a **ResizeObserver** on the iframe body —
+the observer is essential because the embedded chains render async (fetch → build →
+ribbon draw), so fixed timers alone left them stuck at `min-height`. Iframes load
+**eagerly** (NOT `loading="lazy"` — lazy made below-fold frames load at unpredictable
+times vs the fit timers). Styles live in `public/summary.css`
+(`#panel-summary .embeds/.embed-block/.embed-frame`, scoped). Verified in browse:
+Context Map 997px/113 nodes, Token Currents 585px, Drift 596px, Protection 755px, all
+collapse/expand. The embedded views stay fully interactive and their `target="_parent"`
+cross-links drive the SPA tabs.
+
 **Summary Health model.** `scripts/summary.mjs` emits a composite `healthScore`
 (0–100) decomposed into three **deterministic** dimensions: **Honesty** (docs
 match code — from map dangling refs + duplicate drift; renamed from "Coherence"

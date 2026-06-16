@@ -1149,6 +1149,28 @@ function renderSummary(d) {
       </div>
       <div class="df-table" id="dfTable">${tableInner}</div>
     </section>
+
+    <!-- Embedded views: each collapsible block iframes a design page with
+         ?embed=1 (html.embed strips that page's nav/health/dimensions to show
+         just the view). Drift passes section=chain to drop its Packmind block. -->
+    <section class="embeds" id="dfEmbeds">
+      <details class="embed-block" open>
+        <summary class="subhead">Context Map</summary>
+        <iframe class="embed-frame" data-page="/context.html" title="Context Map" scrolling="no"></iframe>
+      </details>
+      <details class="embed-block" open>
+        <summary class="subhead">Token Currents</summary>
+        <iframe class="embed-frame" data-page="/tokens.html" title="Token Currents" scrolling="no"></iframe>
+      </details>
+      <details class="embed-block" open>
+        <summary class="subhead">Drift Chain</summary>
+        <iframe class="embed-frame" data-page="/drift.html" data-params="section=chain" title="Drift Chain" scrolling="no"></iframe>
+      </details>
+      <details class="embed-block" open>
+        <summary class="subhead">Protection Chain</summary>
+        <iframe class="embed-frame" data-page="/evals.html" title="Protection Chain" scrolling="no"></iframe>
+      </details>
+    </section>
   </div>`;
 
   wireSummary(body);
@@ -1173,6 +1195,45 @@ function wireSummary(root) {
       const c = tsec.classList.toggle("collapsed");
       coll.setAttribute("aria-expanded", String(!c));
     });
+
+  // embedded views: load each design page with ?embed=1 and auto-fit the iframe
+  // height to its (same-origin) content. The retries cover late layout/ribbon
+  // draws inside the chains.
+  const fitFrame = (f) => {
+    try {
+      const d = f.contentDocument;
+      if (!d || !d.body) return;
+      const h = Math.max(d.body.scrollHeight, d.documentElement.scrollHeight);
+      if (h > 0) f.style.height = h + "px";
+    } catch (e) {}
+  };
+  root.querySelectorAll(".embed-frame").forEach((f) => {
+    if (!f.dataset.page || f.src) return;
+    f.addEventListener("load", () => {
+      fitFrame(f);
+      [250, 800, 1600].forEach((t) => setTimeout(() => fitFrame(f), t));
+      // The embedded chains render async (fetch → build → ribbon draw), so a
+      // ResizeObserver keeps the iframe sized to its content as it grows, rather
+      // than relying on fixed timers alone.
+      try {
+        const d = f.contentDocument;
+        if (d && window.ResizeObserver) {
+          const ro = new ResizeObserver(() => fitFrame(f));
+          ro.observe(d.body);
+          ro.observe(d.documentElement);
+        }
+      } catch (e) {}
+    });
+    f.src = f.dataset.page + "?embed=1" + (f.dataset.params ? "&" + f.dataset.params : "");
+  });
+  if (!window.__embFitWired) {
+    window.__embFitWired = true;
+    let rt;
+    window.addEventListener("resize", () => {
+      clearTimeout(rt);
+      rt = setTimeout(() => document.querySelectorAll(".embed-frame").forEach(fitFrame), 200);
+    });
+  }
 
   // inline Suggested-action expand (one open at a time)
   const table = root.querySelector("#dfTable");
