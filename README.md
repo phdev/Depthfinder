@@ -307,7 +307,7 @@ opt into LAN). See `CLAUDE.md` for its architecture and invariants.
 ## Development
 
 ```bash
-npm test               # 35 tests: precision gate, golden card, boundary…
+npm test               # 141 tests: precision gate, golden card, boundary…
 npm run bench          # per-phase timings + local 5s tripwire
 npm run corpus         # manual external-repo run (pre-tag ritual)
 npm run snapshot:update  # re-approve the golden card after render changes
