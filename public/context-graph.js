@@ -350,6 +350,8 @@
   function ratingCls(s) { return s < 35 ? "crit" : s < 70 ? "cau" : "good"; }
   function fillSummary(s) {
     var H2 = Math.round(s.healthScore != null ? s.healthScore : 0);
+    var hEl = document.querySelector(".health");
+    if (hEl) { hEl.classList.remove("rt-crit", "rt-caution", "rt-healthy"); hEl.classList.add(H2 < 35 ? "rt-crit" : H2 < 70 ? "rt-caution" : "rt-healthy"); }
     var hs = document.querySelector(".health .score"); if (hs) hs.innerHTML = H2 + '<span class="den">/ 100</span>';
     var rt = document.querySelector(".health .rating"); if (rt) { rt.textContent = ratingWord(H2); rt.className = "rating " + ratingCls(H2); }
     var fill = document.querySelector(".health .rg-fill"); if (fill) { var c = 2 * Math.PI * 52; fill.style.strokeDasharray = (H2 / 100 * c).toFixed(1) + " " + c.toFixed(1); }

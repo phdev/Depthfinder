@@ -39,6 +39,8 @@
   // ── Health hero + Dimensions, from /api/summary ──
   function fillSummary(s) {
     var H = Math.round(s.healthScore != null ? s.healthScore : 0);
+    var hEl = document.querySelector(".health");
+    if (hEl) { hEl.classList.remove("rt-crit", "rt-caution", "rt-healthy"); hEl.classList.add(H < 35 ? "rt-crit" : H < 70 ? "rt-caution" : "rt-healthy"); }
     var hs = document.querySelector(".health .score");
     if (hs) hs.innerHTML = H + '<span class="den">/ 100</span>';
     var rt = document.querySelector(".health .rating");

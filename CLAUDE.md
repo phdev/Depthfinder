@@ -606,6 +606,18 @@ old all-4-at-once thrashed it) and gated by an IntersectionObserver. Biggest raw
 skip the ~1300-iteration pass and restore positions instantly. Cache-hit reload
 produces the identical viewBox (verified). Script cache-bust `context-graph.js?v=15`.
 
+**Health/dimension card colors on the design pages (2026-06-16).** The Health hero +
+dimension cards on Context/Tokens/Drift/Evals showed the wrong colors vs the Summary
+(amber radial/score even when Healthy; "good" rating gray; no green for sev-ok) because
+`context-base.css` hardcodes the radial + score to `--amber` and colors `.rating.good`
+as `--ink`. Fixed to match the Summary's tier coloring: each page's `fillSummary` now
+adds `rt-crit`/`rt-caution`/`rt-healthy` on `.health` (by score: <35/<70/else), and
+`context-base.css` has tier-specific overrides (`.health.rt-healthy .rg-fill{stroke:var(--pos)}`
+etc. — more specific than the mono defaults, so they win) plus `.lcard.sev-ok .lc-val{color:var(--pos)}`.
+Result: green (`--pos` #3fd09a) for Healthy/good, amber for Caution/medium, red for
+Critical/high — identical to the Summary. Cache-bust: context-graph.js?v=16,
+tokens-flow/drift-chain/evals-chain.js?v=2.
+
 **Summary Health model.** `scripts/summary.mjs` emits a composite `healthScore`
 (0–100) decomposed into three **deterministic** dimensions: **Honesty** (docs
 match code — from map dangling refs + duplicate drift; renamed from "Coherence"
