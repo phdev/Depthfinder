@@ -271,6 +271,11 @@
       var curEli = $("curEli10");
       if (curEli) { eli = curEli.checked; curEli.addEventListener("change", function () { eli = curEli.checked; applyEli(); }); }
       applyEli();
+      // tell the embedding Summary the view has rendered (so it can drop the skeleton)
+      var dfReady = function () { try { if (window.parent && window.parent !== window) window.parent.postMessage({ type: "df-embed-ready" }, location.origin); } catch (e) {} };
+      dfReady(); // fire immediately (microtask priority, not a throttled timer)
+      requestAnimationFrame(function () { requestAnimationFrame(dfReady); });
+      setTimeout(dfReady, 600);
     });
     // mobile burger (design parity)
     var burger = document.querySelector(".burger"), navTabs = document.querySelector(".nav-tabs");

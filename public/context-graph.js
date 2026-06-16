@@ -69,6 +69,11 @@
       buildHotspots(res[1] || {});
       fillFindings(res[0]);
       wireRailToggle();
+      // tell the embedding Summary the view has rendered (so it can drop the skeleton)
+      var dfReady = function () { try { if (window.parent && window.parent !== window) window.parent.postMessage({ type: "df-embed-ready" }, location.origin); } catch (e) {} };
+      dfReady(); // fire immediately (microtask priority, not a throttled timer)
+      requestAnimationFrame(function () { requestAnimationFrame(dfReady); });
+      setTimeout(dfReady, 600);
     })
     .catch(function (e) {
       var box = document.getElementById("sxInspect");

@@ -593,18 +593,28 @@ collapse/expand. The embedded views stay fully interactive and their `target="_p
 cross-links drive the SPA tabs.
 
 *Loading perf + skeletons (2026-06-16):* each `.embed-wrap` holds an `.embed-skeleton`
-(spinner + label + shimmer) shown until the embedded view's content actually draws
-(`fitFrame` reveals on `.pc-node/.flow-node/.gnode` present or height>240, RO-driven +
-a 4s safety) — the iframe is `opacity:0` until its block gets `.loaded`. The container
-is the **same size as the view**: each block sets `--emb-h` inline (980/580/600/760px)
-so the skeleton reserves the view's height — no layout jump on reveal. Loads are
-**throttled to 2 concurrent** via a queue (iframes share the parent's main thread; the
-old all-4-at-once thrashed it) and gated by an IntersectionObserver. Biggest raw win:
-`context-graph.js` `layout()` now **caches its deterministic force-layout** in
+(spinner + label + shimmer); the iframe is `opacity:0` until its block gets `.loaded`.
+Loads are **throttled to 2 concurrent** via a queue (iframes share the parent's main
+thread; the old all-4-at-once thrashed it), gated by an IntersectionObserver. Biggest
+raw win: `context-graph.js` `layout()` **caches its deterministic force-layout** in
 `sessionStorage` (`df_ctxlo_v1_<n>_<hash>`, keyed by node ids + token sizes; bump the
-`v1` if the algorithm changes) — re-renders (the embed, the Context tab, refreshes)
-skip the ~1300-iteration pass and restore positions instantly. Cache-hit reload
-produces the identical viewBox (verified). Script cache-bust `context-graph.js?v=15`.
+`v1` if the algorithm changes) — re-renders skip the ~1300-iteration pass and restore
+positions instantly (cache-hit reload = identical viewBox).
+
+*Reveal-when-ready + exact same-size placeholders (2026-06-16 fix):* two issues — the
+skeleton revealed too early (on first node) and its size (hardcoded 980/580/600/760)
+didn't match the loaded view. Fixed: (1) each embedded page posts
+**`postMessage({type:"df-embed-ready"})`** to its parent the moment its view finishes
+rendering — SYNCHRONOUSLY at the end of the boot `.then` (microtask priority, immune to
+the timer throttling that delays a backgrounded tab) plus a rAF + 600ms re-post. The
+Summary's `message` listener reveals that block, measures the EXACT content height,
+sizes the iframe to it, and **caches it in `localStorage` (`df_embh_<page>`)**. A
+height-settle poll (`watchReady`: reveal once `scrollHeight` is unchanged across two
+ticks AND nodes exist, ~14s safety) is the fallback. (2) `--emb-h` (the placeholder's
+reserved height) is set per block from that cache via `embH(page)`, so after the first
+load the skeleton is the **exact same size as the view** — verified 997/585/596/755 px
+reserved == loaded, no jump; defaults updated to those measured values for first load.
+Cache-bust: `app.js?v=4`, `context-graph.js?v=18`, the three chains `?v=4`.
 
 **Health/dimension card colors on the design pages (2026-06-16).** The Health hero +
 dimension cards on Context/Tokens/Drift/Evals showed the wrong colors vs the Summary

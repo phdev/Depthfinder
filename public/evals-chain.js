@@ -262,6 +262,11 @@
       applyEli();
       setTimeout(function () { if (window.__pcFirst) { selected = window.__pcFirst; apply(); } else draw(null); }, 80);
       setTimeout(function () { apply(); }, 260);
+      // tell the embedding Summary the view has rendered (so it can drop the skeleton)
+      var dfReady = function () { try { if (window.parent && window.parent !== window) window.parent.postMessage({ type: "df-embed-ready" }, location.origin); } catch (e) {} };
+      dfReady(); // fire immediately (microtask priority, not a throttled timer)
+      requestAnimationFrame(function () { requestAnimationFrame(dfReady); });
+      setTimeout(dfReady, 600);
     });
     var burger = document.querySelector(".burger"), navTabs = document.querySelector(".nav-tabs");
     if (burger && navTabs) burger.addEventListener("click", function () { var o = navTabs.classList.toggle("open"); burger.classList.toggle("is-open", o); });

@@ -1156,28 +1156,28 @@ function renderSummary(d) {
     <section class="embeds" id="dfEmbeds">
       <details class="embed-block" open>
         <summary class="subhead">Context Map</summary>
-        <div class="embed-wrap" style="--emb-h:980px">
+        <div class="embed-wrap" style="--emb-h:997px">
           <div class="embed-skeleton" aria-hidden="true"><span class="embed-spin"></span><span class="embed-lab">Loading Context Map…</span></div>
           <iframe class="embed-frame" data-page="/context.html" title="Context Map" scrolling="no"></iframe>
         </div>
       </details>
       <details class="embed-block" open>
         <summary class="subhead">Token Currents</summary>
-        <div class="embed-wrap" style="--emb-h:580px">
+        <div class="embed-wrap" style="--emb-h:585px">
           <div class="embed-skeleton" aria-hidden="true"><span class="embed-spin"></span><span class="embed-lab">Loading Token Currents…</span></div>
           <iframe class="embed-frame" data-page="/tokens.html" title="Token Currents" scrolling="no"></iframe>
         </div>
       </details>
       <details class="embed-block" open>
         <summary class="subhead">Drift Chain</summary>
-        <div class="embed-wrap" style="--emb-h:600px">
+        <div class="embed-wrap" style="--emb-h:596px">
           <div class="embed-skeleton" aria-hidden="true"><span class="embed-spin"></span><span class="embed-lab">Loading Drift Chain…</span></div>
           <iframe class="embed-frame" data-page="/drift.html" data-params="section=chain" title="Drift Chain" scrolling="no"></iframe>
         </div>
       </details>
       <details class="embed-block" open>
         <summary class="subhead">Protection Chain</summary>
-        <div class="embed-wrap" style="--emb-h:760px">
+        <div class="embed-wrap" style="--emb-h:755px">
           <div class="embed-skeleton" aria-hidden="true"><span class="embed-spin"></span><span class="embed-lab">Loading Protection Chain…</span></div>
           <iframe class="embed-frame" data-page="/evals.html" title="Protection Chain" scrolling="no"></iframe>
         </div>
@@ -1213,18 +1213,20 @@ function wireSummary(root) {
   // each one as its block nears the viewport (so the Summary is interactive
   // immediately instead of blocking on four heavy pages), show a loading skeleton
   // until the embedded view's content actually renders, then auto-fit height.
+  // Reserve each placeholder at the view's CACHED height (measured on a prior
+  // load), so the skeleton is the SAME size as the loaded view — no jump on
+  // reveal. First time, fall back to a per-view default. Persisted per page.
+  const EMBED_DEF_H = { "/context.html": 997, "/tokens.html": 585, "/drift.html": 596, "/evals.html": 755 };
+  const embH = (page) => { try { const v = +localStorage.getItem("df_embh_" + page); if (v > 80) return v; } catch (e) {} return EMBED_DEF_H[page] || 420; };
+  root.querySelectorAll(".embed-frame").forEach((f) => { const w = f.closest(".embed-wrap"); if (w) w.style.setProperty("--emb-h", embH(f.dataset.page) + "px"); });
+
+  // size the iframe to its (same-origin) content — no reveal here
   const fitFrame = (f) => {
     try {
       const d = f.contentDocument;
       if (!d || !d.body) return;
       const h = Math.max(d.body.scrollHeight, d.documentElement.scrollHeight);
       if (h > 0) f.style.height = h + "px";
-      // reveal once the embedded view has actually drawn its nodes (the chains
-      // render async after their API fetch — revealing on the iframe 'load' event
-      // alone would flash an empty frame). Fallback: any real height after settle.
-      const block = f.closest(".embed-block");
-      if (block && !block.classList.contains("loaded") && (d.querySelector(".pc-node, .flow-node, .gnode") || h > 240))
-        block.classList.add("loaded");
     } catch (e) {}
   };
   const attachRO = (f) => {
@@ -1236,6 +1238,36 @@ function wireSummary(root) {
         ro.observe(d.documentElement);
       }
     } catch (e) {}
+  };
+  // Keep the loading skeleton until the embedded view is FULLY rendered: poll
+  // until its content height has SETTLED (unchanged across two ticks) AND its
+  // nodes exist. The chains render async (fetch → build → ribbon draw), so
+  // revealing on the iframe 'load' event or the first node flashes a half-drawn
+  // frame. On reveal, size to the exact height and cache it so next time the
+  // placeholder is the same size as the view.
+  const watchReady = (f) => {
+    const block = f.closest(".embed-block");
+    let lastH = -1, ticks = 0;
+    const tick = () => {
+      if (block && block.classList.contains("loaded")) return;
+      ticks++;
+      let d = null;
+      try { d = f.contentDocument; } catch (e) {}
+      if (d && d.body) {
+        const h = Math.max(d.body.scrollHeight, d.documentElement.scrollHeight);
+        if (h > 0) f.style.height = h + "px";
+        const settled = h > 80 && h === lastH && d.querySelector(".pc-node, .flow-node, .gnode");
+        lastH = h;
+        if (settled) {
+          if (block) block.classList.add("loaded");
+          try { localStorage.setItem("df_embh_" + f.dataset.page, String(h)); } catch (e) {}
+          return;
+        }
+      }
+      if (ticks > 40) { if (block) block.classList.add("loaded"); return; } // ~14s safety
+      setTimeout(tick, 350);
+    };
+    setTimeout(tick, 250);
   };
   // Throttle the loads. Iframes share the parent's main thread, so loading four
   // heavy pages at once thrashes it (each chain runs a layout/ribbon pass; the
@@ -1252,12 +1284,9 @@ function wireSummary(root) {
       loadingCount++;
       let advanced = false;
       const next = () => { if (advanced) return; advanced = true; loadingCount--; pump(); };
-      const block = f.closest(".embed-block");
       f.addEventListener("load", () => {
-        fitFrame(f);
-        [200, 600, 1400, 2600].forEach((t) => setTimeout(() => fitFrame(f), t));
-        setTimeout(() => { if (block) block.classList.add("loaded"); }, 4000); // safety reveal
         attachRO(f);
+        watchReady(f); // reveals only once the view is fully drawn (+ caches its height)
         setTimeout(next, 250); // brief head start before pulling the next frame
       });
       setTimeout(next, 3000); // never let a stuck frame block the queue
@@ -1291,6 +1320,22 @@ function wireSummary(root) {
     window.addEventListener("resize", () => {
       clearTimeout(rt);
       rt = setTimeout(() => document.querySelectorAll(".embed-frame").forEach(fitFrame), 200);
+    });
+    // Definitive reveal: each embedded page posts "df-embed-ready" once its view
+    // has fully rendered. We measure the exact height, size + cache it, and reveal
+    // — independent of the poll (which can be throttled on a backgrounded tab).
+    window.addEventListener("message", (e) => {
+      if (e.origin !== location.origin || !e.data || e.data.type !== "df-embed-ready") return;
+      document.querySelectorAll(".embed-frame").forEach((f) => {
+        if (f.contentWindow !== e.source) return;
+        try {
+          const d = f.contentDocument;
+          const h = Math.max(d.body.scrollHeight, d.documentElement.scrollHeight);
+          if (h > 80) { f.style.height = h + "px"; localStorage.setItem("df_embh_" + f.dataset.page, String(h)); }
+        } catch (err) {}
+        const block = f.closest(".embed-block");
+        if (block) block.classList.add("loaded");
+      });
     });
   }
 
