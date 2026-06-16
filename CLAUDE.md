@@ -651,6 +651,18 @@ pointed at `/etc` etc.; activate only accepts already-registered roots. Still, o
 LAN-exposed instance a trusted-LAN user can switch among the user's home projects —
 consistent with the existing "local-only / trusted-LAN" posture but a real widening.
 
+**Shared sticky score subnav on the design pages (2026-06-16).** Context/Tokens/
+Drift/Evals now show the **same scroll-revealed scores strip as the Summary** —
+Health + Honesty/Weight/Coverage radials inline + rating + ELI10. `public/subnav.js`
+is a self-contained shared script (like `project-nav.js`): it skips under
+`html.embed` (so the Summary's embedded views don't get it), removes the design's
+original `.subnav` (the Health-only "+`-expand" one), injects a `.dfx-subnav` strip
+(scoped CSS — its own `.dfx-subnav .snav-*` rules using context-base.css tokens, so
+no clash with the global `.snav-*`), fetches `/api/summary` to fill it, and reveals
+it on `window.scrollY > 80` (lower than the Summary's 210 because the design pages
+scroll less). Loaded by all 4 design pages (`subnav.js?v=2`). Verified: Context shows
+Health 83 / Honesty 95 / Weight 100 / Coverage 51 (amber) on scroll, matching Summary.
+
 **Summary Health model.** `scripts/summary.mjs` emits a composite `healthScore`
 (0–100) decomposed into three **deterministic** dimensions: **Honesty** (docs
 match code — from map dangling refs + duplicate drift; renamed from "Coherence"
