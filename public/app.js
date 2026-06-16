@@ -1033,7 +1033,8 @@ function renderSummary(d) {
     const badge = ISSUE_BADGE[it.severity] || "low";
     const badgeTxt = ISSUE_BADGE_TXT[it.severity] || "Low";
     const rowCls = ISSUE_ROW[it.severity] || "r-blue";
-    const tabName = TAB_PANEL[it.tab] ? PANEL_TO_HASH[TAB_PANEL[it.tab]] : null;
+    const tabHash = TAB_PANEL[it.tab] ? PANEL_TO_HASH[TAB_PANEL[it.tab]] : null;
+    const tabName = tabHash ? tabHash.charAt(0).toUpperCase() + tabHash.slice(1) : null; // Context, Tokens, …
     const link = tabName
       ? `<span class="nm-link" data-tab="${it.tab}">${escapeHtml(tabName)}<span class="nl-arrow">→</span></span>`
       : "";
@@ -1099,10 +1100,18 @@ function renderSummary(d) {
         + `<span class="nmh-radial">${radialSvg((100 * hg) / maxHG, 9, "nmh-track", "nmh-fill")}</span>`
         + `<span class="nmh-n">+${hg}</span><span class="nmh-lab">health</span></span>`
       : "";
+    // dimension-improvement radial: how much this hotspot's dimension recovers
+    // (Honesty/Weight/Coverage). Projected, same forecast as the health gain.
+    const dg = it.dimGain || 0;
+    const dim = dg > 0 && it.dimLabel
+      ? `<span class="nm-health nm-dim" title="projected: +${dg} ${it.dimLabel}">`
+        + `<span class="nmh-radial">${radialSvg(dg, 9, "nmh-track", "nmh-fill")}</span>`
+        + `<span class="nmh-n">+${dg}</span><span class="nmh-lab">${escapeHtml(it.dimLabel)}</span></span>`
+      : "";
     return `<div class="df-trow ${rowCls}">
       <div class="hs"><div class="nm">
         <div class="nm-r1"><span class="num tnum">${i + 1}</span><span class="nm-t">${escapeHtml(it.title)}</span></div>
-        <div class="nm-r2"><span class="sev-badge ${badge}">${badgeTxt}</span>${health}${link}</div>
+        <div class="nm-r2"><span class="sev-badge ${badge}">${badgeTxt}</span>${health}${dim}${link}</div>
       </div>${detail}${action}</div>
     </div>`;
   };

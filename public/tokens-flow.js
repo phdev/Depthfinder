@@ -200,6 +200,7 @@
       '<div class="ins-name">' + esc(it.name) + "</div>" +
       '<div class="ins-sevhealth"><span class="sev-badge ' + (it.sev === "high" ? "high" : "med") + '">' + (it.sev === "high" ? "High" : "Medium") + "</span>" +
       (hv ? '<span class="nm-health"><span class="nmh-radial"><svg viewBox="0 0 36 36"><circle class="t" cx="18" cy="18" r="15.5"></circle><circle class="f" cx="18" cy="18" r="15.5" stroke-dasharray="' + dash + ' 97.39"></circle></svg></span>+' + hv + ' <span class="nmh-lab">health</span></span>' : "") +
+      (it.dimGain ? '<span class="nm-health nm-dim"><span class="nmh-radial"><svg viewBox="0 0 36 36"><circle class="t" cx="18" cy="18" r="15.5"></circle><circle class="f" cx="18" cy="18" r="15.5" stroke-dasharray="' + (Math.min(100, it.dimGain) / 100 * C).toFixed(2) + ' 97.39"></circle></svg></span>+' + it.dimGain + ' <span class="nmh-lab">' + esc(it.dimLabel) + '</span></span>' : "") +
       "</div>" +
       (desc ? '<div class="ins-note" style="border-top:none;padding-top:4px;margin-top:8px;">' + esc(desc) + "</div>" : "") +
       dim + acts;
@@ -218,6 +219,7 @@
         sev: h.severity === "high" ? "high" : "med",
         detail: h.detail || "", action: h.action || "",
         healthGain: h.healthGain || 0, tab: h.tab, dim: DIMLABEL[h.tab] || "",
+        dimGain: h.dimGain || 0, dimLabel: h.dimLabel || "",
         cur: hotspotCurrents(h),
       };
     });

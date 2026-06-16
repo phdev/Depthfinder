@@ -138,6 +138,7 @@
       GOTO[id] = c.drift ? null : c.goto;
       det(id, {
         name: it.title || "Hotspot " + (i + 1), sev: sev, health: it.healthGain ? "▲" + it.healthGain : "",
+        dimGain: it.dimGain || 0, dimLabel: it.dimLabel || "",
         desc: it.detail || "", descEli: ELI_BY_TAB[it.tab] || "Cleaning this up keeps the agent's context honest.",
         whyLab: c.drift ? "Drift finding" : "Not a Drift finding", why: it.action || "", whyEli: it.action || "",
         acts: it.action ? [it.action] : [], notFinding: !c.drift, gotoName: c.goto,
@@ -204,7 +205,8 @@
       gotoHtml +
       '<div class="ins-name">' + esc(it.name) + "</div>" +
       '<div class="ins-sevhealth"><span class="sev-badge ' + sevCls + '">' + sevTxt + "</span>" +
-      (it.health ? '<span class="nm-health"><span class="nmh-radial"><svg viewBox="0 0 36 36"><circle class="t" cx="18" cy="18" r="15.5"></circle><circle class="f" cx="18" cy="18" r="15.5" stroke-dasharray="' + (Math.min(100, hv) / 100 * C).toFixed(2) + ' 97.39"></circle></svg></span>' + esc(it.health) + ' <span class="nmh-lab">health</span></span>' : "") + "</div>" +
+      (it.health ? '<span class="nm-health"><span class="nmh-radial"><svg viewBox="0 0 36 36"><circle class="t" cx="18" cy="18" r="15.5"></circle><circle class="f" cx="18" cy="18" r="15.5" stroke-dasharray="' + (Math.min(100, hv) / 100 * C).toFixed(2) + ' 97.39"></circle></svg></span>' + esc(it.health) + ' <span class="nmh-lab">health</span></span>' : "") +
+      (it.dimGain ? '<span class="nm-health nm-dim"><span class="nmh-radial"><svg viewBox="0 0 36 36"><circle class="t" cx="18" cy="18" r="15.5"></circle><circle class="f" cx="18" cy="18" r="15.5" stroke-dasharray="' + (Math.min(100, it.dimGain) / 100 * C).toFixed(2) + ' 97.39"></circle></svg></span>+' + it.dimGain + ' <span class="nmh-lab">' + esc(it.dimLabel) + '</span></span>' : "") + "</div>" +
       (desc ? '<div class="ins-note" style="border-top:none;padding-top:4px;margin-top:8px;">' + esc(desc) + "</div>" : "") +
       (!it.notFinding && why ? '<div class="ins-why"><span class="iw-lab">' + esc(it.whyLab || "Why") + "</span>" + esc(why) + "</div>" : "") +
       acts;

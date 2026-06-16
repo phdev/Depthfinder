@@ -397,7 +397,14 @@ export async function generateSummary() {
     const recoverable = healthWeights[dimKey] * (100 - dimensions[dimKey].score);
     const group = issues.filter((i) => TAB_DIM[i.tab] === dimKey);
     const totW = group.reduce((s, i) => s + (SEV_W[i.severity] || 1), 0) || 1;
-    for (const i of group) i.healthGain = Math.round((recoverable * (SEV_W[i.severity] || 1)) / totW);
+    for (const i of group) {
+      i.healthGain = Math.round((recoverable * (SEV_W[i.severity] || 1)) / totW);
+      // the dimension's own projected improvement: health = weight·dim, so the
+      // dimension recovers healthGain / weight points (the same forecast, decomposed).
+      i.dimKey = dimKey;
+      i.dimLabel = dimensions[dimKey].label;
+      i.dimGain = Math.min(100, Math.round(i.healthGain / healthWeights[dimKey]));
+    }
   }
   for (const i of issues) if (i.healthGain == null) i.healthGain = 0;
   const maxHealthGain = Math.max(1, ...issues.map((i) => i.healthGain));
