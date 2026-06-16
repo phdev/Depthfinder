@@ -354,6 +354,28 @@ Five tabs, each with a hash route for deep-linking:
 | Evals (rule × test × in-CI matrix + live AgentCI gate) | `#evals` | `scripts/coverage.mjs` |
 | Drift (Packmind context-evaluator, cached/opt-in) | `#drift` | `scripts/drift-refresh.mjs` |
 
+**Design-ported Context page (`public/context.html`, 2026-06-16).** A handoff from
+Claude Design (claude.ai/design — the bundle's `Simplicity.html`, renamed "Context"
+in-UI) redesigned the Context tab: a Health hero + collapsible Dimensions cards + a
+force-directed **Context Map** + a Hotspots table. Built as a STANDALONE page at
+`/context.html` (decoupled from the SPA's 59KB `app.js`), **wired to REAL scan
+data**: `public/context-graph.js` is the design's custom SVG force engine (ported
+from the bundle's `simplicity-graph.js`) but fetches `/api/map` (the SAME generator
+the Cytoscape tab uses — its 12 node / 7 edge types already match the design's
+legend, so the adapter is a thin `agent_instruction→ai` type→key map) + `/api/summary`
+(Health + Honesty/Weight/Coverage), instead of the prototype's hardcoded home-center
+surface list. `public/context-base.css` + `public/context.css` are the design's CSS
+(dark monochrome, Arimo/JetBrains-Mono; node-type grays in `--nt-*`). **DONE this
+pass** (verified rendering on home-center, Health 83, no console errors): the 113-node
+graph + select/fan/inspect/filter/pan/zoom + deterministic layout, the Health hero,
+Dimensions cards, and the left-rail stats + type-legend — all from live data. **STILL
+TODO** (richer-hotspots increment): the Hotspots table + per-hotspot mini-maps + the
+collapsible map sidebar need an extended `summary.mjs` hotspot shape (per-dimension %
+lift + multiple suggested actions + ELI10 copy); the rail collapse-toggle +
+CI-gaps/dangling/duplicate findings panels; a nav link from the SPA (currently reach
+it directly at `/context.html`). The bundle's other pages (Home/Summary/Tokens/Drift/
+Evals) were out of scope — the user asked for Context.html only.
+
 **Summary Health model.** `scripts/summary.mjs` emits a composite `healthScore`
 (0–100) decomposed into three **deterministic** dimensions: **Honesty** (docs
 match code — from map dangling refs + duplicate drift; renamed from "Coherence"

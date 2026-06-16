@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+<head>
+<script>if(location.search.indexOf("embed")>=0)document.documentElement.className+=" embed";</script>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Depthfinder — Context</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Arimo:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="context-base.css" />
+<link rel="stylesheet" href="context.css" />
+</head>
+<body>
+
+<!-- ===== TOP NAV ===== -->
+<header class="topnav">
+  <div class="wrap row">
+    <span class="burger"><i></i><i></i><i></i></span>
+    <a class="nav-logo" href="/"><span class="sonar"><i></i><i></i><i></i></span><b>Depthfinder</b></a>
+    <nav class="nav-tabs">
+      <a class="nav-tab" href="/#summary">Summary</a>
+      <div class="nav-tab on">Context</div>
+      <a class="nav-tab" href="/#tokens">Tokens</a>
+      <a class="nav-tab" href="/#evals">Evals</a>
+      <a class="nav-tab" href="/#drift">Drift</a>
+    </nav>
+    <span class="nav-spacer"></span>
+    <span class="badge-local">local-only</span>
+  </div>
+</header>
+
+<!-- ===== SUB NAV (scores) ===== -->
+<div class="subnav" id="subnav">
+  <div class="wrap row">
+    <div class="snav-item sev-md"><span class="snav-radial"><svg viewBox="0 0 36 36"><circle class="t" cx="18" cy="18" r="15.5"></circle><circle class="f" cx="18" cy="18" r="15.5" stroke-dasharray="41.88 97.39"></circle></svg></span><span class="snav-txt"><span class="snav-v tnum">43</span></span><span class="snav-label">Health</span></div><span class="snav-desc"><span class="snav-rating sev-amber">Caution</span></span><label class="eli10-toggle snav-eli"><input type="checkbox" id="navEli10"><span>ELI10</span></label><button class="snav-more" id="snavMore" type="button" aria-label="Show contributing factors"><span class="snav-more-i">+</span></button></div>
+  <div class="wrap row snav-row2" id="snavExtra"><div class="snav-item sev-md"><span class="snav-radial"><svg viewBox="0 0 36 36"><circle class="t" cx="18" cy="18" r="15.5"></circle><circle class="f" cx="18" cy="18" r="15.5" stroke-dasharray="65.25 97.39"></circle></svg></span><span class="snav-txt"><span class="snav-k">Honesty</span><span class="snav-v tnum">67</span></span></div><div class="snav-item sev-hi"><span class="snav-radial"><svg viewBox="0 0 36 36"><circle class="t" cx="18" cy="18" r="15.5"></circle><circle class="f" cx="18" cy="18" r="15.5" stroke-dasharray="4.87 97.39"></circle></svg></span><span class="snav-txt"><span class="snav-k">Weight</span><span class="snav-v tnum">5</span></span></div><div class="snav-item sev-md"><span class="snav-radial"><svg viewBox="0 0 36 36"><circle class="t" cx="18" cy="18" r="15.5"></circle><circle class="f" cx="18" cy="18" r="15.5" stroke-dasharray="48.69 97.39"></circle></svg></span><span class="snav-txt"><span class="snav-k">Coverage</span><span class="snav-v tnum">50</span></span></div>
+  </div>
+  </div>
+</div>
+
+
+<main class="wrap">
+
+  <section class="head">
+    <h1>Context</h1>
+  </section>
+
+  <!-- ===== HEALTH HERO ===== -->
+  <section class="health">
+    <div class="radial" role="img" aria-label="Overall health 43 of 100">
+      <svg viewBox="0 0 120 120">
+        <circle class="rg-track" cx="60" cy="60" r="52"></circle>
+        <circle class="rg-fill" cx="60" cy="60" r="52"></circle>
+      </svg>
+    </div>
+    <div class="left">
+      <span class="ovl">Health</span>
+      <div class="scoreline">
+        <span class="score tnum">43<span class="den">/ 100</span></span>
+        <span class="rating cau">Caution</span>
+      </div>
+      <p class="why">Higher health = more reliable, faster and cheaper AI interactions</p>
+    </div>
+  </section>
+
+  <!-- ===== CONTRIBUTING FACTORS ===== -->
+  <details class="factors-sec">
+    <summary><span class="factors-t">Dimensions</span><span class="chev-d">›</span></summary>
+  <section class="loadgrid">
+    <div class="lcard sev-md">
+      <div class="lc-top"><span class="lc-name">Honesty <span class="lc-sub">How well docs match code</span><span class="lc-improve"><span class="lci-tri">▲</span>Improves reliability</span></span></div>
+      <div class="lc-score"><span class="lc-val tnum">67</span></div>
+    </div>
+    <div class="lcard sev-hi">
+      <div class="lc-top"><span class="lc-name">Weight <span class="lc-sub">How much loads every turn</span><span class="lc-improve"><span class="lci-tri">▲</span>Improves speed & cost</span></span></div>
+      <div class="lc-score"><span class="lc-val tnum">5</span></div>
+    </div>
+    <div class="lcard sev-md">
+      <div class="lc-top"><span class="lc-name">Coverage <span class="lc-sub">Rules and evals enforced in CI</span><span class="lc-improve"><span class="lci-tri">▲</span>Improves reliability</span></span></div>
+      <div class="lc-score"><span class="lc-val tnum">50</span></div>
+    </div>
+  </section>
+  </details>
+
+  <div class="map-subhead-row"><h2 class="subhead subhead-map">Context Map</h2><label class="eli10-toggle map-eli"><input type="checkbox" id="mapEli10" checked><span>ELI10</span></label></div>
+
+  <section class="sx-layout sx-collapsed">
+    <!-- LEFT RAIL -->
+    <aside class="sx-rail">
+      <div class="sx-tools">
+        <button class="sx-refresh" type="button" id="sxRefresh">↻<b>Refresh</b></button>
+        <select class="sx-select" id="sxFilter" aria-label="Filter graph">
+          <option value="all">Full graph</option>
+          <option value="boundary">Boundary focus</option>
+          <option value="loaded">Loaded context only</option>
+          <option value="docs">Docs &amp; prompts</option>
+        </select>
+      </div>
+
+      <div class="sx-prog">
+        <div class="pr-top"><span class="pr-k">CLAUDE.md (always)</span><span class="pr-v">1,375 <span class="pr-ideal">/ 4,000 tok</span></span></div>
+        <div class="sx-bar"><i style="width:34%"></i></div>
+      </div>
+      <div class="sx-prog">
+        <div class="pr-top"><span class="pr-k">Read-first bundle</span><span class="pr-v">16,979 <span class="pr-ideal">/ 22,000 tok</span></span></div>
+        <div class="sx-bar"><i style="width:77%"></i></div>
+      </div>
+
+      <div class="sx-stats">
+        <div class="sx-stat"><div class="st-v">113</div><div class="st-k">nodes</div></div>
+        <div class="sx-stat"><div class="st-v">98</div><div class="st-k">edges</div></div>
+        <div class="sx-stat"><div class="st-v">81,274</div><div class="st-k">total tok</div></div>
+        <div class="sx-stat"><div class="st-v red">2</div><div class="st-k">dangling</div></div>
+      </div>
+
+      <div class="sx-leg-h">Node types</div>
+      <div class="sx-leg" id="legTypes">
+        <span class="lg"><span class="sw" style="background:var(--nt-agent)"></span>agent instruction <span class="n">2</span></span>
+        <span class="lg"><span class="sw" style="background:var(--nt-doc)"></span>doc <span class="n">38</span></span>
+        <span class="lg"><span class="sw" style="background:var(--nt-product)"></span>product prompt <span class="n">4</span></span>
+        <span class="lg"><span class="sw" style="background:var(--nt-devagent)"></span>dev-agent prompt <span class="n">11</span></span>
+        <span class="lg"><span class="sw" style="background:var(--nt-memory)"></span>memory store <span class="n">8</span></span>
+        <span class="lg"><span class="sw" style="background:var(--nt-flag)"></span>derived flag <span class="n">18</span></span>
+        <span class="lg"><span class="sw" style="background:var(--nt-card)"></span>card <span class="n">5</span></span>
+        <span class="lg"><span class="sw" style="background:var(--nt-agent)"></span>eval <span class="n">6</span></span>
+        <span class="lg"><span class="sw" style="background:var(--nt-router)"></span>router tier <span class="n">6</span></span>
+        <span class="lg"><span class="sw" style="background:var(--nt-doc)"></span>code module <span class="n">9</span></span>
+        <span class="lg"><span class="sw" style="background:var(--nt-devagent)"></span>CI job <span class="n">6</span></span>
+      </div>
+
+      <div class="sx-leg-h">Load behavior</div>
+      <div class="sx-leg">
+        <span class="lg"><span class="sw" style="background:var(--nt-agent)"></span>always <span class="n">1</span></span>
+        <span class="lg"><span class="sw" style="background:var(--nt-flag)"></span>scoped <span class="n">1</span></span>
+        <span class="lg"><span class="sw" style="background:var(--nt-router)"></span>on-demand <span class="n">44</span></span>
+        <span class="lg"><span class="sw" style="background:var(--nt-doc)"></span>read-first <span class="n">5</span></span>
+        <span class="lg"><span class="sw" style="background:var(--nt-product)"></span>runtime <span class="n">41</span></span>
+        <span class="lg"><span class="sw" style="background:var(--nt-agent)"></span>ci/eval <span class="n">6</span></span>
+        <span class="lg"><span class="sw" style="background:var(--nt-doc)"></span>code <span class="n">9</span></span>
+        <span class="lg"><span class="sw" style="background:var(--nt-devagent)"></span>ci <span class="n">6</span></span>
+      </div>
+
+      <div class="sx-leg-h">Edges</div>
+      <div class="sx-leg">
+        <span class="lg"><span class="sw line" style="border-color:var(--nt-agent)"></span>read_before</span>
+        <span class="lg"><span class="sw line" style="border-color:var(--red)"></span>decides</span>
+        <span class="lg"><span class="sw dash" style="border-color:var(--nt-product)"></span>enhances</span>
+        <span class="lg"><span class="sw line" style="border-color:var(--nt-devagent)"></span>protected_by</span>
+        <span class="lg"><span class="sw dot" style="border-color:var(--nt-doc)"></span>gated_in_ci</span>
+        <span class="lg"><span class="sw line" style="border-color:var(--line-3)"></span>references</span>
+        <span class="lg"><span class="sw dash" style="border-color:var(--nt-flag)"></span>duplicates</span>
+      </div>
+
+      <details class="sx-find" open>
+        <summary>CI gaps <span class="fc red">4</span><span class="chev-d">›</span></summary>
+        <div class="fbody">
+          <div class="fitem"><b>agentci:gate</b> defined but runs in 0 workflows</div>
+          <div class="fitem"><b>eval:taxonomy</b> not wired into CI</div>
+          <div class="fitem"><b>deterministic_slice</b> invariant ungated</div>
+          <div class="fitem"><b>David Verification</b> job references a missing step</div>
+        </div>
+      </details>
+      <details class="sx-find">
+        <summary>Dangling references <span class="fc amber">2</span><span class="chev-d">›</span></summary>
+        <div class="fbody">
+          <div class="fitem">docs name <b>deriveState.js</b> as canonical — it's an 8-line shim</div>
+          <div class="fitem"><b>home-center2-offline.md</b> points to a deleted path</div>
+        </div>
+      </details>
+      <details class="sx-find">
+        <summary>Duplicate blocks <span class="fc amber">1</span><span class="chev-d">›</span></summary>
+        <div class="fbody">
+          <div class="fitem">boundary rule restated across <b>12 files</b></div>
+        </div>
+      </details>
+    </aside>
+
+    <!-- GRAPH -->
+    <div class="sx-graph">
+      <div class="sx-inspect" id="sxInspect"></div>
+      <svg id="sxSvg" viewBox="0 0 1000 720" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+  </section>
+
+
+  <!-- ===== HOTSPOTS TABLE (hidden — data source for the map sidebar) ===== -->
+  <section class="tsec" style="--cols:minmax(320px,2fr) 0.7fr 0.7fr 0.7fr;display:none;">
+    <div class="tsec-head">
+      <div class="th-left">
+        <h2>Hotspots</h2>
+        <div class="hs-counts">
+          <span class="hc high">3 high</span>
+          <span class="hc med">5 medium</span>
+        </div>
+      </div>
+      <div class="th-right">
+        <label class="eli10-toggle"><input type="checkbox" id="eli10"><span>ELI10</span></label>
+        <button class="reset-btn" id="hsReset" type="button">↺ Reset</button>
+      </div>
+    </div>
+
+    <div class="table" id="hsTable">
+      <div class="thead">
+        <span class="ch sortord">
+          <select id="hsSort" class="sortsel" aria-label="Sort hotspots">
+            <option value="order">Suggested order</option>
+            <option value="sev">Severity</option>
+          </select>
+        </span>
+        <span class="ch r sortable" data-key="drift">Honesty <span class="caret"></span></span><span class="ch r sortable" data-key="tokens">Weight <span class="caret"></span></span>
+        <span class="ch r sortable" data-key="coverage">Coverage <span class="caret"></span></span>
+      </div>
+
+      <!-- order 1 — AgentCI (#4) -->
+      <div class="trow r-red" data-order="1" data-sev="2" data-context="0" data-tokens="0" data-drift="4" data-coverage="44">
+        <div class="hs"><div class="nm"><div class="nm-r1"><span class="num tnum">1</span><span class="nm-t">AgentCI gate not enforced</span></div><div class="nm-r2"><span class="sev-badge high">High</span><span class="nm-health"><span class="nmh-radial"><svg viewBox="0 0 36 36"><circle class="t" cx="18" cy="18" r="15.5"></circle><circle class="f" cx="18" cy="18" r="15.5" stroke-dasharray="9.74 97.39"></circle></svg></span>+10 <span class="nmh-lab">health</span></span></div></div><div class="de" data-eli10="There is a safety check meant to run automatically, but right now it never runs, so nothing stops mistakes from sneaking in.">agentci:gate / eval:taxonomy run in zero workflows, leaving the deterministic-slice invariant ungoverned.</div><div class="why"><span class="why-lab">Why 1st</span><span class="why-txt" data-eli10="Do this first because it is quick and it acts like a guard that keeps new mess from piling up while you clean.">Install the enforcement ratchet first — cheap, big Coverage gain, and it stops new drift / complexity growing while you clean. No dependencies.</span></div><button class="acts-btn" type="button">Suggested actions <span class="ab-n">4</span><span class="ab-arrow">→</span></button></div>
+        <div class="cell r" data-label="Honesty"><span class="cv lift tnum">▲4%</span></div><div class="cell r" data-label="Weight"><span class="cv mut">—</span></div>
+        <div class="cell r" data-label="Coverage"><span class="cv lift hi tnum">▲44%</span></div>
+        <div class="acts-expand"><div class="acts-expand-in"><div class="ae-head">Suggested actions</div><div class="ae-list"><button class="ae-act" type="button"><span class="da-n">1</span><span class="da-t">Add agentci:gate as a blocking job in .github/workflows/openclaw-checks.yml.</span></button><button class="ae-act" type="button"><span class="da-n">2</span><span class="da-t">Add eval:taxonomy as a non-blocking step that uploads its JSON as a CI artifact.</span></button><button class="ae-act" type="button"><span class="da-n">3</span><span class="da-t">Record the deterministic_slice_replayable → agentci:gate link in context/rules.yaml.</span></button><button class="ae-act" type="button"><span class="da-n">4</span><span class="da-t">Confirm the gate fails on a deliberately broken fixture before trusting it.</span></button></div></div></div>
+      </div>
+
+      <!-- order 2 — CLAUDE.md (#1) -->
+      <div class="trow r-red" data-order="2" data-sev="2" data-context="14" data-tokens="44" data-drift="5" data-coverage="0">
+        <div class="hs"><div class="nm"><div class="nm-r1"><span class="num tnum">2</span><span class="nm-t">CLAUDE.md</span></div><div class="nm-r2"><span class="sev-badge high">High</span><span class="nm-health"><span class="nmh-radial"><svg viewBox="0 0 36 36"><circle class="t" cx="18" cy="18" r="15.5"></circle><circle class="f" cx="18" cy="18" r="15.5" stroke-dasharray="18.50 97.39"></circle></svg></span>+19 <span class="nmh-lab">health</span></span></div></div><div class="de" data-eli10="One giant instructions file is sent to the AI every single time. It is huge and linked to everything, so it is costly and risky.">~10,829 tok on every turn and 23 edges; carries runbooks, 29 abs-paths, and a copy of the boundary rule.</div><div class="why"><span class="why-lab">Why 2nd</span><span class="why-txt" data-eli10="Fix this next because it is the biggest single win, shrinking this one file makes almost everything else lighter too.">Keystone. Biggest single recovery (mostly Tokens) + widest blast radius (23 edges); shrinks everything downstream.</span></div><button class="acts-btn" type="button">Suggested actions <span class="ab-n">4</span><span class="ab-arrow">→</span></button></div>
+        <div class="cell r" data-label="Honesty"><span class="cv lift tnum">▲5%</span></div><div class="cell r" data-label="Weight"><span class="cv lift hi tnum">▲44%</span></div>
+        <div class="cell r" data-label="Coverage"><span class="cv mut">—</span></div>
+        <div class="acts-expand"><div class="acts-expand-in"><div class="ae-head">Suggested actions</div><div class="ae-list"><button class="ae-act" type="button"><span class="da-n">1</span><span class="da-t">Split CLAUDE.md to a ~3.5k-token spine: gbrain pointer + the 5 rules + “where things live” + workflow.</span></button><button class="ae-act" type="button"><span class="da-n">2</span><span class="da-t">Move the Pi / voice / hardware runbooks into docs/runbooks/* (folding into pi/README.md, voice-service/README.md, deploy/mac-mini/README.md).</span></button><button class="ae-act" type="button"><span class="da-n">3</span><span class="da-t">Relocate the 29 machine-absolute paths alongside those runbooks.</span></button><button class="ae-act" type="button"><span class="da-n">4</span><span class="da-t">Verify the reduction with /context and /memory.</span></button></div></div></div>
+      </div>
+
+      <!-- order 3 — Always-loaded bloat (#8) -->
+      <div class="trow r-amber" data-order="3" data-sev="1" data-context="0" data-tokens="15" data-drift="2" data-coverage="0">
+        <div class="hs"><div class="nm"><div class="nm-r1"><span class="num tnum">3</span><span class="nm-t">Always-loaded bloat</span></div><div class="nm-r2"><span class="sev-badge med">Medium</span><span class="nm-health"><span class="nmh-radial"><svg viewBox="0 0 36 36"><circle class="t" cx="18" cy="18" r="15.5"></circle><circle class="f" cx="18" cy="18" r="15.5" stroke-dasharray="5.84 97.39"></circle></svg></span>+6 <span class="nmh-lab">health</span></span></div></div><div class="de" data-eli10="Besides the big file, a long read-me-first list is always loaded, especially an 8,000-word history log nobody needs every time.">The read-first bundle beyond CLAUDE.md — chiefly the 8.2k-tok decisions log riding in “READ FIRST.”</div><div class="why"><span class="why-lab">Why 3rd</span><span class="why-txt" data-eli10="You are already cleaning that same read-first pile, so drop the giant history log while you are in there.">Same read-first set as #1 — demote the 8.2k decisions log while you're already in there.</span></div><button class="acts-btn" type="button">Suggested actions <span class="ab-n">3</span><span class="ab-arrow">→</span></button></div>
+        <div class="cell r" data-label="Honesty"><span class="cv lift tnum">▲2%</span></div><div class="cell r" data-label="Weight"><span class="cv lift hi tnum">▲15%</span></div>
+        <div class="cell r" data-label="Coverage"><span class="cv mut">—</span></div>
+        <div class="acts-expand"><div class="acts-expand-in"><div class="ae-head">Suggested actions</div><div class="ae-list"><button class="ae-act" type="button"><span class="da-n">1</span><span class="da-t">Demote docs/home_center_decisions_log.md (8.2k tok) from “READ FIRST” to “consult when breaking an invariant.”</span></button><button class="ae-act" type="button"><span class="da-n">2</span><span class="da-t">Trim the read-first set to the 4 contract docs.</span></button><button class="ae-act" type="button"><span class="da-n">3</span><span class="da-t">Reference large docs by excerpt / link rather than loading them whole.</span></button></div></div></div>
+      </div>
+
+      <!-- order 4 — Doc duplication (#7) -->
+      <div class="trow r-amber" data-order="4" data-sev="1" data-context="7" data-tokens="4" data-drift="10" data-coverage="0">
+        <div class="hs"><div class="nm"><div class="nm-r1"><span class="num tnum">4</span><span class="nm-t">Doc duplication</span></div><div class="nm-r2"><span class="sev-badge med">Medium</span><span class="nm-health"><span class="nmh-radial"><svg viewBox="0 0 36 36"><circle class="t" cx="18" cy="18" r="15.5"></circle><circle class="f" cx="18" cy="18" r="15.5" stroke-dasharray="4.87 97.39"></circle></svg></span>+5 <span class="nmh-lab">health</span></span></div></div><div class="de" data-eli10="The same rule is copy-pasted into 12 files. When one copy changes, the others quietly go out of date.">The boundary rule in 12 files plus near-dups; its main harm is copies diverging.</div><div class="why"><span class="why-lab">Why 4th</span><span class="why-txt" data-eli10="Keep the rule in one place and add a checker so it cannot get copied around again.">Collapse the rule to one file and add the lint that stops it recurring; feeds the Honesty fixes.</span></div><button class="acts-btn" type="button">Suggested actions <span class="ab-n">3</span><span class="ab-arrow">→</span></button></div>
+        <div class="cell r" data-label="Honesty"><span class="cv lift hi tnum">▲10%</span></div><div class="cell r" data-label="Weight"><span class="cv lift tnum">▲4%</span></div>
+        <div class="cell r" data-label="Coverage"><span class="cv mut">—</span></div>
+        <div class="acts-expand"><div class="acts-expand-in"><div class="ae-head">Suggested actions</div><div class="ae-list"><button class="ae-act" type="button"><span class="da-n">1</span><span class="da-t">State the boundary rule once, canonically, in docs/README.md.</span></button><button class="ae-act" type="button"><span class="da-n">2</span><span class="da-t">Replace the other 11 copies with a one-line link to it.</span></button><button class="ae-act" type="button"><span class="da-n">3</span><span class="da-t">Add a CI check that fails if the canonical statement reappears verbatim elsewhere.</span></button></div></div></div>
+      </div>
+
+      <!-- order 5 — Outdated / stale (#9) -->
+      <div class="trow r-amber" data-order="5" data-sev="1" data-context="0" data-tokens="5" data-drift="9" data-coverage="7">
+        <div class="hs"><div class="nm"><div class="nm-r1"><span class="num tnum">5</span><span class="nm-t">Outdated / stale surfaces</span></div><div class="nm-r2"><span class="sev-badge med">Medium</span><span class="nm-health"><span class="nmh-radial"><svg viewBox="0 0 36 36"><circle class="t" cx="18" cy="18" r="15.5"></circle><circle class="f" cx="18" cy="18" r="15.5" stroke-dasharray="4.87 97.39"></circle></svg></span>+5 <span class="nmh-lab">health</span></span></div></div><div class="de" data-eli10="Some notes describe how things used to work, not how they work now, like an old map pointing to the wrong street.">Stale content vs reality — the shim-named-canonical mismatch plus aging paths / refs.</div><div class="why"><span class="why-lab">Why 5th</span><span class="why-txt" data-eli10="Fix the wrong pointer and add a checker that flags links going nowhere; it pairs nicely with the last cleanup.">Fix the shim-named-canonical ref + add a dangling-ref lint; pairs with #4's lint work.</span></div><button class="acts-btn" type="button">Suggested actions <span class="ab-n">3</span><span class="ab-arrow">→</span></button></div>
+        <div class="cell r" data-label="Honesty"><span class="cv lift hi tnum">▲9%</span></div><div class="cell r" data-label="Weight"><span class="cv lift tnum">▲5%</span></div>
+        <div class="cell r" data-label="Coverage"><span class="cv lift tnum">▲7%</span></div>
+        <div class="acts-expand"><div class="acts-expand-in"><div class="ae-head">Suggested actions</div><div class="ae-list"><button class="ae-act" type="button"><span class="da-n">1</span><span class="da-t">Point the docs at src/core/derivations/index.js and note src/state/deriveState.js is a re-export shim.</span></button><button class="ae-act" type="button"><span class="da-n">2</span><span class="da-t">Add a dangling-reference lint (doc paths that don't resolve on disk).</span></button><button class="ae-act" type="button"><span class="da-n">3</span><span class="da-t">Date-stamp or retire surfaces that haven't tracked the code.</span></button></div></div></div>
+      </div>
+
+      <!-- order 6 — Unconnected surfaces (#5) -->
+      <div class="trow r-amber" data-order="6" data-sev="1" data-context="9" data-tokens="11" data-drift="0" data-coverage="0">
+        <div class="hs"><div class="nm"><div class="nm-r1"><span class="num tnum">6</span><span class="nm-t">Unconnected surfaces</span></div><div class="nm-r2"><span class="sev-badge med">Medium</span><span class="nm-health"><span class="nmh-radial"><svg viewBox="0 0 36 36"><circle class="t" cx="18" cy="18" r="15.5"></circle><circle class="f" cx="18" cy="18" r="15.5" stroke-dasharray="5.84 97.39"></circle></svg></span>+6 <span class="nmh-lab">health</span></span></div></div><div class="de" data-eli10="Six files get loaded but nothing actually uses them. They are just dead weight taking up space.">Six surfaces are scanned and loaded but referenced by nothing — dead weight that costs tokens and noise.</div><div class="why"><span class="why-lab">Why 6th</span><span class="why-txt" data-eli10="Quick win: delete or file away the 6 unused ones to instantly save space and cut noise.">Delete / archive the 6 orphans — quick Tokens + Context bank. (≈ Health 83 by here.)</span></div><button class="acts-btn" type="button">Suggested actions <span class="ab-n">3</span><span class="ab-arrow">→</span></button></div>
+        <div class="cell r" data-label="Honesty"><span class="cv mut">—</span></div><div class="cell r" data-label="Weight"><span class="cv lift hi tnum">▲11%</span></div>
+        <div class="cell r" data-label="Coverage"><span class="cv mut">—</span></div>
+        <div class="acts-expand"><div class="acts-expand-in"><div class="ae-head">Suggested actions</div><div class="ae-list"><button class="ae-act" type="button"><span class="da-n">1</span><span class="da-t">Generate the list of the 6 surfaces with no incoming edges.</span></button><button class="ae-act" type="button"><span class="da-n">2</span><span class="da-t">Delete or archive the genuinely unused ones.</span></button><button class="ae-act" type="button"><span class="da-n">3</span><span class="da-t">For the rest, either wire the missing edge or move them out of the always-scanned set.</span></button></div></div></div>
+      </div>
+
+      <!-- order 7 — Prompt stack (#2) -->
+      <div class="trow r-red" data-order="7" data-sev="2" data-context="22" data-tokens="9" data-drift="0" data-coverage="0">
+        <div class="hs"><div class="nm"><div class="nm-r1"><span class="num tnum">7</span><span class="nm-t">Prompt stack</span></div><div class="nm-r2"><span class="sev-badge high">High</span><span class="nm-health"><span class="nmh-radial"><svg viewBox="0 0 36 36"><circle class="t" cx="18" cy="18" r="15.5"></circle><circle class="f" cx="18" cy="18" r="15.5" stroke-dasharray="7.79 97.39"></circle></svg></span>+8 <span class="nmh-lab">health</span></span></div></div><div class="de" data-eli10="The AI personality instructions live in three different folders, with a confusing chain of files feeding into each other.">Three persona homes (agents/, claws/, openclaw/prompts/) plus a persona→instructions→assistant chain.</div><div class="why"><span class="why-lab">Why 7th</span><span class="why-txt" data-eli10="This one is hard, so do it after the easy wins: put all the personality files in one place and pick a single name.">Hard structural: consolidate 3 persona homes, pick one name (Homer vs Howie), add glossary. Do after cheap wins are banked.</span></div><button class="acts-btn" type="button">Suggested actions <span class="ab-n">4</span><span class="ab-arrow">→</span></button></div>
+        <div class="cell r" data-label="Honesty"><span class="cv mut">—</span></div><div class="cell r" data-label="Weight"><span class="cv lift tnum">▲9%</span></div>
+        <div class="cell r" data-label="Coverage"><span class="cv mut">—</span></div>
+        <div class="acts-expand"><div class="acts-expand-in"><div class="ae-head">Suggested actions</div><div class="ae-list"><button class="ae-act" type="button"><span class="da-n">1</span><span class="da-t">Consolidate the three persona homes into one agents/ tree with product/, dev/, design/ subfolders.</span></button><button class="ae-act" type="button"><span class="da-n">2</span><span class="da-t">Pick one persona name (resolve Homer vs Howie) and apply it consistently.</span></button><button class="ae-act" type="button"><span class="da-n">3</span><span class="da-t">Add a ~10-line docs/glossary.md mapping the named concepts.</span></button><button class="ae-act" type="button"><span class="da-n">4</span><span class="da-t">Collapse template chains where a single prompt suffices.</span></button></div></div></div>
+      </div>
+
+      <!-- order 8 — Layer mixing (#3) -->
+      <div class="trow r-amber" data-order="8" data-sev="1" data-context="18" data-tokens="5" data-drift="3" data-coverage="0">
+        <div class="hs"><div class="nm"><div class="nm-r1"><span class="num tnum">8</span><span class="nm-t">Layer mixing</span></div><div class="nm-r2"><span class="sev-badge med">Medium</span><span class="nm-health"><span class="nmh-radial"><svg viewBox="0 0 36 36"><circle class="t" cx="18" cy="18" r="15.5"></circle><circle class="f" cx="18" cy="18" r="15.5" stroke-dasharray="5.84 97.39"></circle></svg></span>+6 <span class="nmh-lab">health</span></span></div></div><div class="de" data-eli10="Twelve different names for overlapping ideas blur the lines between docs, code, and instructions, so one change means hunting everywhere.">The 12 named concepts blur doc↔code↔runbook↔prompt boundaries; small stale-ref tail.</div><div class="why"><span class="why-lab">Why 8th</span><span class="why-txt" data-eli10="This finishes the big cleanup from number 7: give each idea one home so things stop tangling together.">Coupled to #2 (same concept-consolidation) — finish the structural refactor. (≈ Health 96 by here.)</span></div><button class="acts-btn" type="button">Suggested actions <span class="ab-n">3</span><span class="ab-arrow">→</span></button></div>
+        <div class="cell r" data-label="Honesty"><span class="cv lift tnum">▲3%</span></div><div class="cell r" data-label="Weight"><span class="cv lift tnum">▲5%</span></div>
+        <div class="cell r" data-label="Coverage"><span class="cv mut">—</span></div>
+        <div class="acts-expand"><div class="acts-expand-in"><div class="ae-head">Suggested actions</div><div class="ae-list"><button class="ae-act" type="button"><span class="da-n">1</span><span class="da-t">Establish one canonical home per concept and link rather than restate.</span></button><button class="ae-act" type="button"><span class="da-n">2</span><span class="da-t">Remove cross-layer edges (a doc shouldn't point into a runbook that points into a prompt).</span></button><button class="ae-act" type="button"><span class="da-n">3</span><span class="da-t">Use the Do 7 glossary as the single naming source so concepts stop multiplying.</span></button></div></div></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script src="context-graph.js"></script>
+<script>
+  (function(){
+    var table = document.getElementById('hsTable');
+    if(!table) return;
+    var rows  = [].slice.call(table.querySelectorAll('.trow'));
+    // inject per-row "Dimensions" toggle (mobile-only via CSS)
+    rows.forEach(function(row,i){
+      var hs=row.querySelector('.hs'); if(!hs) return;
+      var id='af-'+(row.dataset.order||i);
+      var cb=document.createElement('input'); cb.type='checkbox'; cb.className='af-toggle'; cb.id=id;
+      var lb=document.createElement('label'); lb.className='af-label'; lb.setAttribute('for',id);
+      lb.innerHTML='Dimensions <span class="af-x">\u203a</span>';
+      hs.insertAdjacentElement('afterend', lb);
+      hs.insertAdjacentElement('afterend', cb);
+    });
+    var heads = [].slice.call(table.querySelectorAll('.thead .sortable'));
+    var state = { key:'order', asc:true };
+    function apply(){
+      var sorted = rows.slice();
+      if(state.key){
+        sorted.sort(function(a,b){
+          var av = parseFloat(a.dataset[state.key]) || 0,
+              bv = parseFloat(b.dataset[state.key]) || 0;
+          return state.asc ? av - bv : bv - av;
+        });
+      } else {
+        sorted.sort(function(a,b){ return (+a.dataset.order) - (+b.dataset.order); });
+      }
+      sorted.forEach(function(r){ table.appendChild(r); });
+      heads.forEach(function(h){
+        var on = h.dataset.key === state.key;
+        h.classList.toggle('active', on);
+        h.classList.toggle('asc', on && state.asc);
+      });
+    }
+    var sortSel = document.getElementById('hsSort');
+    heads.forEach(function(h){
+      h.addEventListener('click', function(){
+        var k = h.dataset.key;
+        if(state.key === k){ state.asc = !state.asc; }
+        else { state.key = k; state.asc = false; }
+        apply();
+      });
+    });
+    if(sortSel){
+      sortSel.addEventListener('change', function(){
+        state.key = sortSel.value;
+        state.asc = (sortSel.value === 'order');
+        apply();
+      });
+    }
+
+    /* ---- mobile-only metric sort options ---- */
+    var mq = window.matchMedia('(max-width:720px)');
+    var metricOpts = [['tokens','Sort: Weight ↓'],['drift','Sort: Honesty ↓'],['coverage','Sort: Coverage ↓']];
+    function syncSortOptions(){
+      if(!sortSel) return;
+      var has = sortSel.querySelector('option[value="context"]');
+      if(mq.matches && !has){
+        metricOpts.forEach(function(o){
+          var opt=document.createElement('option'); opt.value=o[0]; opt.textContent=o[1]; sortSel.appendChild(opt);
+        });
+      } else if(!mq.matches && has){
+        metricOpts.forEach(function(o){
+          var el=sortSel.querySelector('option[value="'+o[0]+'"]'); if(el) el.remove();
+        });
+        if(['context','tokens','drift','coverage'].indexOf(sortSel.value)>=0){
+          sortSel.value='order'; state.key='order'; state.asc=true; apply();
+        }
+      }
+    }
+    syncSortOptions();
+    if(mq.addEventListener) mq.addEventListener('change', syncSortOptions);
+
+    /* ---- ELI10 toggle ---- */
+    var eliChk = document.getElementById('eli10');
+    function applyEli(on){
+      document.querySelectorAll('.de, .why-txt').forEach(function(el){
+        if(el.dataset.orig === undefined) el.dataset.orig = el.textContent;
+        el.textContent = (on && el.dataset.eli10) ? el.dataset.eli10 : el.dataset.orig;
+      });
+    }
+    if(eliChk){ eliChk.addEventListener('change', function(){ applyEli(eliChk.checked); }); }
+    document.getElementById('hsReset').addEventListener('click', function(){
+      if(sortSel) sortSel.value = 'order';
+      state.key = 'order'; state.asc = true; apply();
+    });
+    apply();
+
+    /* ---- inline suggested-actions expand ---- */
+    table.addEventListener('click', function(e){
+      var btn = e.target.closest('.acts-btn');
+      if(!btn) return;
+      var row = btn.closest('.trow');
+      var panel = row.querySelector('.acts-expand');
+      if(!panel) return;
+      var isOpen = panel.classList.contains('open');
+      // close any other open panel
+      table.querySelectorAll('.acts-expand.open').forEach(function(p){
+        if(p !== panel){ p.classList.remove('open'); var b=p.closest('.trow').querySelector('.acts-btn'); if(b) b.classList.remove('is-open'); }
+      });
+      panel.classList.toggle('open', !isOpen);
+      btn.classList.toggle('is-open', !isOpen);
+    });
+
+    /* ---- mobile nav toggle ---- */
+    var burger = document.querySelector('.burger');
+    var navTabs = document.querySelector('.nav-tabs');
+    if(burger && navTabs){
+      burger.addEventListener('click', function(){
+        var open = navTabs.classList.toggle('open');
+        burger.classList.toggle('is-open', open);
+      });
+      navTabs.addEventListener('click', function(e){
+        if(e.target.closest('.nav-tab')){ navTabs.classList.remove('open'); burger.classList.remove('is-open'); }
+      });
+    }
+  })();
+</script>
+
+<script>
+(function(){var sn=document.getElementById("subnav");if(!sn)return;function on(){if(window.scrollY>210)sn.classList.add("show");else sn.classList.remove("show");}window.addEventListener("scroll",on,{passive:true});on();var mb=document.getElementById("snavMore"),ex=document.getElementById("snavExtra");if(mb&&ex){mb.addEventListener("click",function(){var o=ex.classList.toggle("open");mb.classList.toggle("open",o);mb.setAttribute("aria-label",o?"Hide contributing factors":"Show contributing factors");});}})();
+</script>
+
+<script>
+(function(){
+  var nav=document.getElementById('navEli10'); if(!nav) return;
+  function others(){ return [].slice.call(document.querySelectorAll('.eli10-toggle input')).filter(function(c){return c.id!=='navEli10';}); }
+  nav.addEventListener('change', function(){
+    others().forEach(function(c){ if(c.checked!==nav.checked){ c.checked=nav.checked; c.dispatchEvent(new Event('change')); } });
+  });
+})();
+</script>
+
+<script>(function(){
+  var KEY="df_eli10";
+  function boxes(){return [].slice.call(document.querySelectorAll(".eli10-toggle input"));}
+  function get(){var v=localStorage.getItem(KEY);return v===null?true:v==="1";}
+  function set(v){try{if(localStorage.getItem(KEY)!==(v?"1":"0"))localStorage.setItem(KEY,v?"1":"0");}catch(e){}}
+  var on=get();
+  boxes().forEach(function(c){c.checked=on;c.dispatchEvent(new Event("change"));});
+  document.addEventListener("change",function(e){
+    var t=e.target;if(!t||!t.matches||!t.matches(".eli10-toggle input"))return;
+    set(t.checked);
+    boxes().forEach(function(c){if(c!==t&&c.checked!==t.checked){c.checked=t.checked;c.dispatchEvent(new Event("change"));}});
+  });
+  window.addEventListener("storage",function(e){if(e.key!==KEY)return;var v=get();boxes().forEach(function(c){if(c.checked!==v){c.checked=v;c.dispatchEvent(new Event("change"));}});});
+})();</script>
+</body>
+</html>
