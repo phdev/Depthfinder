@@ -519,6 +519,16 @@ future Evals page), `drift.css` (5-col grid override + `.pkm` Packmind styles), 
   ribbons, drift/not-drift hotspot classification + chain highlight, Packmind 2
   cards, health 83/Healthy, SPA-embed chrome hidden — no console errors.
 
+**Canonical tab order (2026-06-16): Summary · Context · Tokens · Drift · Evals.**
+Every nav uses this order — the SPA tab bar (`index.html` `.tabs`, with decorative
+`t-num` 0–4 labels) AND each embedded design page's own `.nav-tabs`
+(`context.html` / `tokens.html` / `drift.html`). When adding/reordering tabs, keep
+all four in sync. Note `data-panel` names ≠ hash names: `graph`→`#context`,
+`coverage`→`#evals` (see `PANEL_TO_HASH`); `TAB_PANEL` maps a dimension number
+(1 Honesty/2 Weight/3 Coverage/4 Drift) to a panel for Summary "go to" links and is
+NOT the visual tab order, so reordering the bar doesn't touch it. `t-num` labels are
+decorative (no keyboard handler) — renumber them left-to-right when reordering.
+
 **Summary Health model.** `scripts/summary.mjs` emits a composite `healthScore`
 (0–100) decomposed into three **deterministic** dimensions: **Honesty** (docs
 match code — from map dangling refs + duplicate drift; renamed from "Coherence"
