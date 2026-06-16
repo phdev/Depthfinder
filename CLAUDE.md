@@ -663,6 +663,25 @@ it on `window.scrollY > 80` (lower than the Summary's 210 because the design pag
 scroll less). Loaded by all 4 design pages (`subnav.js?v=2`). Verified: Context shows
 Health 83 / Honesty 95 / Weight 100 / Coverage 51 (amber) on scroll, matching Summary.
 
+**Spacing & radial polish (2026-06-16).** A batch of cross-page consistency fixes:
+(1) **Tokens header→health gap** normalized — `tokens.css` `.tk-head` padding `34/4`
+→ `42/26` and `h1` `40px/800` → `38px/700` so it matches the other pages' `.head`
+(the Tokens header used to sit tighter to the hero than Context/Drift/Evals).
+(2) **Summary Dimensions→Hotspots gap** widened — `#panel-summary .df-tsec-head`
+margin-top `16px` → `36px` (the dimension cards were crowding the Hotspots heading).
+(3) **Context Map "Show details" button removed** — the `#sxRailToggle` toggle in
+`context.html`'s `.map-subhead-row` is gone (the in-map Hotspots rail is always
+present; the toggle was redundant). (4) **Health hero radial thickened to match the
+Dimension card radials** — the hero `.health .radial` `.rg-track`/`.rg-fill`
+`stroke-width` `20` → `32` (in BOTH `summary.css` for the Summary tab and
+`context-base.css` for the 4 design pages). The hero ring (r=52, viewBox 120) read as
+a thin band vs the chunky dimension donuts (`.lcr-*` stroke 7, r=11.5); 32 matches the
+dimension's stroke/radius ratio (~0.61) so both render as equally thick donuts. The
+already-present `overflow:visible` on the radial SVGs absorbs the few-px bleed past
+the viewBox (no clipping). `r=52` is unchanged, so the `2·π·52` dasharray math in
+`app.js`/`context-graph.js`/`tokens-flow.js`/`drift-chain.js`/`evals-chain.js` stays
+valid. CSS files carry no `?v=` query — a hard reload picks them up.
+
 **Summary Health model.** `scripts/summary.mjs` emits a composite `healthScore`
 (0–100) decomposed into three **deterministic** dimensions: **Honesty** (docs
 match code — from map dangling refs + duplicate drift; renamed from "Coherence"

@@ -142,10 +142,10 @@
 }
 #panel-summary .df-health .radial { flex: 0 0 auto; width: 54px; height: 54px; align-self: center; margin-left: 4px; }
 #panel-summary .df-health .radial svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-#panel-summary .df-health .radial .rg-track { fill: none; stroke: var(--df-panel-3); stroke-width: 20; }
+#panel-summary .df-health .radial .rg-track { fill: none; stroke: var(--df-panel-3); stroke-width: 32; }
 #panel-summary .df-health .radial .rg-fill {
   fill: none;
-  stroke-width: 20;
+  stroke-width: 32;
   stroke-linecap: butt;
 }
 #panel-summary .df-health.rt-crit .radial .rg-fill { stroke: var(--df-red); filter: drop-shadow(0 0 6px rgba(255, 84, 104, 0.4)); }
@@ -271,8 +271,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  /* 16px below Dimensions — matches the design pages' Dimensions → view gap */
-  margin: 16px 0 18px;
+  /* extra room between the (expanded) dimension cards and Hotspots */
+  margin: 36px 0 18px;
 }
 #panel-summary .th-left { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 #panel-summary .th-right { display: flex; align-items: center; gap: 14px; }

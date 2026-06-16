@@ -2,8 +2,9 @@
    DEPTHFINDER — Tokens page ("Token Currents")
    inherits tokens + shell from summary.css
    ============================================================ */
-.tk-head{padding:34px 0 4px;}
-.tk-head h1{font-size:40px;font-weight:800;letter-spacing:-.03em;margin:0;}
+/* match the other pages' .head padding so the header → health gap is consistent */
+.tk-head{padding:42px 0 26px;}
+.tk-head h1{font-size:38px;font-weight:700;letter-spacing:-.02em;margin:0;}
 .tk-head .sub{color:var(--ink-2);font-size:15px;margin:10px 0 0;}
 
 /* stat tiles */
