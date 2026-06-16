@@ -537,6 +537,39 @@ this order. Gotchas: `data-panel` names ≠ hash names (`graph`→`#context`,
 the visual order; the old `.topbar`/`.tabs`/`.tab` CSS in `styles.css` is now unused
 but left in place.
 
+**Design-ported Evals page ("Protection chain", `public/evals.html`, 2026-06-16).**
+Fourth Claude Design handoff (`api.anthropic.com/v1/design/h/SHnkPU88jYyCRINZ1M2l6w`,
+`Evals.html`) redesigns the Evals tab as a **4-column chain** —
+Hotspots · Rules · Artifacts · Enforcement — showing which invariants are protected
+by a gate/test and whether that protection actually runs in CI. Structurally it's the
+same `.pchain`/`.pc-*` engine as Drift (reuses `public/evals.css`, the `.pc-*` base
+that was already in the repo). Built like the others: embedded as the SPA Evals tab
+via `<iframe id="coverageFrame" src="/evals.html">`; `app.js`'s `loadCoverage()`
+early-returns when `#coverageFrame` exists; `body.embed-active` now covers `coverage`
+too — so ALL FOUR design tabs are embedded and only Summary uses the (now design-nav)
+SPA shell. Files: `evals.html` + `evals-chain.js`. **Wired to REAL data, nothing
+fabricated** — from `/api/coverage`:
+- **Rules** column = real `rules[]` (by `id`). **Artifacts** column = the union of
+  `rules[].protects[]` (deduped by path; `kind:"gate"`→amber Gate tag, else Test).
+  **Enforcement** column = `In CI` (`c-ci`) + `Not in CI` (`c-gap`, red) derived from
+  each artifact's `inCI`. LINKS: rule→artifact→enforcement; a rule→artifact or
+  artifact→`c-gap` link where `inCI:false` is a RED "bad" ribbon (the gap).
+- **Satisfied protections** panel = rules with `status:"protected-in-ci"` (each a
+  `sat-*` node linked to its rule, so clicking highlights its in-CI chain).
+- **Hotspots** = real `/api/summary` issues: a `tab===3` (Coverage) issue is a
+  **protection finding** linked to the not-in-CI rule (auto-selected on load); other
+  tabs are **not-a-protection-finding** (italic, "go to Token Currents/Drift Chain"
+  via `/#tokens`/`/#drift`). home-center: the AgentCI-gate issue is the one finding;
+  its chain is `deterministic_slice_replayable → agentci:gate → Not in CI` (red).
+- ELI10 (global `df_eli10`) swaps the rule-name nodes to plain language
+  (`RULE_ELI` keyed by rule id) + the detail's `descEli`. Health + Dimensions from
+  `/api/summary`. Verified in browse (desktop): 4 real rules, 5 artifacts, 15 ribbons,
+  3 satisfied, the gate finding's red chain, health 83, SPA-embed chrome hidden — no
+  console errors. (Like Drift, ribbons hide under the ≤880px chain-stacking media
+  query.) NOTE: all in-CI artifacts share the single `c-ci` node, so clicking any
+  satisfied rule highlights the whole in-CI cluster — inherent to the shared sink +
+  transitive `chainFrom`, and matches the design.
+
 **Summary Health model.** `scripts/summary.mjs` emits a composite `healthScore`
 (0–100) decomposed into three **deterministic** dimensions: **Honesty** (docs
 match code — from map dangling refs + duplicate drift; renamed from "Coherence"

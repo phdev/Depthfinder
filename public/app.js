@@ -86,7 +86,7 @@ function activate(panel) {
   // Context + Tokens + Drift tabs = full design pages in an iframe; hide the SPA
   // chrome there so the design's own nav/health/dimensions are the top of the tab
   // (their nav links target _parent to drive these SPA tabs).
-  document.body.classList.toggle("embed-active", panel === "graph" || panel === "tokens" || panel === "drift");
+  document.body.classList.toggle("embed-active", panel === "graph" || panel === "tokens" || panel === "drift" || panel === "coverage");
   if (!loaded[panel]) {
     loaded[panel] = true;
     if (panel === "summary") loadSummary();
@@ -771,6 +771,10 @@ function renderCoverage(d) {
 }
 
 async function loadCoverage() {
+  // The Evals tab renders the design's "Protection chain" page via an iframe
+  // (#coverageFrame); skip the legacy render. The old #coverageBody stays in the
+  // DOM (hidden) so the rest of app.js's element refs keep working.
+  if (document.getElementById("coverageFrame")) return;
   const r = await (await fetch("/api/coverage")).json();
   if (r.status === "not-built") {
     $("#coverageBody").innerHTML = notBuiltHtml("c", "Eval coverage");

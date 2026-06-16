@@ -13,8 +13,8 @@
          nav/health/dimensions/ELI10 lead — its nav links target _parent to drive the
          other SPA tabs. The legacy panel bodies stay in the DOM for app.js's refs but
          are force-hidden. */
-      #panel-graph, #panel-tokens, #panel-drift { padding: 0 !important; }
-      #panel-graph .panel-grid, #panel-tokens .tokens-legacy, #panel-drift .drift-legacy { display: none !important; }
+      #panel-graph, #panel-tokens, #panel-drift, #panel-coverage { padding: 0 !important; }
+      #panel-graph .panel-grid, #panel-tokens .tokens-legacy, #panel-drift .drift-legacy, #panel-coverage .coverage-legacy { display: none !important; }
       .ctx-frame { width: 100%; height: 100dvh; border: 0; display: block; background: #000; }
       body.embed-active .topnav { display: none !important; }
 
@@ -136,8 +136,13 @@
     </section>
 
     <!-- ── Panel 3: Eval coverage ───────────────────────────────────────── -->
+    <!-- The Evals tab now renders the design's "Protection chain" page
+         (public/evals.html) in an embed iframe. The legacy coverage body is kept in
+         the DOM (hidden) so app.js refs (#coverageBody) stay valid; loadCoverage()
+         early-returns when #coverageFrame exists. -->
     <section class="panel" id="panel-coverage">
-      <div class="placeholder" id="coverageBody">Loading…</div>
+      <iframe class="ctx-frame" id="coverageFrame" src="/evals.html" title="Evals"></iframe>
+      <div class="coverage-legacy"><div class="placeholder" id="coverageBody">Loading…</div></div>
     </section>
 
     <!-- ── Panel 4: Drift ───────────────────────────────────────────────── -->
