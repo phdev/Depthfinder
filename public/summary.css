@@ -52,7 +52,9 @@
 #panel-summary .df-sum .tnum { font-variant-numeric: tabular-nums; }
 
 /* ---- page head ------------------------------------------------- */
-#panel-summary .df-head { padding: 36px 0 22px; }
+/* match the design pages' .head padding (context-base.css) so the header →
+   health → dimensions spacing is identical across Summary and Context/Tokens/… */
+#panel-summary .df-head { padding: 42px 0 26px; }
 #panel-summary .df-head h1 {
   margin: 0;
   font-size: 38px;
@@ -609,7 +611,7 @@
 }
 @media (max-width: 720px) {
   #panel-summary .df-sum { padding: 0 16px 44px; }
-  #panel-summary .df-head { padding: 24px 0 18px; }
+  #panel-summary .df-head { padding: 30px 0 20px; }
   #panel-summary .df-head h1 { font-size: 30px; }
   #panel-summary .df-subnav { margin: 0 -16px; padding: 0 16px; }
   #panel-summary .df-health { padding: 20px 18px; gap: 18px; flex-wrap: wrap; }
