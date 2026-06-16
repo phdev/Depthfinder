@@ -29,4 +29,5 @@
 
   Your agent reads all of this as ground truth, every call.
   npx depthfinder --triage to step through the fixes · --json for full results
+  In a clone? npm start → http://127.0.0.1:4317 for the full dashboard
 

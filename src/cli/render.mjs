@@ -5,8 +5,7 @@
 // dimensions (Honesty / Weight / Coverage) indented under it with a ↳, each
 // with a one-line description and a 4-tier color (critical/caution/ok/great) on
 // the bar + number. This reversed the original "no status word / honesty-led
-// headline" invariant (the user chose dashboard parity with the dishonest-
-// headline tradeoff in view, 2026-06-15). Below the meters: ALL hotspots
+// headline" tradeoff in view, 2026-06-15). Below the meters: ALL hotspots
 // (uncapped), each tagged with a colored criticality level and the score it
 // returns if fixed (Health first, then Honesty, in green). The old "Context
 // Honesty N · …" summary line was removed (2026-06-15) — that number now lives
@@ -158,6 +157,7 @@ export function renderCard(model, { color = false } = {}) {
   L.push("");
   L.push("  Your agent reads all of this as ground truth, every call.");
   L.push("  npx depthfinder --triage to step through the fixes · --json for full results");
+  L.push("  In a clone? npm start → http://127.0.0.1:4317 for the full dashboard");
   L.push("");
   return L.join("\n");
 }
