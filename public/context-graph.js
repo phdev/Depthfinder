@@ -53,6 +53,7 @@
   var nodes = [], L = [], byId = {}, nodeEls = [], edgeEls = [];
   var W = 1000, H = 720;
   var selectedId = null, curPos = {}, curVB = { x: 0, y: 0, w: 1000, h: 720 }, animRAF = null;
+  var baseVB = { x: 0, y: 0, w: 1000, h: 720 }; // fitted to the laid-out nodes
 
   function api(p) { return fetch(p).then(function (r) { if (!r.ok) throw new Error(p + " " + r.status); return r.json(); }); }
 
@@ -94,24 +95,34 @@
     fillRail(map);
   }
 
-  // ── force layout (design parameters) ──
+  // ── force layout — tuned for REAL data (the design's hand-assigned clusters
+  // aren't available, so spacing comes from stronger repulsion + a hard collision
+  // pass + free spread, then the viewBox is fitted to the result so nothing is
+  // cramped or clipped). Deterministic jitter → stable across reloads.
   function layout() {
-    var seeds = { core: [470, 360], design: [770, 150], code: [660, 560], flags: [250, 560], bottom: [470, 665], mem: [810, 640], ci: [760, 470] };
-    var seed = 20251; // deterministic jitter so the layout is stable across reloads
+    var area = { w: 1500, h: 1050 }; W = area.w; H = area.h;
+    var cx = area.w / 2, cy = area.h / 2, R = Math.min(area.w, area.h) * 0.34;
+    var order = ["core", "design", "code", "ci", "mem", "flags", "bottom"], seeds = {};
+    order.forEach(function (c, i) { var a = (i / order.length) * Math.PI * 2; seeds[c] = [cx + R * Math.cos(a), cy + R * Math.sin(a)]; });
+    var seed = 20251;
     function rnd() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
-    nodes.forEach(function (n) { var s = seeds[n.cluster] || [500, 360]; n.x = s[0] + (rnd() - 0.5) * 130; n.y = s[1] + (rnd() - 0.5) * 130; n.vx = 0; n.vy = 0; });
-    for (var it = 0; it < 460; it++) {
+    nodes.forEach(function (n) { var s = seeds[n.cluster] || [cx, cy]; n.x = s[0] + (rnd() - 0.5) * 240; n.y = s[1] + (rnd() - 0.5) * 240; n.vx = 0; n.vy = 0; });
+    for (var it = 0; it < 560; it++) {
       for (var i = 0; i < nodes.length; i++) for (var j = i + 1; j < nodes.length; j++) {
         var a = nodes[i], b = nodes[j], dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy + 0.01, d = Math.sqrt(d2);
-        var f = 2700 / d2, fx = f * dx / d, fy = f * dy / d; a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
+        var f = 5200 / d2, fx = f * dx / d, fy = f * dy / d; a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
+        var min = a.r + b.r + 16; // hard anti-overlap collision
+        if (d < min) { var p = (min - d) * 0.5; a.vx += p * dx / d; a.vy += p * dy / d; b.vx -= p * dx / d; b.vy -= p * dy / d; }
       }
-      L.forEach(function (l) { var a = byId[l.s], b = byId[l.t]; var dx = b.x - a.x, dy = b.y - a.y, d = Math.sqrt(dx * dx + dy * dy) + 0.01; var f = (d - 95) * 0.02, fx = f * dx / d, fy = f * dy / d; a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy; });
-      nodes.forEach(function (n) {
-        n.vx += (500 - n.x) * 0.0022; n.vy += (380 - n.y) * 0.0022;
-        n.x += Math.max(-7, Math.min(7, n.vx)); n.y += Math.max(-7, Math.min(7, n.vy));
-        n.vx *= 0.86; n.vy *= 0.86; n.x = Math.max(42, Math.min(W - 42, n.x)); n.y = Math.max(42, Math.min(H - 42, n.y));
-      });
+      L.forEach(function (l) { var a = byId[l.s], b = byId[l.t]; var dx = b.x - a.x, dy = b.y - a.y, d = Math.sqrt(dx * dx + dy * dy) + 0.01; var f = (d - 120) * 0.018, fx = f * dx / d, fy = f * dy / d; a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy; });
+      nodes.forEach(function (n) { n.vx += (cx - n.x) * 0.0015; n.vy += (cy - n.y) * 0.0015; n.x += Math.max(-9, Math.min(9, n.vx)); n.y += Math.max(-9, Math.min(9, n.vy)); n.vx *= 0.85; n.vy *= 0.85; });
     }
+    // fit the initial viewBox to the laid-out nodes (1000×720 aspect)
+    var xs = nodes.map(function (n) { return n.x; }), ys = nodes.map(function (n) { return n.y; });
+    var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs), minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
+    var pad = 80, w = (maxX - minX) + pad * 2, h = (maxY - minY) + pad * 2, ar = 1000 / 720;
+    if (w / h < ar) w = h * ar; else h = w / ar;
+    baseVB = { x: (minX + maxX) / 2 - w / 2, y: (minY + maxY) / 2 - h / 2, w: w, h: h };
   }
 
   // ── render ──
@@ -142,6 +153,8 @@
     });
     svg.addEventListener("click", function () { deselect(); });
     curPos = {}; nodes.forEach(function (n) { curPos[n.id] = { x: n.x, y: n.y }; });
+    curVB = { x: baseVB.x, y: baseVB.y, w: baseVB.w, h: baseVB.h };
+    svg.setAttribute("viewBox", baseVB.x + " " + baseVB.y + " " + baseVB.w + " " + baseVB.h);
   }
 
   function neighbours(id) { var s = {}; s[id] = 1; L.forEach(function (l) { if (l.s === id) s[l.t] = 1; if (l.t === id) s[l.s] = 1; }); return s; }
@@ -175,7 +188,7 @@
     edgeEls.forEach(function (l) { l.classList.remove("dim"); });
     var insp = document.getElementById("sxInspect"); if (insp) insp.innerHTML = "";
     var orig = {}; nodes.forEach(function (n) { orig[n.id] = { x: n.x, y: n.y }; });
-    animate(orig, { x: 0, y: 0, w: 1000, h: 720 }, 460);
+    animate(orig, { x: baseVB.x, y: baseVB.y, w: baseVB.w, h: baseVB.h }, 460);
   }
   function select(id) {
     selectedId = id; var n = byId[id], nb = neighbours(id);
@@ -218,7 +231,7 @@
     });
     panZoom();
   }
-  function resetViewBox() { if (animRAF) cancelAnimationFrame(animRAF); curVB = { x: 0, y: 0, w: 1000, h: 720 }; svg.setAttribute("viewBox", "0 0 1000 720"); }
+  function resetViewBox() { if (animRAF) cancelAnimationFrame(animRAF); curVB = { x: baseVB.x, y: baseVB.y, w: baseVB.w, h: baseVB.h }; svg.setAttribute("viewBox", baseVB.x + " " + baseVB.y + " " + baseVB.w + " " + baseVB.h); }
 
   // ── pan + cmd/ctrl-wheel zoom + zoom buttons (design behavior) ──
   function panZoom() {

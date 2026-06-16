@@ -83,6 +83,10 @@ function activate(panel) {
     t.classList.toggle("active", t.dataset.panel === panel);
   for (const p of document.querySelectorAll(".panel"))
     p.classList.toggle("active", p.id === `panel-${panel}`);
+  // Context tab = the full design page in an iframe; hide the SPA chrome there so
+  // the design's own nav/health/dimensions are the top of the tab (its nav links
+  // target _parent to drive these SPA tabs).
+  document.body.classList.toggle("ctx-active", panel === "graph");
   if (!loaded[panel]) {
     loaded[panel] = true;
     if (panel === "summary") loadSummary();

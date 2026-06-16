@@ -380,10 +380,19 @@ severity/health/detail/action — nothing fabricated. Added the **rail show/hide
 toggle** (`#sxRailToggle` — the design shipped the rail minimized with no control)
 and wired the rail's **dangling-references** finding to real `map.danglingRefs`.
 **Increment 3 (DONE):** the new design **IS the SPA's Context tab** now. `index.html`'s
-`#panel-graph` embeds `<iframe id="ctxFrame" src="/context.html?embed">` — the design's
-`html.embed` rules (in `context-base.css`) hide its own topnav/subnav/health/dimensions,
-leaving just the Context Map (graph + hotspots + rail), which is exactly the tab's
-scope. The legacy Cytoscape grid is KEPT in the DOM but force-hidden
+`#panel-graph` embeds `<iframe id="ctxFrame" src="/context.html">` — the FULL design
+page (NOT `?embed`; an earlier pass stripped it to just the map, but the user wanted
+the Health hero + Dimensions + ELI10 + the design's nav showing). `app.js`'s
+`activate()` toggles `body.ctx-active`, and a small inline `<style>` hides the SPA's
+own `.topbar`+`.tabs` on that tab so the **design's own nav is the top nav** (matches
+the Claude design); the design nav's links `target="_parent"` so they drive the other
+SPA tabs from inside the iframe. **Increment 4 (DONE):** node-layout pass for REAL
+data — the design's clean spacing came from hand-assigned clusters the real graph
+lacks, so `layout()` was rewritten with stronger repulsion + a hard collision pass
+(`r_a+r_b+16`) + free spread (no edge-clamp) in a 1500×1050 field, then the initial
+viewBox is FITTED to the laid-out nodes (`baseVB`, routed through reset/deselect). 113
+nodes now sit with a positive min-gap (~14px, no overlaps) vs the old clumping. The
+legacy Cytoscape grid is KEPT in the DOM but force-hidden
 (`#panel-graph .panel-grid{display:none!important}` — its `display:grid` beat the
 `hidden` attr), so every app.js element ref (`#cy`, `#refreshMap`, …) stays valid;
 `loadGraph()` early-returns when `#ctxFrame` exists (one-line guard, no Cytoscape
