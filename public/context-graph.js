@@ -58,7 +58,13 @@
 
   // ── boot ──
   Promise.all([api("/api/map"), api("/api/summary").catch(function () { return null; })])
-    .then(function (res) { build(res[0]); if (res[1]) fillSummary(res[1]); })
+    .then(function (res) {
+      build(res[0]);
+      if (res[1]) fillSummary(res[1]);
+      buildHotspots(res[1] || {});
+      fillFindings(res[0]);
+      wireRailToggle();
+    })
     .catch(function (e) {
       var box = document.getElementById("sxInspect");
       if (box) box.innerHTML = '<div class="ins-note">Could not load the context map: ' + (e && e.message || e) + ". Is the dashboard server running?</div>";
@@ -287,5 +293,96 @@
         return '<span class="lg"><span class="sw" style="background:' + TYPE[k].c + '"></span>' + LEGLABEL[k] + ' <span class="n">' + byType[k] + "</span></span>";
       }).join("");
     }
+  }
+
+  // ── Hotspots, wired to real /api/summary issues ──
+  // The design's hidden hotspots table was a data source for an in-map sidebar +
+  // per-hotspot highlight. Here that data comes from the REAL scan: each issue
+  // already carries severity, title, detail, `tab` (1 Honesty / 2 Weight / 3
+  // Coverage / 4 Drift) and `healthGain`. We anchor each to its real graph node
+  // by fuzzy-matching the title/detail against node ids, then drive the design's
+  // sidebar + node highlight + inspect detail from it. Nothing is fabricated.
+  function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  function norm(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
+  var DIMLABEL = { 1: "Honesty", 2: "Weight", 3: "Coverage", 4: "Drift" };
+  function gainDash(h) { var v = Math.max(0, Math.min(100, parseFloat(String(h).replace(/[^0-9.]/g, "")) || 0)); return (v / 100 * C).toFixed(2); }
+  function findAnchor(h) {
+    var hay = norm((h.title || "") + " " + (h.detail || "")), best = null, bestLen = 0;
+    nodes.forEach(function (n) {
+      [n.id, n.label].forEach(function (s) { var k = norm(s); if (k.length >= 5 && hay.indexOf(k) >= 0 && k.length > bestLen) { best = n.id; bestLen = k.length; } });
+    });
+    return best;
+  }
+
+  function wireRailToggle() {
+    var rt = document.getElementById("sxRailToggle"), lay = document.querySelector(".sx-layout");
+    if (!rt || !lay) return;
+    rt.addEventListener("click", function () { var c = lay.classList.toggle("sx-collapsed"); rt.textContent = c ? "Show details" : "Hide details"; });
+  }
+
+  function renderHotspotDetail(it) {
+    var box = document.getElementById("sxInspect"); if (!box) return;
+    var acts = it.action ? '<div class="ins-acts"><div class="ins-acts-h">Suggested action</div><div class="ins-act"><span class="ia-n">1</span><span>' + esc(it.action) + "</span></div></div>" : "";
+    var dim = it.dim ? '<div class="ins-row"><span class="k">Improves</span><span class="v"><b>' + esc(it.dim) + "</b></span></div>" : "";
+    box.innerHTML =
+      '<div class="ins-name">' + esc(it.name) + "</div>" +
+      '<div class="ins-sevhealth"><span class="sev-badge ' + (it.sev === "high" ? "high" : "med") + '">' + (it.sev === "high" ? "High" : "Medium") + "</span>" +
+      (it.health ? '<span class="nm-health"><span class="nmh-radial"><svg viewBox="0 0 36 36"><circle class="t" cx="18" cy="18" r="15.5"></circle><circle class="f" cx="18" cy="18" r="15.5" stroke-dasharray="' + gainDash(it.health) + ' 97.39"></circle></svg></span>' + esc(it.health) + ' <span class="nmh-lab">health</span></span>' : "") +
+      "</div>" +
+      (it.detail ? '<div class="ins-note" style="border-top:none;padding-top:4px;margin-top:8px;">' + esc(it.detail) + "</div>" : "") +
+      dim + acts;
+  }
+
+  function buildHotspots(summary) {
+    var raw = (summary && (summary.hotspots || summary.issues)) || [];
+    if (!raw.length) return;
+    var items = raw.map(function (h, i) {
+      var a = findAnchor(h);
+      return {
+        order: String(i + 1), name: h.title || ("Hotspot " + (i + 1)),
+        sev: h.severity === "high" ? "high" : "med", detail: h.detail || "",
+        health: h.healthGain ? ("+" + h.healthGain) : "", dim: DIMLABEL[h.tab] || "",
+        action: h.action || "", anchorId: a, ids: a ? Object.keys(neighbours(a)) : [],
+      };
+    });
+    var graphEl = document.querySelector(".sx-graph"); if (!graphEl) return;
+    var side = document.createElement("aside"); side.className = "map-hs open";
+    var hi = items.filter(function (x) { return x.sev === "high"; }).length, md = items.length - hi;
+    var head = document.createElement("button"); head.type = "button"; head.className = "map-hs-head";
+    head.innerHTML = '<span class="mh-t">Hotspots <span class="mh-n high">' + hi + " high</span>" + (md ? '<span class="mh-n med">' + md + " medium</span>" : "") + '</span><span class="mh-x">‹</span>';
+    var list = document.createElement("div"); list.className = "map-hs-list";
+    var firstBtn = null;
+    items.forEach(function (it) {
+      var b = document.createElement("button"); b.type = "button"; b.className = "map-hs-item";
+      b.innerHTML = '<span class="mh-ord">' + it.order + '</span><span class="mh-name">' + esc(it.name) + '</span><span class="mh-dot ' + it.sev + '"></span>';
+      b.addEventListener("click", function () {
+        list.querySelectorAll(".map-hs-item.on").forEach(function (x) { x.classList.remove("on"); });
+        b.classList.add("on");
+        if (it.anchorId && byId[it.anchorId]) select(it.anchorId); else deselect();
+        renderHotspotDetail(it);
+      });
+      list.appendChild(b);
+      if (!firstBtn) firstBtn = b;
+    });
+    head.addEventListener("click", function () { var o = side.classList.toggle("open"); head.querySelector(".mh-x").textContent = o ? "‹" : "›"; });
+    side.appendChild(head); side.appendChild(list);
+    var col = document.createElement("div"); col.className = "sx-hs-col"; col.appendChild(side);
+    var insp = document.getElementById("sxInspect"); if (insp) col.appendChild(insp);
+    graphEl.appendChild(col);
+    if (firstBtn) setTimeout(function () { firstBtn.click(); }, 80);
+    svg.addEventListener("click", function () { list.querySelectorAll(".map-hs-item.on").forEach(function (x) { x.classList.remove("on"); }); });
+  }
+
+  // real dangling references → the rail's "Dangling references" panel
+  function fillFindings(map) {
+    var dangling = (map && map.danglingRefs) || [];
+    document.querySelectorAll(".sx-rail .sx-find").forEach(function (d) {
+      var sum = d.querySelector("summary"); if (!sum || !/dangling/i.test(sum.textContent)) return;
+      var fc = sum.querySelector(".fc"); if (fc) fc.textContent = String(dangling.length);
+      var body = d.querySelector(".fbody"); if (!body) return;
+      body.innerHTML = dangling.length
+        ? dangling.slice(0, 12).map(function (r) { return '<div class="fitem"><b>' + esc(r.source || r.from || "") + "</b> → " + esc(r.path || r.to || "") + "</div>"; }).join("")
+        : '<div class="fitem">No dangling references — every doc path resolves.</div>';
+    });
   }
 })();

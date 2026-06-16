@@ -368,13 +368,22 @@ surface list. `public/context-base.css` + `public/context.css` are the design's 
 (dark monochrome, Arimo/JetBrains-Mono; node-type grays in `--nt-*`). **DONE this
 pass** (verified rendering on home-center, Health 83, no console errors): the 113-node
 graph + select/fan/inspect/filter/pan/zoom + deterministic layout, the Health hero,
-Dimensions cards, and the left-rail stats + type-legend — all from live data. **STILL
-TODO** (richer-hotspots increment): the Hotspots table + per-hotspot mini-maps + the
-collapsible map sidebar need an extended `summary.mjs` hotspot shape (per-dimension %
-lift + multiple suggested actions + ELI10 copy); the rail collapse-toggle +
-CI-gaps/dangling/duplicate findings panels; a nav link from the SPA (currently reach
-it directly at `/context.html`). The bundle's other pages (Home/Summary/Tokens/Drift/
-Evals) were out of scope — the user asked for Context.html only.
+Dimensions cards, and the left-rail stats + type-legend — all from live data.
+**Increment 2 (DONE, verified):** the in-map **Hotspots sidebar** is wired to the
+REAL `/api/summary` issues — turned out NO `summary.mjs` change was needed because
+each issue already carries `severity`, `title`, `detail`, `tab` (1 Honesty / 2
+Weight / 3 Coverage / 4 Drift → "Improves X"), and **`healthGain`** ("+N health").
+`buildHotspots()` fuzzy-matches each issue to its real graph node (`findAnchor`:
+normalize + substring the title/detail against node ids) so clicking a hotspot
+**highlights the real node + neighbours** and the inspect panel shows the real
+severity/health/detail/action — nothing fabricated. Added the **rail show/hide
+toggle** (`#sxRailToggle` — the design shipped the rail minimized with no control)
+and wired the rail's **dangling-references** finding to real `map.danglingRefs`.
+**Still pending (minor):** the rail's CI-gaps + duplicate-block findings are still
+the design's placeholders (no single API field yet); the hidden full hotspots TABLE
++ its per-row mini-maps aren't rendered (the in-map sidebar replaces them); a nav
+link from the SPA (reach it directly at `/context.html`). The bundle's other pages
+(Home/Summary/Tokens/Drift/Evals) were out of scope — Context.html only.
 
 **Summary Health model.** `scripts/summary.mjs` emits a composite `healthScore`
 (0–100) decomposed into three **deterministic** dimensions: **Honesty** (docs

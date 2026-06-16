@@ -322,3 +322,10 @@
   .sx-inspect:empty{display:none;}
   .map-zoom{display:none;}
 }
+
+/* rail show/hide toggle (added when wiring real data — the design shipped the
+   rail minimized with no control to reveal its legends/findings) */
+.map-detail-toggle{margin-left:auto;font:600 11px/1 Arimo,system-ui,sans-serif;color:var(--ink-2);
+  background:var(--panel-3);border:1px solid var(--line-2);border-radius:999px;padding:6px 12px;cursor:pointer;}
+.map-detail-toggle:hover{color:var(--ink);border-color:var(--line-3);}
+.map-subhead-row .map-eli{margin-left:14px;}
