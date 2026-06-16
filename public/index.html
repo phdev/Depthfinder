@@ -16,25 +16,64 @@
       #panel-graph, #panel-tokens, #panel-drift { padding: 0 !important; }
       #panel-graph .panel-grid, #panel-tokens .tokens-legacy, #panel-drift .drift-legacy { display: none !important; }
       .ctx-frame { width: 100%; height: 100dvh; border: 0; display: block; background: #000; }
-      body.embed-active .topbar, body.embed-active .tabs { display: none !important; }
+      body.embed-active .topnav { display: none !important; }
+
+      /* Top nav matched to the design pages (Context/Tokens/Drift) — replaces the
+         old .topbar + .tabs two-bar chrome with the design's single-row .topnav.
+         Self-contained literal colors (resolved from context-base.css tokens) so it
+         needs no extra stylesheet and can't restyle the native Summary content. */
+      .topnav { border-bottom: 1px solid #1b2330; position: sticky; top: 0; z-index: 20; background: rgba(7,10,15,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+      .topnav .row { display: flex; align-items: center; gap: 26px; height: 60px; max-width: 1200px; margin: 0 auto; padding: 0 40px; }
+      .topnav .burger { display: none; flex-direction: column; gap: 4px; padding: 4px; cursor: pointer; background: none; border: 0; }
+      .topnav .burger i { width: 18px; height: 1.5px; background: #9aa7b7; display: block; border-radius: 2px; }
+      .topnav .nav-logo { display: flex; align-items: center; gap: 10px; color: #eaf0f7; text-decoration: none; }
+      .topnav .sonar { position: relative; width: 24px; height: 24px; flex: 0 0 auto; }
+      .topnav .sonar i { position: absolute; inset: 0; margin: auto; border-radius: 50%; border: 1.5px solid #e6ecf4; }
+      .topnav .sonar i:nth-child(1) { width: 6px; height: 6px; background: #e6ecf4; border: none; box-shadow: 0 0 8px #e6ecf4; }
+      .topnav .sonar i:nth-child(2) { width: 14px; height: 14px; opacity: .6; }
+      .topnav .sonar i:nth-child(3) { width: 22px; height: 22px; opacity: .28; }
+      .topnav .nav-logo b { font-weight: 700; letter-spacing: .01em; }
+      .topnav .nav-tabs { display: flex; gap: 2px; height: 100%; margin-left: 6px; }
+      .topnav .nav-tab { display: flex; align-items: center; height: 100%; padding: 0 16px; color: #5d6878; font-size: 13px; border-bottom: 2px solid transparent; cursor: pointer; text-decoration: none; }
+      .topnav .nav-tab:hover { color: #9aa7b7; }
+      .topnav .nav-tab.on { color: #eaf0f7; border-bottom-color: #e6ecf4; }
+      .topnav .nav-spacer { flex: 1; }
+      .topnav .refresh-btn { background: none; border: 0; color: #9aa7b7; font-size: 20px; line-height: 1; cursor: pointer; padding: 4px 6px; }
+      .topnav .refresh-btn:hover { color: #eaf0f7; }
+      .topnav .refresh-btn.spin { animation: dfspin .8s linear infinite; }
+      .topnav .badge-local { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; font-size: 11px; color: #9aa7b7; border: 1px solid #27313f; border-radius: 999px; padding: 5px 12px 5px 10px; letter-spacing: .05em; }
+      .topnav .badge-local::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #9aa7b7; box-shadow: 0 0 7px #9aa7b7; }
+      @media (max-width: 760px) {
+        .topnav .burger { display: flex; }
+        .topnav .nav-tabs { display: none; position: absolute; top: 60px; left: 0; right: 0; flex-direction: column; height: auto; background: #05080d; border-bottom: 1px solid #1b2330; padding: 6px 0; }
+        .topnav .nav-tabs.open { display: flex; }
+        .topnav .nav-tab { height: auto; padding: 11px 40px; border-bottom: none; }
+        .topnav .row { padding: 0 20px; gap: 14px; }
+      }
     </style>
   </head>
   <body>
-    <header class="topbar">
-      <div class="brand">
-        <img class="logo" src="/assets/depthfinder-logo.svg" alt="Depthfinder" />
-        <div class="brand-name">Depthfinder</div>
-        <div class="pill"><span class="pill-dot"></span>local-only</div>
+    <!-- Top nav matched to the design pages: single-row .topnav with sonar logo,
+         text tabs (Summary · Context · Tokens · Drift · Evals), and local-only badge.
+         The nav-tabs are hash anchors — clicking sets location.hash, which the
+         existing hashchange listener turns into activate(); data-panel maps the
+         anchor to its SPA panel. -->
+    <header class="topnav">
+      <div class="wrap row">
+        <button class="burger" id="navBurger" aria-label="Menu"><i></i><i></i><i></i></button>
+        <a class="nav-logo" href="#summary"><span class="sonar"><i></i><i></i><i></i></span><b>Depthfinder</b></a>
+        <nav class="nav-tabs" id="tabs">
+          <a class="nav-tab on" href="#summary" data-panel="summary">Summary</a>
+          <a class="nav-tab" href="#context" data-panel="graph">Context</a>
+          <a class="nav-tab" href="#tokens" data-panel="tokens">Tokens</a>
+          <a class="nav-tab" href="#drift" data-panel="drift">Drift</a>
+          <a class="nav-tab" href="#evals" data-panel="coverage">Evals</a>
+        </nav>
+        <span class="nav-spacer"></span>
+        <button class="refresh-btn" id="globalRefresh" aria-label="Refresh" title="Refresh this panel">↻</button>
+        <span class="badge-local">local-only</span>
       </div>
-      <button class="refresh-btn" id="globalRefresh" aria-label="Refresh" title="Refresh this panel">↻</button>
     </header>
-    <nav class="tabs" id="tabs">
-      <button class="tab active" data-panel="summary"><span class="t-num">0</span><span class="t-full">Summary</span><span class="t-short">Summary</span></button>
-      <button class="tab" data-panel="graph"><span class="t-num">1</span><span class="t-full">Context</span><span class="t-short">Context</span></button>
-      <button class="tab" data-panel="tokens"><span class="t-num">2</span><span class="t-full">Tokens</span><span class="t-short">Tokens</span></button>
-      <button class="tab" data-panel="drift"><span class="t-num">3</span><span class="t-full">Drift</span><span class="t-short">Drift</span></button>
-      <button class="tab" data-panel="coverage"><span class="t-num">4</span><span class="t-full">Evals</span><span class="t-short">Evals</span></button>
-    </nav>
 
     <!-- ── Panel 0: Summary / triage ────────────────────────────────────── -->
     <section class="panel active" id="panel-summary">

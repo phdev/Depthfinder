@@ -519,15 +519,23 @@ future Evals page), `drift.css` (5-col grid override + `.pkm` Packmind styles), 
   ribbons, drift/not-drift hotspot classification + chain highlight, Packmind 2
   cards, health 83/Healthy, SPA-embed chrome hidden — no console errors.
 
-**Canonical tab order (2026-06-16): Summary · Context · Tokens · Drift · Evals.**
-Every nav uses this order — the SPA tab bar (`index.html` `.tabs`, with decorative
-`t-num` 0–4 labels) AND each embedded design page's own `.nav-tabs`
-(`context.html` / `tokens.html` / `drift.html`). When adding/reordering tabs, keep
-all four in sync. Note `data-panel` names ≠ hash names: `graph`→`#context`,
-`coverage`→`#evals` (see `PANEL_TO_HASH`); `TAB_PANEL` maps a dimension number
-(1 Honesty/2 Weight/3 Coverage/4 Drift) to a panel for Summary "go to" links and is
-NOT the visual tab order, so reordering the bar doesn't touch it. `t-num` labels are
-decorative (no keyboard handler) — renumber them left-to-right when reordering.
+**Unified top nav (2026-06-16): Summary · Context · Tokens · Drift · Evals.**
+The SPA shell (`index.html`) now uses the **design's `.topnav`** (single-row sonar
+logo + text `.nav-tab`s + local-only badge) instead of the old two-bar
+`.topbar`+`.tabs` — so the Summary/Evals tabs (the non-embedded ones) match the
+embedded design pages (`context.html`/`tokens.html`/`drift.html`), which carry their
+own identical `.nav-tabs`. The SPA `.nav-tab`s are **hash anchors**
+(`<a href="#context" data-panel="graph">`): clicking sets `location.hash`, the
+existing `hashchange` listener calls `activate()`, and `activate()` toggles
+`.nav-tab.on` for the active panel. The nav CSS lives self-contained (literal colors)
+in `index.html`'s `<style>` so it needs no extra sheet and can't restyle the native
+Summary; `body.embed-active .topnav{display:none}` hides it on the iframe tabs (no
+double nav). `#navBurger` toggles `.nav-tabs.open` on mobile. Keep all FOUR navs in
+this order. Gotchas: `data-panel` names ≠ hash names (`graph`→`#context`,
+`coverage`→`#evals`, see `PANEL_TO_HASH`); `TAB_PANEL` maps a dimension number
+(1 Honesty/2 Weight/3 Coverage/4 Drift) → panel for Summary "go to" links and is NOT
+the visual order; the old `.topbar`/`.tabs`/`.tab` CSS in `styles.css` is now unused
+but left in place.
 
 **Summary Health model.** `scripts/summary.mjs` emits a composite `healthScore`
 (0–100) decomposed into three **deterministic** dimensions: **Honesty** (docs

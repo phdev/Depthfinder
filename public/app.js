@@ -79,8 +79,8 @@ function panelFromHash() {
 // (replaces). hashchange (back/forward) just re-runs activate().
 function activate(panel) {
   if (!VALID_PANELS.has(panel)) panel = "summary";
-  for (const t of document.querySelectorAll(".tab"))
-    t.classList.toggle("active", t.dataset.panel === panel);
+  for (const t of document.querySelectorAll(".nav-tab"))
+    t.classList.toggle("on", t.dataset.panel === panel);
   for (const p of document.querySelectorAll(".panel"))
     p.classList.toggle("active", p.id === `panel-${panel}`);
   // Context + Tokens + Drift tabs = full design pages in an iframe; hide the SPA
@@ -99,11 +99,16 @@ function activate(panel) {
 }
 const TAB_PANEL = { 0: "summary", 1: "graph", 2: "tokens", 3: "coverage", 4: "drift" };
 $("#tabs").addEventListener("click", (e) => {
-  const t = e.target.closest(".tab");
+  const t = e.target.closest(".nav-tab");
   if (!t) return;
+  e.preventDefault(); // anchors carry an href="#hash"; we drive the hash ourselves
   const want = "#" + PANEL_TO_HASH[t.dataset.panel];
   if (location.hash === want) activate(t.dataset.panel); // re-click same tab
   else location.hash = want; // pushes history; hashchange listener activates
+});
+// mobile burger toggles the nav-tabs drawer (matches the design pages)
+$("#navBurger")?.addEventListener("click", () => {
+  document.getElementById("tabs")?.classList.toggle("open");
 });
 window.addEventListener("hashchange", () => {
   const p = panelFromHash();
@@ -1314,7 +1319,7 @@ async function loadSummary() {
 
 // global refresh ↻ — reloads whichever panel is active
 $("#globalRefresh")?.addEventListener("click", async () => {
-  const panel = document.querySelector(".tab.active")?.dataset.panel || "summary";
+  const panel = document.querySelector(".nav-tab.on")?.dataset.panel || "summary";
   const btn = $("#globalRefresh");
   btn.classList.add("spin");
   try {
@@ -1335,7 +1340,7 @@ let __rszTimer;
 window.addEventListener("resize", () => {
   clearTimeout(__rszTimer);
   __rszTimer = setTimeout(() => {
-    if (document.querySelector(".tab.active")?.dataset.panel === "tokens" && window.__tokensData)
+    if (document.querySelector(".nav-tab.on")?.dataset.panel === "tokens" && window.__tokensData)
       buildSankey(window.__tokensData.sources, window.__tokensData.destinations);
     if (window.__cy) window.__cy.resize();
   }, 150);
