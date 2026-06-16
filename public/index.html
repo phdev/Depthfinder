@@ -6,6 +6,14 @@
     <title>Depthfinder — home-center</title>
     <link rel="stylesheet" href="/styles.css" />
     <link rel="stylesheet" href="/summary.css" />
+    <style>
+      /* Context tab = the design page in an embed iframe (fills the panel). The
+         legacy Cytoscape grid stays in the DOM for app.js's refs but is force-
+         hidden (its .panel-grid{display:grid} beats the `hidden` attribute). */
+      #panel-graph { padding: 0 !important; }
+      #panel-graph .panel-grid { display: none !important; }
+      .ctx-frame { width: 100%; height: calc(100dvh - 104px); min-height: 480px; border: 0; display: block; background: #000; }
+    </style>
   </head>
   <body>
     <header class="topbar">
@@ -30,8 +38,13 @@
     </section>
 
     <!-- ── Panel 1: Context graph ───────────────────────────────────────── -->
+    <!-- The Context tab now renders the design's page (public/context.html) in an
+         embed iframe. The legacy Cytoscape grid below is kept in the DOM but hidden
+         so app.js's element refs (#cy, #refreshMap, …) stay valid; loadGraph()
+         early-returns when #ctxFrame exists. -->
     <section class="panel" id="panel-graph">
-      <div class="panel-grid">
+      <iframe class="ctx-frame" id="ctxFrame" src="/context.html?embed" title="Context map"></iframe>
+      <div class="panel-grid" hidden>
         <aside class="sidebar">
           <div class="controls">
             <div class="row">

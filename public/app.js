@@ -451,6 +451,10 @@ function clearDetail() {
 }
 
 async function loadGraph() {
+  // The Context tab renders the design's page via an iframe (#ctxFrame); skip the
+  // legacy Cytoscape render. The old panel-grid stays in the DOM (hidden) so the
+  // rest of app.js's element refs keep working.
+  if (document.getElementById("ctxFrame")) return;
   let map;
   try {
     map = await (await fetch("/api/map")).json();

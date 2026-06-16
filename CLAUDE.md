@@ -379,11 +379,20 @@ normalize + substring the title/detail against node ids) so clicking a hotspot
 severity/health/detail/action — nothing fabricated. Added the **rail show/hide
 toggle** (`#sxRailToggle` — the design shipped the rail minimized with no control)
 and wired the rail's **dangling-references** finding to real `map.danglingRefs`.
-**Still pending (minor):** the rail's CI-gaps + duplicate-block findings are still
-the design's placeholders (no single API field yet); the hidden full hotspots TABLE
-+ its per-row mini-maps aren't rendered (the in-map sidebar replaces them); a nav
-link from the SPA (reach it directly at `/context.html`). The bundle's other pages
-(Home/Summary/Tokens/Drift/Evals) were out of scope — Context.html only.
+**Increment 3 (DONE):** the new design **IS the SPA's Context tab** now. `index.html`'s
+`#panel-graph` embeds `<iframe id="ctxFrame" src="/context.html?embed">` — the design's
+`html.embed` rules (in `context-base.css`) hide its own topnav/subnav/health/dimensions,
+leaving just the Context Map (graph + hotspots + rail), which is exactly the tab's
+scope. The legacy Cytoscape grid is KEPT in the DOM but force-hidden
+(`#panel-graph .panel-grid{display:none!important}` — its `display:grid` beat the
+`hidden` attr), so every app.js element ref (`#cy`, `#refreshMap`, …) stays valid;
+`loadGraph()` early-returns when `#ctxFrame` exists (one-line guard, no Cytoscape
+render). Verified: clicking Context shows the embedded design (113 nodes, 5 hotspots),
+`legacyCy:0`, other tabs + no console errors intact. **Still pending (minor):** the
+rail's CI-gaps + duplicate-block findings are still design placeholders (no single API
+field yet); the hidden full hotspots TABLE + per-row mini-maps aren't rendered (the
+in-map sidebar replaces them). The bundle's other pages (Home/Summary/Tokens/Drift/
+Evals) were out of scope — Context.html only.
 
 **Summary Health model.** `scripts/summary.mjs` emits a composite `healthScore`
 (0–100) decomposed into three **deterministic** dimensions: **Honesty** (docs
