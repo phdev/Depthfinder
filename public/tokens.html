@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Depthfinder — Tokens</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Arimo:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="context-base.css" />
+<link rel="stylesheet" href="context.css" />
+<link rel="stylesheet" href="tokens.css?v=1" />
+</head>
+<body>
+
+<!-- ===== TOP NAV (design's own; the SPA hides its chrome on this tab) ===== -->
+<header class="topnav">
+  <div class="wrap row">
+    <span class="burger"><i></i><i></i><i></i></span>
+    <a class="nav-logo" href="/" target="_parent"><span class="sonar"><i></i><i></i><i></i></span><b>Depthfinder</b></a>
+    <nav class="nav-tabs">
+      <a class="nav-tab" href="/#summary" target="_parent">Summary</a>
+      <a class="nav-tab" href="/#context" target="_parent">Context</a>
+      <div class="nav-tab on">Tokens</div>
+      <a class="nav-tab" href="/#evals" target="_parent">Evals</a>
+      <a class="nav-tab" href="/#drift" target="_parent">Drift</a>
+    </nav>
+    <span class="nav-spacer"></span>
+    <span class="badge-local">local-only</span>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="tk-head">
+    <h1>Tokens</h1>
+    <p class="sub">Where the agent's context tokens come from, and where they flow each turn.</p>
+  </section>
+
+  <!-- ===== HEALTH HERO (filled from /api/summary) ===== -->
+  <section class="health">
+    <div class="radial" role="img" aria-label="Overall health">
+      <svg viewBox="0 0 120 120">
+        <circle class="rg-track" cx="60" cy="60" r="52"></circle>
+        <circle class="rg-fill" cx="60" cy="60" r="52"></circle>
+      </svg>
+    </div>
+    <div class="left">
+      <span class="ovl">Health</span>
+      <div class="scoreline">
+        <span class="score tnum">—<span class="den">/ 100</span></span>
+        <span class="rating">—</span>
+      </div>
+      <p class="why">Higher health = more reliable, faster and cheaper AI interactions</p>
+    </div>
+  </section>
+
+  <!-- ===== DIMENSIONS (filled from /api/summary) ===== -->
+  <details class="factors-sec">
+    <summary><span class="factors-t">Dimensions</span><span class="chev-d">›</span></summary>
+  <section class="loadgrid">
+    <div class="lcard">
+      <div class="lc-top"><span class="lc-name">Honesty <span class="lc-sub">How well docs match code</span><span class="lc-improve"><span class="lci-tri">▲</span>Improves reliability</span></span></div>
+      <div class="lc-score"><span class="lc-val tnum">—</span></div>
+    </div>
+    <div class="lcard">
+      <div class="lc-top"><span class="lc-name">Weight <span class="lc-sub">How much loads every turn</span><span class="lc-improve"><span class="lci-tri">▲</span>Improves speed &amp; cost</span></span></div>
+      <div class="lc-score"><span class="lc-val tnum">—</span></div>
+    </div>
+    <div class="lcard">
+      <div class="lc-top"><span class="lc-name">Coverage <span class="lc-sub">Rules and evals enforced in CI</span><span class="lc-improve"><span class="lci-tri">▲</span>Improves reliability</span></span></div>
+      <div class="lc-score"><span class="lc-val tnum">—</span></div>
+    </div>
+  </section>
+  </details>
+
+  <!-- ===== TOKEN CURRENTS — Sankey flow (filled from /api/tokens) ===== -->
+  <div class="map-subhead-row" style="margin:16px 0 18px;"><h2 class="subhead" style="margin:0;">Currents</h2><label class="eli10-toggle map-eli"><input type="checkbox" id="curEli10" checked><span>ELI10</span></label></div>
+  <section class="tk-flow">
+    <div class="tk-hs-col">
+      <aside class="map-hs tk-hs open" id="tkHs"></aside>
+      <aside class="tk-detail sx-inspect" id="tkDetail"></aside>
+    </div>
+    <div class="tk-flow-stage">
+      <svg class="ribbons" id="ribbons" viewBox="0 0 1000 460" preserveAspectRatio="none"></svg>
+      <div class="tk-flow-grid">
+        <div class="tk-col left" id="flowSrc"></div>
+        <div class="tk-flow-mid"></div>
+        <div class="tk-col right" id="flowSink"></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script src="tokens-flow.js?v=1"></script>
+</body>
+</html>

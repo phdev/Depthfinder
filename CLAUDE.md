@@ -444,6 +444,42 @@ that cancels the rAF AND clears the class — so an interrupting pan/zoom can ne
 leave `.sx-animating` (and its `pointer-events:none`) stuck on, which would have
 dead-locked clicks. Cache bump `?v=14` (script + `context.css`).
 
+**Design-ported Tokens page ("Token Currents", `public/tokens.html`, 2026-06-16).**
+A second Claude Design handoff (`api.anthropic.com/v1/design/h/QprwmI3yIlO09nwa4hM8fw`,
+`Tokens.html`) redesigned the Tokens tab as a **Sankey "Currents" flow**: 6 token
+**sources** (CLAUDE.md, Read-first docs, Product prompts, Memory, Evals/CI, Code
+modules) flowing via curved ribbons to 4 **sinks** (Always-loaded, Runtime
+decisions, Protection layer, Agent output), with a Hotspots sidebar that highlights
+which currents each hotspot touches. Built exactly like the Context tab: a
+standalone full design page embedded as the SPA's Tokens tab via
+`<iframe id="tokensFrame" src="/tokens.html">`; `app.js`'s `loadTokens()`
+early-returns when `#tokensFrame` exists (legacy sankey kept in DOM, hidden via
+`#panel-tokens .tokens-legacy{display:none}`); `activate()` toggles
+**`body.embed-active`** (renamed from `ctx-active` — now covers BOTH graph + tokens
+tabs) to hide the SPA chrome so the design's own nav leads. Files: `tokens.html`
+(nav links `target="_parent"`, CSS = context-base.css + context.css + tokens.css),
+`tokens.css` (design verbatim — `.tk-flow`/`.flow-node`/`.ribbons`), and
+`tokens-flow.js` (the wiring). **Wired to REAL data, nothing fabricated:**
+`/api/tokens` (`scripts/token-budget.mjs · generateCurrents`, which ALREADY emits
+the exact `sources`/`destinations` shape) drives the flow nodes; the **ribbons are
+the CONSERVED currents** — each mirrors a real generateCurrents destination formula
+(Always = CLAUDE.md+Read-first · Runtime = Product+Memory · Protection = Evals/CI ·
+Output = Code modules), ribbon width ∝ source tokens (a true Sankey, not the design's
+illustrative bands). `/api/summary` fills the Health hero + Dimensions (reads
+`honesty`, falls back to stale `coherence`) and the Hotspots sidebar from the REAL
+`issues`. Each hotspot is mapped to the currents it affects by keyword/`tab` matching
+(`hotspotCurrents()` — honest, derived from the issue's real title/detail/tab, e.g.
+"AgentCI gate" → evals+protection, "decisions log" → readfirst+always). Click a flow
+node → highlight its connected current; click a hotspot → highlight its currents +
+show the detail panel (real detail + `action` + `healthGain` + improved dimension).
+The **ELI10 toggle** (synced to the global `df_eli10`) swaps the detail's technical
+`detail` for a generic, category-level plain-language line keyed off the dimension
+`tab` (true for any hotspot in that tab — no fabricated specifics) and shows the
+flow-node plain descriptors. Verified in browse: real source/sink values (claude
+1.4k … code 18k), 6 ribbons, 5 real hotspots, health 83/Healthy, dims 95/100/51,
+node + hotspot highlighting, SPA-embed chrome hidden, and mobile stacking (flow
+column, ribbons hidden) — no console errors.
+
 **Summary Health model.** `scripts/summary.mjs` emits a composite `healthScore`
 (0–100) decomposed into three **deterministic** dimensions: **Honesty** (docs
 match code — from map dangling refs + duplicate drift; renamed from "Coherence"

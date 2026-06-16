@@ -83,10 +83,10 @@ function activate(panel) {
     t.classList.toggle("active", t.dataset.panel === panel);
   for (const p of document.querySelectorAll(".panel"))
     p.classList.toggle("active", p.id === `panel-${panel}`);
-  // Context tab = the full design page in an iframe; hide the SPA chrome there so
-  // the design's own nav/health/dimensions are the top of the tab (its nav links
-  // target _parent to drive these SPA tabs).
-  document.body.classList.toggle("ctx-active", panel === "graph");
+  // Context + Tokens tabs = full design pages in an iframe; hide the SPA chrome
+  // there so the design's own nav/health/dimensions are the top of the tab (their
+  // nav links target _parent to drive these SPA tabs).
+  document.body.classList.toggle("embed-active", panel === "graph" || panel === "tokens");
   if (!loaded[panel]) {
     loaded[panel] = true;
     if (panel === "summary") loadSummary();
@@ -654,6 +654,10 @@ function renderTokens(d) {
 }
 
 async function loadTokens() {
+  // The Tokens tab renders the design's "Token Currents" page via an iframe
+  // (#tokensFrame); skip the legacy sankey render. The old #tokensBody stays in
+  // the DOM (hidden) so the rest of app.js's element refs keep working.
+  if (document.getElementById("tokensFrame")) return;
   renderTokens(await (await fetch("/api/tokens")).json());
 }
 const yn = (v) => (v ? '<span class="tick">✓</span>' : '<span class="cross">✗</span>');
