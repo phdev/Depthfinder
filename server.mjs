@@ -18,7 +18,12 @@ import { readFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { join, normalize, extname } from "node:path";
 import { networkInterfaces } from "node:os";
-import { PUBLIC_DIR, CACHE_DIR, TOOL_DIR, REPO_ROOT } from "./lib/repo.mjs";
+import {
+  PUBLIC_DIR, CACHE_DIR, TOOL_DIR, REPO_ROOT,
+  setRepoRoot, repoName, looksLikeProject, projectPathOk,
+  readProjects, writeProjects, registerProject,
+} from "./lib/repo.mjs";
+import { resolve as resolvePath } from "node:path";
 import { redactDeep } from "./lib/redact.mjs";
 
 // Secure default: loopback only. Opt into LAN with --lan / LAN=1 / HOST=...
@@ -140,14 +145,45 @@ async function handle(req, res) {
   const url = new URL(req.url, `http://${HOST}:${PORT}`);
   const path = url.pathname;
 
-  // drain POST body (unused; refresh actions are path-addressed)
-  if (method === "POST") for await (const _ of req) {/* ignore */}
+  // read the POST body (most refresh actions are path-addressed and ignore it,
+  // but the project add/activate endpoints need it)
+  let bodyText = "";
+  if (method === "POST") for await (const c of req) bodyText += c;
+  const jsonBody = () => { try { return JSON.parse(bodyText || "{}"); } catch { return {}; } };
 
   try {
     // ── GET APIs ──
     if (method === "GET" && path === "/api/summary") {
       const mod = await import("./scripts/summary.mjs");
       return sendJson(res, 200, await mod.generateSummary());
+    }
+
+    // ── Projects (repo-name dropdown) ──
+    // The scanned project can be switched at runtime: setRepoRoot() re-points the
+    // live REPO_ROOT binding and every API regenerates fresh for the new root.
+    if (method === "GET" && path === "/api/project") {
+      registerProject(REPO_ROOT); // make sure the current project is always listed
+      const reg = readProjects();
+      return sendJson(res, 200, { name: repoName(), root: REPO_ROOT, projects: reg.projects });
+    }
+    if (method === "POST" && path === "/api/project/add") {
+      const abs = resolvePath(String(jsonBody().path || "").replace(/^~(?=\/|$)/, process.env.HOME || ""));
+      if (!abs || !projectPathOk(abs))
+        return sendJson(res, 400, { ok: false, error: "Path must be a directory inside your home folder." });
+      if (!looksLikeProject(abs))
+        return sendJson(res, 400, { ok: false, error: "That folder doesn't look like a code project (no .git, package.json, CLAUDE.md, …)." });
+      const reg = registerProject(abs);
+      return sendJson(res, 200, { ok: true, projects: reg.projects });
+    }
+    if (method === "POST" && path === "/api/project/activate") {
+      const want = resolvePath(String(jsonBody().root || ""));
+      const reg = readProjects();
+      if (!reg.projects.some((p) => p.root === want))
+        return sendJson(res, 400, { ok: false, error: "Unknown project — add it first." });
+      setRepoRoot(want);
+      reg.active = want;
+      writeProjects(reg);
+      return sendJson(res, 200, { ok: true, name: repoName(), root: want });
     }
 
     // "Open in Terminal" helper handshake. Reads the opt-in helper's per-boot

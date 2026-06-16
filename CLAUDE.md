@@ -618,6 +618,29 @@ Result: green (`--pos` #3fd09a) for Healthy/good, amber for Caution/medium, red 
 Critical/high — identical to the Summary. Cache-bust: context-graph.js?v=16,
 tokens-flow/drift-chain/evals-chain.js?v=2.
 
+**Repo-name dropdown + multi-project (2026-06-16).** The top nav's static
+"local-only" badge is replaced by a **repo-name dropdown** (`public/project-nav.js`,
+a self-contained shared script that injects its own styles and is loaded by the SPA
+shell + all 4 design pages; it early-returns under `html.embed` so the Summary's
+embedded views don't show it). It shows the scanned repo's name (green "live" dot +
+name + caret); the menu lists registered **projects** (active one checked, with path)
+and an **"Add a project…"** inline-input row. **Runtime project switching with NO
+restart:** `lib/repo.mjs`'s `REPO_ROOT` is now a **live `let` binding** (was `const`)
+with `setRepoRoot()` — ES module exports are live and every scan script reads
+`REPO_ROOT` at call time and regenerates fresh, so re-pointing it makes all APIs
+serve the new project immediately (verified: switching home-center↔Depthfinder flips
+`/api/summary` health 83↔40). Endpoints in `server.mjs`: `GET /api/project`
+(`{name, root, projects}`; auto-registers the current root), `POST /api/project/add`
+(`{path}` → validate + register), `POST /api/project/activate` (`{root}` →
+`setRepoRoot` + persist). Registry persists in `.cache/projects.json` (gitignored).
+The front-end `activate()` reloads `window.top` so every tab re-fetches for the new
+project. **Security (the scanner is unauthenticated on the LAN):** add/activate is
+guarded — paths must be **inside `$HOME`** (`projectPathOk`) AND carry a project
+marker (`.git`/`package.json`/`CLAUDE.md`/… — `looksLikeProject`), so it can't be
+pointed at `/etc` etc.; activate only accepts already-registered roots. Still, on a
+LAN-exposed instance a trusted-LAN user can switch among the user's home projects —
+consistent with the existing "local-only / trusted-LAN" posture but a real widening.
+
 **Summary Health model.** `scripts/summary.mjs` emits a composite `healthScore`
 (0–100) decomposed into three **deterministic** dimensions: **Honesty** (docs
 match code — from map dangling refs + duplicate drift; renamed from "Coherence"
