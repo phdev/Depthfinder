@@ -396,8 +396,10 @@ to ZERO overlaps, then a TIGHT viewBox fitted to the cloud (NO aspect-forcing �
 SVG's `preserveAspectRatio=meet` fills the area) routed through `baseVB` /
 reset/deselect. (A hard radial clamp was tried to stay compact but caused rim
 whack-a-mole / residual overlaps; strong-centering + unclamped de-overlap is what hit
-0.) Single-link (deg≤1) nodes render as DOTS WITHOUT labels (cut ~half the text
-clutter, 78→35; the label shows in the inspect panel on click), and the top-hotspot
+0.) Single-link (deg≤1) nodes render as small DOTS; they now ALSO get a dim, truncated
+label below the dot (re-added 2026-06-16 per "show the label names for the node
+dots" — `fill:#6b7686`, `font-size:8`, secondary to the hub labels; full name still
+in the inspect panel on click), and the top-hotspot
 auto-select was REMOVED so the full spaced graph shows on load (it had zoomed into
 one cluster and dimmed the rest). home-center: 113 nodes → 0 overlaps, ~19px min-gap,
 readable. `context.html` cache-busts the script (`context-graph.js?v=N`) so reloads
@@ -421,6 +423,26 @@ rail's CI-gaps + duplicate-block findings are still design placeholders (no sing
 field yet); the hidden full hotspots TABLE + per-row mini-maps aren't rendered (the
 in-map sidebar replaces them). The bundle's other pages (Home/Summary/Tokens/Drift/
 Evals) were out of scope — Context.html only.
+
+**Map animation perf (2026-06-16, fixed jitter on select/deselect zoom).** The
+camera tween (`animate()` in `context-graph.js`) was jittery zooming into a selected
+node and back. Root cause: every `requestAnimationFrame` rewrote `style.transform`
+on all ~113 node `<g>`s AND `x1/y1/x2/y2` on all ~98 edges — but `select()` passes
+`{}` and `deselect()` passes the nodes' HOME positions, so the nodes never actually
+move (only the viewBox/camera does). Those ~500 DOM writes/frame were pure no-ops
+that still forced the browser to repaint 200+ elements every frame. Fix: `animate()`
+now detects whether any node's target differs from its current position (`moves`
+flag, 0.01 epsilon) and, when nothing moves, tweens ONLY the viewBox — skipping the
+node/edge loops entirely. Second, low-risk win for mobile Safari (where re-rastering
+113 SVG `<text>` labels per frame is the real cost): an `.sx-animating` class is
+toggled on the SVG only during the tween, applying `shape-rendering:optimizeSpeed;
+text-rendering:optimizeSpeed; pointer-events:none` (crisp text restored the instant
+it settles). Because that class carries `pointer-events:none`, ALL animation-cancel
+sites (mousedown-pan, ⌘/ctrl-wheel zoom, zoom buttons, resetViewBox, a new
+`animate()` interrupting an old one) were routed through a single `stopAnim()` helper
+that cancels the rAF AND clears the class — so an interrupting pan/zoom can never
+leave `.sx-animating` (and its `pointer-events:none`) stuck on, which would have
+dead-locked clicks. Cache bump `?v=14` (script + `context.css`).
 
 **Summary Health model.** `scripts/summary.mjs` emits a composite `healthScore`
 (0–100) decomposed into three **deterministic** dimensions: **Honesty** (docs

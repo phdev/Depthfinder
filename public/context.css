@@ -155,6 +155,11 @@
 .sx-graph{position:relative;min-height:0;
   background:radial-gradient(760px 520px at 50% 46%, rgba(76,141,255,.045), transparent 70%);}
 .sx-graph > svg#sxSvg{display:block;width:100%;height:100%;position:absolute;inset:0;}
+/* Only during a select/deselect camera tween: rasterize for speed + drop
+   hit-testing so the per-frame viewBox repaint stays cheap (esp. mobile Safari).
+   Removed the instant the tween settles, so at-rest text stays crisp. */
+#sxSvg.sx-animating{shape-rendering:optimizeSpeed;text-rendering:optimizeSpeed;pointer-events:none;}
+#sxSvg.sx-animating .gnode text{opacity:.9;}
 .gnode{cursor:pointer;}
 .gnode circle{transition:stroke .15s,filter .15s;}
 .gnode{transition:opacity .3s ease;}

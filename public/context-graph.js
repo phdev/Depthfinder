@@ -54,6 +54,10 @@
   var W = 1000, H = 720;
   var selectedId = null, curPos = {}, curVB = { x: 0, y: 0, w: 1000, h: 720 }, animRAF = null;
   var baseVB = { x: 0, y: 0, w: 1000, h: 720 }; // fitted to the laid-out nodes
+  // Cancel any in-flight camera tween AND clear the speed-hint class. Routed
+  // through here (not a bare cancelAnimationFrame) so an interrupting pan/zoom
+  // can never leave `.sx-animating` — and its pointer-events:none — stuck on.
+  function stopAnim() { if (animRAF) { cancelAnimationFrame(animRAF); animRAF = null; } if (svg) svg.classList.remove("sx-animating"); }
 
   function api(p) { return fetch(p).then(function (r) { if (!r.ok) throw new Error(p + " " + r.status); return r.json(); }); }
 
@@ -191,9 +195,12 @@
         t.textContent = n.label.length > 20 ? n.label.slice(0, 19) + "…" : n.label;
         g.appendChild(c); g.appendChild(t);
       } else {
-        // deg≤1 → dot only (no label) to cut text clutter; the label shows in the
-        // inspect panel on click.
-        g.appendChild(c);
+        // deg≤1 dot — show its (truncated) label too, dim so it stays secondary
+        // to the hub labels; full name in the inspect panel on click.
+        var td = el("text", { x: n.x, y: n.y + rr + 9, "text-anchor": "middle", "font-size": 8 });
+        td.style.fill = "#6b7686";
+        td.textContent = n.label.length > 20 ? n.label.slice(0, 19) + "…" : n.label;
+        g.appendChild(c); g.appendChild(td);
       }
       g.addEventListener("click", function (e) { e.stopPropagation(); if (selectedId === n.id) deselect(); else select(n.id); });
       svg.appendChild(g); nodeEls.push(g);
@@ -207,16 +214,34 @@
   function neighbours(id) { var s = {}; s[id] = 1; L.forEach(function (l) { if (l.s === id) s[l.t] = 1; if (l.t === id) s[l.s] = 1; }); return s; }
 
   function animate(targetPos, vbT, dur) {
-    if (animRAF) cancelAnimationFrame(animRAF);
-    var start = {}; nodeEls.forEach(function (g) { var id = g.dataset.id; start[id] = { x: curPos[id].x, y: curPos[id].y }; });
+    stopAnim();
+    // select()/deselect() only move the CAMERA (viewBox) — the nodes stay put.
+    // Detect that here: if no node's target differs from where it already is, we
+    // skip the ~113 node-transform + ~390 edge-attribute writes per frame and
+    // tween ONLY the viewBox. Those per-frame writes were pure no-ops that still
+    // forced the browser to repaint 200+ elements every frame → the zoom jitter.
+    var start = {}, moves = false;
+    nodeEls.forEach(function (g) {
+      var id = g.dataset.id, o = byId[id], s = { x: curPos[id].x, y: curPos[id].y };
+      start[id] = s;
+      var tg = targetPos[id] || { x: o.x, y: o.y };
+      if (Math.abs(tg.x - s.x) > 0.01 || Math.abs(tg.y - s.y) > 0.01) moves = true;
+    });
     var vb0 = { x: curVB.x, y: curVB.y, w: curVB.w, h: curVB.h }, t0 = performance.now();
+    // While moving, tell the browser it may rasterize for speed (crisp text is
+    // restored the instant the tween settles) and skip hit-testing. Big help on
+    // mobile Safari, where re-rastering 113 SVG text labels per frame is the cost.
+    svg.classList.add("sx-animating");
     function step(now) {
       var p = Math.min(1, (now - t0) / (dur || 460)), e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
-      nodeEls.forEach(function (g) { var id = g.dataset.id, o = byId[id]; var tg = targetPos[id] || { x: o.x, y: o.y }; var x = start[id].x + (tg.x - start[id].x) * e, y = start[id].y + (tg.y - start[id].y) * e; curPos[id] = { x: x, y: y }; g.style.transform = "translate(" + (x - o.x) + "px," + (y - o.y) + "px)"; });
-      edgeEls.forEach(function (l) { var a = curPos[l.dataset.from], b = curPos[l.dataset.to]; if (a) { l.setAttribute("x1", a.x); l.setAttribute("y1", a.y); } if (b) { l.setAttribute("x2", b.x); l.setAttribute("y2", b.y); } });
+      if (moves) {
+        nodeEls.forEach(function (g) { var id = g.dataset.id, o = byId[id]; var tg = targetPos[id] || { x: o.x, y: o.y }; var x = start[id].x + (tg.x - start[id].x) * e, y = start[id].y + (tg.y - start[id].y) * e; curPos[id] = { x: x, y: y }; g.style.transform = "translate(" + (x - o.x) + "px," + (y - o.y) + "px)"; });
+        edgeEls.forEach(function (l) { var a = curPos[l.dataset.from], b = curPos[l.dataset.to]; if (a) { l.setAttribute("x1", a.x); l.setAttribute("y1", a.y); } if (b) { l.setAttribute("x2", b.x); l.setAttribute("y2", b.y); } });
+      }
       curVB = { x: vb0.x + (vbT.x - vb0.x) * e, y: vb0.y + (vbT.y - vb0.y) * e, w: vb0.w + (vbT.w - vb0.w) * e, h: vb0.h + (vbT.h - vb0.h) * e };
       svg.setAttribute("viewBox", curVB.x + " " + curVB.y + " " + curVB.w + " " + curVB.h);
-      if (p < 1) animRAF = requestAnimationFrame(step);
+      if (p < 1) { animRAF = requestAnimationFrame(step); }
+      else { animRAF = null; svg.classList.remove("sx-animating"); }
     }
     animRAF = requestAnimationFrame(step);
   }
@@ -278,7 +303,7 @@
     });
     panZoom();
   }
-  function resetViewBox() { if (animRAF) cancelAnimationFrame(animRAF); curVB = { x: baseVB.x, y: baseVB.y, w: baseVB.w, h: baseVB.h }; svg.setAttribute("viewBox", baseVB.x + " " + baseVB.y + " " + baseVB.w + " " + baseVB.h); }
+  function resetViewBox() { stopAnim(); curVB = { x: baseVB.x, y: baseVB.y, w: baseVB.w, h: baseVB.h }; svg.setAttribute("viewBox", baseVB.x + " " + baseVB.y + " " + baseVB.w + " " + baseVB.h); }
 
   // ── pan + cmd/ctrl-wheel zoom + zoom buttons (design behavior) ──
   function panZoom() {
@@ -286,17 +311,17 @@
     function setVB() { svg.setAttribute("viewBox", curVB.x + " " + curVB.y + " " + curVB.w + " " + curVB.h); }
     function clampW(w) { return Math.max(170, Math.min(2400, w)); }
     var dragging = false, moved = false, sx = 0, sy = 0, vb0 = null; svg.style.cursor = "grab";
-    svg.addEventListener("mousedown", function (e) { if (e.target.closest(".gnode")) return; dragging = true; moved = false; sx = e.clientX; sy = e.clientY; vb0 = { x: curVB.x, y: curVB.y, w: curVB.w, h: curVB.h }; if (animRAF) cancelAnimationFrame(animRAF); svg.style.cursor = "grabbing"; e.preventDefault(); });
+    svg.addEventListener("mousedown", function (e) { if (e.target.closest(".gnode")) return; dragging = true; moved = false; sx = e.clientX; sy = e.clientY; vb0 = { x: curVB.x, y: curVB.y, w: curVB.w, h: curVB.h }; stopAnim(); svg.style.cursor = "grabbing"; e.preventDefault(); });
     window.addEventListener("mousemove", function (e) { if (!dragging) return; var rect = svg.getBoundingClientRect(); if (Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy) > 3) moved = true; curVB.x = vb0.x - (e.clientX - sx) * (vb0.w / rect.width); curVB.y = vb0.y - (e.clientY - sy) * (vb0.h / rect.height); setVB(); });
     window.addEventListener("mouseup", function () { if (dragging) { dragging = false; svg.style.cursor = "grab"; } });
     svg.addEventListener("click", function (e) { if (moved) { e.stopImmediatePropagation(); moved = false; } }, true);
     svg.addEventListener("wheel", function (e) {
-      if (!(e.metaKey || e.ctrlKey)) return; e.preventDefault(); if (animRAF) cancelAnimationFrame(animRAF);
+      if (!(e.metaKey || e.ctrlKey)) return; e.preventDefault(); stopAnim();
       var rect = svg.getBoundingClientRect(); var mx = curVB.x + (e.clientX - rect.left) / rect.width * curVB.w, my = curVB.y + (e.clientY - rect.top) / rect.height * curVB.h;
       var nw = clampW(curVB.w * (e.deltaY > 0 ? 1.022 : 0.979)), nh = nw * (curVB.h / curVB.w);
       curVB.x = mx - (mx - curVB.x) * (nw / curVB.w); curVB.y = my - (my - curVB.y) * (nh / curVB.h); curVB.w = nw; curVB.h = nh; setVB();
     }, { passive: false });
-    function zoomCenter(f) { if (animRAF) cancelAnimationFrame(animRAF); var cx = curVB.x + curVB.w / 2, cy = curVB.y + curVB.h / 2; var nw = clampW(curVB.w * f), nh = nw * (curVB.h / curVB.w); curVB.x = cx - nw / 2; curVB.y = cy - nh / 2; curVB.w = nw; curVB.h = nh; setVB(); }
+    function zoomCenter(f) { stopAnim(); var cx = curVB.x + curVB.w / 2, cy = curVB.y + curVB.h / 2; var nw = clampW(curVB.w * f), nh = nw * (curVB.h / curVB.w); curVB.x = cx - nw / 2; curVB.y = cy - nh / 2; curVB.w = nw; curVB.h = nh; setVB(); }
     var zc = document.createElement("div"); zc.className = "map-zoom";
     zc.innerHTML = '<button type="button" class="mz" data-z="in" aria-label="Zoom in">+</button><button type="button" class="mz" data-z="out" aria-label="Zoom out">−</button><button type="button" class="mz mz-fit" data-z="fit" aria-label="Reset view">⤢</button>';
     gEl.appendChild(zc);
