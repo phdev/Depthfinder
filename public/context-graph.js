@@ -77,7 +77,9 @@
     // radius from token weight (sqrt, clamped to the design's 8–30 range)
     nodes = rawNodes.map(function (n) {
       var key = TYPEMAP[n.type] || "doc";
-      var r = Math.max(8, Math.min(30, 8 + Math.sqrt(n.tokens || 0) / 3));
+      // smaller radii than the design (its hubs were hand-placed; ours pack into a
+      // dense real core) — keeps the high-degree nodes from overlapping
+      var r = Math.max(5, Math.min(16, 5 + Math.sqrt(n.tokens || 0) / 4.2));
       return {
         id: n.id, label: n.label || n.id, type: key, raw: n,
         r: r, cluster: CLUSTER[key] || "core",
@@ -99,30 +101,47 @@
   // aren't available, so spacing comes from stronger repulsion + a hard collision
   // pass + free spread, then the viewBox is fitted to the result so nothing is
   // cramped or clipped). Deterministic jitter → stable across reloads.
+  var GAP = 13; // minimum clear space between any two node circles
   function layout() {
-    var area = { w: 1500, h: 1050 }; W = area.w; H = area.h;
-    var cx = area.w / 2, cy = area.h / 2, R = Math.min(area.w, area.h) * 0.34;
+    var area = { w: 1180, h: 820 }; W = area.w; H = area.h;
+    var cx = area.w / 2, cy = area.h / 2, R = Math.min(area.w, area.h) * 0.32;
     var order = ["core", "design", "code", "ci", "mem", "flags", "bottom"], seeds = {};
     order.forEach(function (c, i) { var a = (i / order.length) * Math.PI * 2; seeds[c] = [cx + R * Math.cos(a), cy + R * Math.sin(a)]; });
     var seed = 20251;
     function rnd() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
-    nodes.forEach(function (n) { var s = seeds[n.cluster] || [cx, cy]; n.x = s[0] + (rnd() - 0.5) * 240; n.y = s[1] + (rnd() - 0.5) * 240; n.vx = 0; n.vy = 0; });
-    for (var it = 0; it < 560; it++) {
+    nodes.forEach(function (n) { var s = seeds[n.cluster] || [cx, cy]; n.x = s[0] + (rnd() - 0.5) * 170; n.y = s[1] + (rnd() - 0.5) * 170; n.vx = 0; n.vy = 0; });
+    // main force pass: moderate repulsion + soft collision + links. Kept COMPACT
+    // on purpose — the de-overlap pass below guarantees separation, so we don't
+    // need to blow the graph up (which made nodes tiny once fitted to view).
+    for (var it = 0; it < 600; it++) {
       for (var i = 0; i < nodes.length; i++) for (var j = i + 1; j < nodes.length; j++) {
         var a = nodes[i], b = nodes[j], dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy + 0.01, d = Math.sqrt(d2);
-        var f = 5200 / d2, fx = f * dx / d, fy = f * dy / d; a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
-        var min = a.r + b.r + 16; // hard anti-overlap collision
-        if (d < min) { var p = (min - d) * 0.5; a.vx += p * dx / d; a.vy += p * dy / d; b.vx -= p * dx / d; b.vy -= p * dy / d; }
+        var f = 3300 / d2, fx = f * dx / d, fy = f * dy / d; a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
+        var min = a.r + b.r + GAP;
+        if (d < min) { var p = (min - d) * 0.6; a.vx += p * dx / d; a.vy += p * dy / d; b.vx -= p * dx / d; b.vy -= p * dy / d; }
       }
-      L.forEach(function (l) { var a = byId[l.s], b = byId[l.t]; var dx = b.x - a.x, dy = b.y - a.y, d = Math.sqrt(dx * dx + dy * dy) + 0.01; var f = (d - 120) * 0.018, fx = f * dx / d, fy = f * dy / d; a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy; });
-      nodes.forEach(function (n) { n.vx += (cx - n.x) * 0.0015; n.vy += (cy - n.y) * 0.0015; n.x += Math.max(-9, Math.min(9, n.vx)); n.y += Math.max(-9, Math.min(9, n.vy)); n.vx *= 0.85; n.vy *= 0.85; });
+      L.forEach(function (l) { var a = byId[l.s], b = byId[l.t]; var dx = b.x - a.x, dy = b.y - a.y, d = Math.sqrt(dx * dx + dy * dy) + 0.01; var f = (d - 100) * 0.02, fx = f * dx / d, fy = f * dy / d; a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy; });
+      nodes.forEach(function (n) { n.vx += (cx - n.x) * 0.004; n.vy += (cy - n.y) * 0.004; n.x += Math.max(-9, Math.min(9, n.vx)); n.y += Math.max(-9, Math.min(9, n.vy)); n.vx *= 0.85; n.vy *= 0.85; });
     }
-    // fit the initial viewBox to the laid-out nodes (1000×720 aspect)
+    // dedicated de-overlap: pure position push-apart until NO circles overlap
+    // (the force pass leaves hubs touching; this guarantees clear separation).
+    // pure push-apart until NO circles overlap. No radial clamp (that caused rim
+    // whack-a-mole) — the strong centering above already keeps the cloud compact,
+    // so this converges to the tightest overlap-free arrangement.
+    for (var k = 0; k < 700; k++) {
+      var any = false;
+      for (var x = 0; x < nodes.length; x++) for (var y = x + 1; y < nodes.length; y++) {
+        var a2 = nodes[x], b2 = nodes[y], ddx = a2.x - b2.x, ddy = a2.y - b2.y, dd = Math.sqrt(ddx * ddx + ddy * ddy) || 0.01, mn = a2.r + b2.r + GAP;
+        if (dd < mn) { var sh = (mn - dd) / 2, ux = ddx / dd, uy = ddy / dd; a2.x += ux * sh; a2.y += uy * sh; b2.x -= ux * sh; b2.y -= uy * sh; any = true; }
+      }
+      if (!any) break;
+    }
     var xs = nodes.map(function (n) { return n.x; }), ys = nodes.map(function (n) { return n.y; });
     var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs), minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
-    var pad = 80, w = (maxX - minX) + pad * 2, h = (maxY - minY) + pad * 2, ar = 1000 / 720;
-    if (w / h < ar) w = h * ar; else h = w / ar;
-    baseVB = { x: (minX + maxX) / 2 - w / 2, y: (minY + maxY) / 2 - h / 2, w: w, h: h };
+    // Tight fit (no aspect forcing) — the SVG's preserveAspectRatio="xMidYMid meet"
+    // scales this to fill the area, so the node cloud renders as large as it can.
+    var pad = 50;
+    baseVB = { x: minX - pad, y: minY - pad, w: (maxX - minX) + pad * 2, h: (maxY - minY) + pad * 2 };
   }
 
   // ── render ──
@@ -145,8 +164,9 @@
         var t = el("text", { x: n.x, y: n.y + n.r + 11, "text-anchor": "middle", "font-size": fs }); t.textContent = n.label;
         g.appendChild(c); g.appendChild(t);
       } else {
-        var td = el("text", { x: n.x, y: n.y + rr + 9, "text-anchor": "middle", "font-size": 8.5 }); td.style.fill = "#333a45"; td.textContent = n.label;
-        g.appendChild(c); g.appendChild(td);
+        // deg≤1 → dot only (no label) to cut text clutter; the label shows in the
+        // inspect panel on click.
+        g.appendChild(c);
       }
       g.addEventListener("click", function (e) { e.stopPropagation(); if (selectedId === n.id) deselect(); else select(n.id); });
       svg.appendChild(g); nodeEls.push(g);
@@ -382,7 +402,8 @@
     var col = document.createElement("div"); col.className = "sx-hs-col"; col.appendChild(side);
     var insp = document.getElementById("sxInspect"); if (insp) col.appendChild(insp);
     graphEl.appendChild(col);
-    if (firstBtn) setTimeout(function () { firstBtn.click(); }, 80);
+    // (No auto-select — show the full, spaced graph on load; the design auto-
+    // focused the top hotspot, which zoomed into one cluster and dimmed the rest.)
     svg.addEventListener("click", function () { list.querySelectorAll(".map-hs-item.on").forEach(function (x) { x.classList.remove("on"); }); });
   }
 

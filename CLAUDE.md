@@ -386,12 +386,22 @@ the Health hero + Dimensions + ELI10 + the design's nav showing). `app.js`'s
 `activate()` toggles `body.ctx-active`, and a small inline `<style>` hides the SPA's
 own `.topbar`+`.tabs` on that tab so the **design's own nav is the top nav** (matches
 the Claude design); the design nav's links `target="_parent"` so they drive the other
-SPA tabs from inside the iframe. **Increment 4 (DONE):** node-layout pass for REAL
-data — the design's clean spacing came from hand-assigned clusters the real graph
-lacks, so `layout()` was rewritten with stronger repulsion + a hard collision pass
-(`r_a+r_b+16`) + free spread (no edge-clamp) in a 1500×1050 field, then the initial
-viewBox is FITTED to the laid-out nodes (`baseVB`, routed through reset/deselect). 113
-nodes now sit with a positive min-gap (~14px, no overlaps) vs the old clumping. The
+SPA tabs from inside the iframe. **Increment 4 (DONE, several tuning passes):**
+node-layout for REAL data — the design's clean spacing came from hand-assigned
+clusters the real graph lacks. Final `layout()`: smaller radii (max 16,
+`5+sqrt(tokens)/4.2`), a COMPACT force pass with STRONG centering (0.004 — so
+unlinked nodes don't drift out and balloon the fitted view), then a CLAMP-FREE
+**de-overlap pass** (pure position push-apart, `r_a+r_b+GAP`, GAP 13) that converges
+to ZERO overlaps, then a TIGHT viewBox fitted to the cloud (NO aspect-forcing — the
+SVG's `preserveAspectRatio=meet` fills the area) routed through `baseVB` /
+reset/deselect. (A hard radial clamp was tried to stay compact but caused rim
+whack-a-mole / residual overlaps; strong-centering + unclamped de-overlap is what hit
+0.) Single-link (deg≤1) nodes render as DOTS WITHOUT labels (cut ~half the text
+clutter, 78→35; the label shows in the inspect panel on click), and the top-hotspot
+auto-select was REMOVED so the full spaced graph shows on load (it had zoomed into
+one cluster and dimmed the rest). home-center: 113 nodes → 0 overlaps, ~19px min-gap,
+readable. `context.html` cache-busts the script (`context-graph.js?v=N`) so reloads
+pick up layout changes. The
 legacy Cytoscape grid is KEPT in the DOM but force-hidden
 (`#panel-graph .panel-grid{display:none!important}` — its `display:grid` beat the
 `hidden` attr), so every app.js element ref (`#cy`, `#refreshMap`, …) stays valid;
