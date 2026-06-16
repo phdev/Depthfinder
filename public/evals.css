@@ -3,6 +3,9 @@
    inherits tokens + shell from summary.css
    ============================================================ */
 .ev-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-top:34px;}
+/* the first chain heading sits 16px below Dimensions (matches the Context page's
+   Dimensions → Context Map gap), not the default 34; later ev-heads keep 34 */
+.factors-sec + .ev-head,.factors-sec + .chain-wrap > .ev-head{margin-top:16px;}
 .ev-head h2{font-size:24px;font-weight:700;letter-spacing:-.01em;margin:0;color:#c4ccd6;}
 .ev-head .ev-sub{font-family:var(--mono);font-size:12px;color:var(--ink-3);margin-top:6px;}
 .ev-rescan{font-family:var(--sans);font-size:12px;color:var(--ink-2);background:var(--panel-3);

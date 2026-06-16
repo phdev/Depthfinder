@@ -222,7 +222,7 @@
   transition: border-color 0.15s, transform 0.15s;
   cursor: pointer;
 }
-#panel-summary .lcard:hover { border-color: var(--df-line-3); transform: translateY(-1px); }
+#panel-summary .lcard:hover { border-color: var(--df-line-3); }
 #panel-summary .lc-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding-left: 8px; }
 #panel-summary .lc-name { font-size: 13.5px; font-weight: 600; color: var(--df-ink); display: flex; flex-direction: column; gap: 2px; }
 #panel-summary .lc-name .lc-sub { font-size: 11px; color: var(--df-ink-3); font-weight: 400; }
@@ -271,7 +271,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin: 30px 0 18px;
+  /* 16px below Dimensions — matches the design pages' Dimensions → view gap */
+  margin: 16px 0 18px;
 }
 #panel-summary .th-left { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 #panel-summary .th-right { display: flex; align-items: center; gap: 14px; }

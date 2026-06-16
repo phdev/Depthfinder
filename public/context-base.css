@@ -273,7 +273,7 @@ a{color:inherit;text-decoration:none;}
 .lcard{position:relative;border:1px solid var(--line);border-radius:13px;background:var(--panel);
   padding:15px 20px 16px;display:flex;flex-direction:column;gap:9px;overflow:hidden;
   transition:border-color .15s,transform .15s;}
-.lcard:hover{border-color:var(--line-3);transform:translateY(-1px);}
+.lcard:hover{border-color:var(--line-3);}
 .lcard::before{display:none;}
 .lc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding-left:8px;}
 .lc-name{font-size:13.5px;font-weight:600;color:var(--ink);display:flex;flex-direction:column;gap:2px;}

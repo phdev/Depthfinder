@@ -1141,7 +1141,7 @@ function renderSummary(d) {
       </div>
     </section>
 
-    <details class="df-factors">
+    <details class="df-factors" open>
       <summary><span class="factors-t">Dimensions</span><span class="chev-d">›</span></summary>
       <section class="df-loadgrid">${dims.map(card).join("")}</section>
     </details>
