@@ -784,6 +784,7 @@ async function loadCoverage() {
 }
 const escapeHtml = (s) =>
   String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const esc = escapeHtml; // short alias used by the Semantic Honesty panel
 
 // "Open in Terminal" helper handshake. probeHelper() asks the dashboard whether
 // the opt-in loopback helper (:4318) is up; if so we reveal the .ae-term buttons
@@ -941,6 +942,121 @@ async function loadDrift() {
   // (hidden) so the rest of app.js's element refs keep working.
   if (document.getElementById("driftFrame")) return;
   renderDrift(await (await fetch("/api/drift")).json());
+}
+
+// ── Semantic Honesty panel (model tier, opt-in) ─────────────────────────────
+const JUDGE_CONFIRM =
+  "Run the Semantic Honesty judge?\n\nThis runs your local agent (claude/codex) read-only over the repo for 1–3 minutes and costs agent tokens — like Run drift, it calls a model. It catches doc claims that are stale or inverted even though every path resolves.";
+const JV_ORDER = { false: 0, stale: 1, unknown: 2, holds: 3 };
+let judgePolling = false;
+
+function judgeRow(f) {
+  const v = String(f.verdict || "unknown").toLowerCase();
+  return (
+    `<div class="jrow jv-${v}">` +
+    `<div class="jr-top"><span class="jr-verdict">${esc(v.toUpperCase())}</span>` +
+    (f.severity ? `<span class="jr-sev sev-${esc(String(f.severity).toLowerCase())}">${esc(f.severity)}</span>` : "") +
+    `<span class="jr-loc">${esc(f.location || "")}</span></div>` +
+    (f.claim ? `<div class="jr-claim">“${esc(f.claim)}”</div>` : "") +
+    (f.evidence ? `<div class="jr-ev">↳ ${esc(f.evidence)}</div>` : "") +
+    (f.fix && f.fix !== "none" ? `<div class="jr-fix">→ fix: ${esc(f.fix)}</div>` : "") +
+    `</div>`
+  );
+}
+
+function renderJudgePanel(data) {
+  const body = $("#dfJudgeBody");
+  const btn = $("#runJudge");
+  if (!body) return;
+  const st = data && data.status;
+
+  if (st === "running") {
+    if (btn) { btn.disabled = true; btn.textContent = "▶ running…"; }
+    const secs = data.elapsedMs ? Math.round(data.elapsedMs / 1000) : 0;
+    body.innerHTML = `<div class="judge-running"><span class="embed-spin"></span> the agent is reading the repo… <span class="jr-dim">${secs}s elapsed (typically 1–3 min)</span></div>`;
+    if (!judgePolling) { judgePolling = true; setTimeout(pollJudge, 4000); }
+    return;
+  }
+  judgePolling = false;
+  if (btn) { btn.disabled = false; btn.textContent = "▶ Run deep check"; }
+
+  const judge = data && data.judge;
+  if (judge && Array.isArray(judge.findings)) {
+    const ranked = [...judge.findings].sort((a, b) => (JV_ORDER[a.verdict] ?? 9) - (JV_ORDER[b.verdict] ?? 9));
+    const issues = ranked.filter((f) => f.verdict !== "holds");
+    const holds = ranked.filter((f) => f.verdict === "holds");
+    const c = judge.counts || {};
+    const meta =
+      `<div class="judge-meta">${esc(data.agent || "agent")} · ${data.durationMs ? Math.round(data.durationMs / 1000) + "s" : ""} · ${data.ranAt ? "ran " + timeAgo(data.ranAt) : ""}</div>`;
+    const summary =
+      `<div class="judge-summary">Semantic Honesty: <b>${c.total ?? ranked.length}</b> state-claims · ${c.holds ?? holds.length} hold · ${c.stale ?? 0} stale · <b class="jv-false-t">${c.false ?? 0}</b> false · ${c.unknown ?? 0} unknown</div>`;
+    const issuesHtml = issues.length
+      ? issues.map(judgeRow).join("")
+      : `<div class="judge-ok">✓ no stale or inverted state-claims found</div>`;
+    const holdsChip = holds.length ? `<div class="judge-holds">${holds.length} claim${holds.length === 1 ? "" : "s"} hold</div>` : "";
+    body.innerHTML = summary + meta + issuesHtml + holdsChip;
+    return;
+  }
+
+  if (st === "error") {
+    body.innerHTML = `<div class="judge-err">Judge failed: ${esc(data.error || "unknown error")}</div>`;
+    return;
+  }
+  // empty / not-installed → message + how to enable
+  const inst = data && data.instructions;
+  const msg = (data && data.message) || (inst && inst.summary) || "Run a deep check to judge doc claims against the code.";
+  let how = "";
+  if (data && data.installed === false && inst) {
+    how =
+      `<div class="judge-how">${inst.options.map((o) => `<div class="jh-opt"><b>${esc(o.label)}</b><div>${o.steps.map((s) => `<code>${esc(s)}</code>`).join("")}</div></div>`).join("")}</div>`;
+  }
+  body.innerHTML = `<div class="judge-note">${esc(msg)}</div>${how}`;
+}
+
+async function pollJudge() {
+  try {
+    renderJudgePanel(await (await fetch("/api/judge")).json());
+  } catch {}
+}
+
+function wireRunJudge(root) {
+  const btn = (root || document).querySelector("#runJudge");
+  if (!btn) return;
+  btn.onclick = async () => {
+    if (!confirm(JUDGE_CONFIRM)) return;
+    btn.disabled = true;
+    btn.textContent = "▶ starting…";
+    try {
+      const resp = await (await fetch("/api/refresh/judge", { method: "POST" })).json();
+      if (resp.status === "started") renderJudgePanel({ status: "running", startedAt: resp.startedAt });
+      else renderJudgePanel(resp); // not-installed / empty
+    } catch {
+      btn.disabled = false;
+      btn.textContent = "▶ Run deep check";
+    }
+  };
+  // collapse toggle for the section
+  const coll = (root || document).querySelector("#dfJudgeCollapse");
+  const sec = (root || document).querySelector("#dfJudge");
+  if (coll && sec)
+    coll.addEventListener("click", () => {
+      const c = sec.classList.toggle("collapsed");
+      coll.setAttribute("aria-expanded", String(!c));
+    });
+  // initial state
+  pollJudge();
+}
+
+// "3m ago" / "2h ago" — compact relative time for the judge meta line.
+function timeAgo(iso) {
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!isFinite(ms)) return "";
+  const m = Math.round(ms / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return m + "m ago";
+  const h = Math.round(m / 60);
+  if (h < 24) return h + "h ago";
+  return Math.round(h / 24) + "d ago";
 }
 
 // ── Panel 0: summary / triage ───────────────────────────────────────────────
@@ -1191,6 +1307,22 @@ function renderSummary(d) {
           <iframe class="embed-frame" data-page="/evals.html" title="Protection Chain" scrolling="no"></iframe>
         </div>
       </details>
+    </section>
+
+    <!-- Semantic Honesty (model tier): opt-in deep check that runs a local agent
+         read-only over the repo to catch stale/inverted state-claims the
+         deterministic pass can't. Sibling of Drift — manual, cache-backed. -->
+    <section class="df-judge" id="dfJudge">
+      <div class="df-tsec-head">
+        <div class="th-left">
+          <button class="hs-collapse" id="dfJudgeCollapse" type="button" aria-expanded="true"><span class="hs-chev">›</span>Semantic Honesty</button>
+          <span class="judge-sub">model judge · reads docs vs code · opt-in</span>
+        </div>
+        <div class="th-right">
+          <button class="judge-run" id="runJudge" type="button">▶ Run deep check</button>
+        </div>
+      </div>
+      <div class="judge-body" id="dfJudgeBody"><div class="judge-note">Loading…</div></div>
     </section>
   </div>`;
 
@@ -1483,6 +1615,9 @@ function wireSummary(root) {
     panel.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
   }
+
+  // Semantic Honesty (model tier): Run button + collapse + initial cached status.
+  wireRunJudge(root);
 }
 
 async function loadSummary() {

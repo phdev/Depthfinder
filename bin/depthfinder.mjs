@@ -2,7 +2,7 @@
 // depthfinder — keep your AI context honest.
 //
 // Zero-config: `npx depthfinder [path]`. Deterministic oracles only; no
-// model calls (except opt-in --burn); nothing leaves your machine. Default run
+// model calls (except opt-in --burn / --judge); nothing leaves your machine. Default run
 // writes NOTHING to the scanned repo (5A); it records one score-history line
 // in the user cache dir (--no-history to skip).
 //
@@ -50,6 +50,7 @@ import { buildPayload, writeOut } from "../src/cli/claims.mjs";
 import { firstSegment, resolveRelPosix } from "../src/cli/paths.mjs";
 import { directiveLinks } from "../src/cli/follow.mjs";
 import { resolveAgent, runBurn, verificationDetours } from "../src/cli/burn.mjs";
+import { runJudge, renderJudge } from "../src/cli/judge.mjs";
 import { collectRenameFixes, applyRenameFixes, renderFixPreview } from "../src/cli/fix.mjs";
 
 // Read once at load; a missing/corrupt package.json (only a hand-copied partial
@@ -93,9 +94,15 @@ const USAGE = `usage: depthfinder [path] [--json] [--out <dir>] [--no-follow] [-
               it prints the command and asks before spawning. Needs a real
               terminal (not CI / a pipe / --json).
   --burn      run a local agent (claude/codex) against the top false claim and
-              show what it actually says — opt-in; the ONLY path that calls a
+              show what it actually says — opt-in; one of two paths that call a
               model. Override the agent with --burn-agent "<cmd>".
   --burn-agent <cmd>  the agent command for --burn (default: claude, else codex)
+  --judge     SEMANTIC honesty check (model tier): run a local agent (claude/
+              codex) read-only over the repo to catch doc state-claims that are
+              stale or inverted even though every path resolves (e.g. shipped,
+              default-on code described as an unbuilt plan). Opt-in; the second
+              path that calls a model. Override with --judge-agent "<cmd>".
+  --judge-agent <cmd> the agent command for --judge (default: claude, else codex)
   --no-history do not record this run / show a "since last run" delta (the
               record lives in your cache dir, never in the scanned repo)
   --color, --no-color  force the colored meters/criticality tags ON or OFF.
@@ -206,6 +213,8 @@ function main() {
         docs: { type: "boolean" },
         burn: { type: "boolean" },
         "burn-agent": { type: "string" },
+        judge: { type: "boolean" },
+        "judge-agent": { type: "string" },
         "no-history": { type: "boolean" },
         convention: { type: "boolean" },
         "install-skill": { type: "boolean" },
@@ -565,6 +574,38 @@ function run({ values, positionals }) {
     }
   }
 
+  // Semantic Honesty judge (V1.6, opt-in) — the MODEL TIER. The deterministic
+  // pass above verified paths/deps/counts; --judge runs a local agent read-only
+  // over the repo to catch the rot it structurally can't: state-claims that are
+  // stale or inverted even though every reference resolves. Second consent-gated
+  // model path (the contract names exactly what is sent before it runs).
+  let judgeResult = null;
+  if (values.judge) {
+    const agent = resolveAgent({ agentCmd: values["judge-agent"] });
+    if (!agent) {
+      warn("--judge: no agent found — install claude or codex, or set DEPTHFINDER_BURN_AGENT");
+    } else {
+      // Judge the CONTEXT tier (the surface loaded every turn). Reconstruct each
+      // doc's text from the already-ingested lines; redaction happens in the
+      // prompt builder (1A on the judge input).
+      const judgeDocs = usable
+        .map((rel) => {
+          const r = readContextFile(root, rel);
+          return r.ok ? { path: rel, text: r.lines.map((l) => l.text).join("\n") } : null;
+        })
+        .filter(Boolean);
+      if (!judgeDocs.length) {
+        warn("--judge: no readable context files to judge");
+      } else {
+        process.stderr.write(
+          redact(`  ! --judge: running \`${agent.join(" ")}\` read-only over ${root}; your context docs + the files it inspects are sent to the agent (passing --judge is your consent)\n`),
+        );
+        judgeResult = runJudge(judgeDocs, { agent, cwd: root, override: values["judge-agent"] });
+        if (judgeResult.error) warn(`--judge: ${judgeResult.error}`);
+      }
+    }
+  }
+
   const score = computeScore(claims);
   // --strict gate state (Phase A), evaluated on the CONTEXT tier only. Recorded
   // in the payload so `--json` consumers read gate.failed directly instead of
@@ -705,6 +746,7 @@ function run({ values, positionals }) {
     claimsTotal: claims.length,
     claims,
     docClaims,
+    judge: judgeResult,
     meta: { skippedLines, warnings, shallowClone: shallow },
   };
 
@@ -727,6 +769,11 @@ function run({ values, positionals }) {
   } else {
     process.stdout.write(redact(renderCard(model, { color })));
     process.stdout.write("\n");
+    // The model tier appends below the deterministic card (--judge only).
+    if (judgeResult) {
+      process.stdout.write(redact(renderJudge(judgeResult, { color })));
+      process.stdout.write("\n");
+    }
   }
 
   if (values.out) {

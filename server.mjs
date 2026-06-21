@@ -229,6 +229,12 @@ async function handle(req, res) {
       return sendJson(res, 200, mod.driftStatus());
     }
 
+    // Semantic Honesty (model tier) — cached judge result; manual refresh only.
+    if (method === "GET" && path === "/api/judge") {
+      const mod = await import("./scripts/semantic-judge.mjs");
+      return sendJson(res, 200, mod.judgeStatus());
+    }
+
     // ── POST refresh ──
     if (method === "POST" && path === "/api/refresh/map") {
       const map = await getMap();
@@ -267,6 +273,21 @@ async function handle(req, res) {
       const child = spawn(
         process.execPath,
         [join(TOOL_DIR, "scripts", "drift-refresh.mjs"), "--run"],
+        { cwd: REPO_ROOT, detached: true, stdio: "ignore" },
+      );
+      child.unref();
+      return sendJson(res, 200, { status: "started", startedAt: new Date().toISOString() });
+    }
+    // Semantic Honesty judge — opt-in model run, detached (1–3 min), .cache only.
+    if (method === "POST" && path === "/api/refresh/judge") {
+      const mod = await import("./scripts/semantic-judge.mjs");
+      const st = mod.judgeStatus();
+      // No agent on PATH → nothing to run; return the empty status + instructions.
+      if (st.status === "empty" && st.installed === false)
+        return sendJson(res, 200, st);
+      const child = spawn(
+        process.execPath,
+        [join(TOOL_DIR, "scripts", "semantic-judge.mjs"), "--run"],
         { cwd: REPO_ROOT, detached: true, stdio: "ignore" },
       );
       child.unref();

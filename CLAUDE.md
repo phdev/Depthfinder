@@ -254,6 +254,38 @@ are the tax, surfaced as "the detour is the tax, every session."
   (`claude -p` / `codex exec`), so it draws on that agent's usage quota — on
   Claude plans, the separate Agent SDK allotment (from 2026-06-15). One call
   per run; documented in the README `--burn` section.
+- **`src/cli/judge.mjs` (V1.6, `--judge`) — Semantic Honesty judge, the MODEL
+  TIER.** The deterministic core verifies paths/deps/counts; it structurally
+  CANNOT decide whether a doc's *state-of-the-world narrative* still matches the
+  code — the failure where every path resolves but the prose is stale or
+  inverted (ships, default-on code described as an unbuilt plan; architecture A
+  documented while the code uses B). A doc can be 100% valid-paths and 100%
+  false. `--judge` is the SECOND consent-gated model path: it shadows a local
+  agent (`claude`, else `codex`; `--judge-agent`/`DEPTHFINDER_BURN_AGENT`
+  override) but — unlike `--burn`'s empty temp cwd — runs it **read-only INSIDE
+  the repo** so it can gather the grep/read/`git log` evidence the rubric
+  requires, then returns a strict JSON verdict array
+  (`{location,claim,verdict,evidence,severity,fix}`, verdict ∈ holds/stale/false/
+  unknown). `JUDGE_RUBRIC` is the prompt; it is evidence-first and tuned to the
+  same "prefer a missed finding to a false accusation / never accuse without a
+  citation" contract as the deterministic core (unknown-never-false). Pieces:
+  `buildJudgePrompt` (rubric + each DOC, doc text REDACTED — 1A on the input),
+  `judgeAgentArgv` (claude/codex get READ-ONLY tool flags — `claude -p
+  --allowedTools "Read Grep Glob Bash" --permission-mode acceptEdits`; no Write/
+  Edit; explicit override passes through), `runJudge` (spawn in `cwd=repoRoot`,
+  parse), `parseJudgeOutput` (defensive: whole-string → ```json fence → widest
+  bracket slice; normalizes verdict/severity casing; never throws),
+  `renderJudge` (verdict-colored section appended BELOW the deterministic card,
+  worst-first). Wiring in `bin/depthfinder.mjs`: runs after `--burn`, prints the
+  consent contract to stderr (`running \`claude -p\` read-only over <root>; …
+  your consent`), judges the **Context tier** (the surface loaded every turn);
+  `--json` adds an additive `judge:{agent,findings,counts,summary}` field (or
+  `{agent,error}`), `raw` dropped. Advisory — a missing/failing agent warns and
+  the scan still exits 0. Timeout default 5 min, `DEPTHFINDER_JUDGE_TIMEOUT` (ms)
+  overrides for big repos. Hermetic tests: the stub agent
+  (`tests/helpers/stub-agent.mjs`) detects judge-mode (prompt contains "Semantic
+  Honesty") and emits canned JSON, so `tests/judge.test.mjs` (14 tests) makes NO
+  real model call; 5A holds (`--judge` is byte-identical to the repo).
 - `src/cli/templates.mjs` — the ONLY inferential sentence per finding;
   templates are data with an exact-match test (cut-rule in header).
 - `src/cli/history.mjs` (V1.2, score-history) — records each run's score to
@@ -291,11 +323,13 @@ are the tax, surfaced as "the detour is the tax, every session."
    `npm run snapshot:update` and review of the diff.
 3. **The CLI module graph never imports `lib/repo.mjs`** (import-time path
    resolution) — enforced by the boundary test.
-4. **No model calls except `--burn`.** The default path is fully
-   deterministic and offline. `--burn` is the single, consent-gated
-   exception: it calls a local agent, sends ONE line (best-effort redacted —
-   pattern-based, not airtight), prints the contract first, and never writes
-   to the repo (runs in a temp cwd).
+4. **No model calls except `--burn` and `--judge`.** The default path is fully
+   deterministic and offline. Two consent-gated exceptions call a local agent:
+   `--burn` sends ONE line (in a temp cwd, no repo access); `--judge` (the model
+   tier, see below) runs the agent READ-ONLY inside the repo. Both print the
+   contract first, redact the doc text they embed (best-effort, pattern-based),
+   and never write to the scanned repo. Tests exercise both via a stub agent
+   (`DEPTHFINDER_BURN_AGENT`) so CI makes NO real model call.
 5. **Writes nothing to the SCANNED repo BY DEFAULT.** The only write to the
    scanned repo is **`--fix --write`** (opt-in, rename-only, reviewable). Other
    writes are out-of-repo: `--out` (opt-in) and the score-history cache line
@@ -776,14 +810,32 @@ Its one job: open the user's Terminal with a suggested-action prompt PRE-TYPED
 
 - `server.mjs` — built-in `http` server. Binds **127.0.0.1 only** by default;
   `LAN=1` / `--lan` / `HOST=` opts into LAN exposure. Endpoints:
-  `GET /api/{summary,map,tokens,coverage,drift}`, `GET /api/helper` (terminal-
-  helper handshake — serves the helper token same-origin, raw/un-redacted),
-  `POST /api/refresh/{map,tokens,coverage,drift}`, `POST /api/run/gate`.
+  `GET /api/{summary,map,tokens,coverage,drift,judge}`, `GET /api/helper`
+  (terminal-helper handshake — serves the helper token same-origin, raw/un-
+  redacted), `POST /api/refresh/{map,tokens,coverage,drift,judge}`,
+  `POST /api/run/gate`. `GET /api/judge` is read-only (latest cached judge
+  result); `POST /api/refresh/judge` spawns `scripts/semantic-judge.mjs --run`
+  **detached** (it outlives the request — the model run takes 1–3 min), exactly
+  like `/api/refresh/drift`.
 - `scripts/action-helper.mjs` — the opt-in **terminal helper** (separate process,
   loopback `:4318`, never tunneled). Documented under "Suggested Actions" above.
   Enable: `npm run helper:enable` (installs the `dev.depthfinder.helper` launchd
   job). This is the ONLY Depthfinder surface that can launch a process, and it
   only ever PRE-TYPES (never runs) — execution is the user's Enter press.
+- `scripts/semantic-judge.mjs` — the **Semantic Honesty panel** generator (model
+  tier, dashboard side). Sibling of `drift-refresh.mjs`: opt-in, calls a model,
+  manual + cache-backed (`GET /api/judge` only ever READS `.cache/judge-<ISO>.json`;
+  a `judge-running.json` lock signals an in-flight run). `runSemanticJudge()`
+  reuses the CLI wholesale — it spawns `depthfinder <repo> --judge --json
+  --no-history` in `REPO_ROOT` and caches `payload.judge` — so NO judge logic is
+  duplicated and all redaction/consent/discovery is the CLI's. `judgeStatus()` is
+  the read-only status (running → cached → empty/not-installed, with install
+  instructions when no `claude`/`codex` is on PATH). `npm run judge:run` /
+  `--status` CLI entry. Front-end: a **Semantic Honesty** collapsible section on
+  the Summary tab (`#dfJudge` in `app.js`, styled in `summary.css`) with a "Run
+  deep check" button → `POST /api/refresh/judge` → polls `/api/judge` → renders
+  the verdict rows (verdict-colored: false/stale/unknown/holds) + the tally line.
+  Like Drift, the run button confirms first (it costs tokens).
 - `scripts/*.mjs` — one generator per panel; each writes its cache under
   `.cache/` (gitignored) and never writes to the analyzed repo.
 - `lib/repo.mjs` — REPO_ROOT resolution (`$REPO_ROOT` env > `.repo-root` file >

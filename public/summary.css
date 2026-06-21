@@ -728,3 +728,55 @@
 #panel-summary .embed-block.loaded .embed-wrap { min-height: 0; }
 #panel-summary .embed-block.loaded .embed-frame { opacity: 1; min-height: 0; }
 #panel-summary .embed-block.loaded .embed-skeleton { opacity: 0; visibility: hidden; }
+
+/* ── Semantic Honesty (model tier) panel ─────────────────────────────────── */
+#panel-summary .df-judge { margin-top: 36px; }
+#panel-summary .df-judge .df-tsec-head { margin: 0 0 14px; }
+#panel-summary .judge-sub { font-size: 12px; color: var(--df-ink-3); margin-left: 10px; }
+#panel-summary .judge-run {
+  font-family: var(--df-sans); font-size: 13px; font-weight: 600; color: var(--df-ink);
+  background: var(--df-panel-3); border: 1px solid var(--df-line-2); border-radius: 9px;
+  padding: 8px 14px; cursor: pointer; transition: background .12s, border-color .12s;
+}
+#panel-summary .judge-run:hover:not(:disabled) { border-color: var(--df-line-3); background: var(--df-panel-2); }
+#panel-summary .judge-run:disabled { opacity: .6; cursor: default; }
+#panel-summary .df-judge.collapsed .judge-body { display: none; }
+#panel-summary .df-judge.collapsed .hs-chev { transform: none; }
+#panel-summary .judge-body { display: flex; flex-direction: column; gap: 9px; }
+#panel-summary .judge-note { color: var(--df-ink-2); font-size: 14px; line-height: 1.5; }
+#panel-summary .judge-running { display: flex; align-items: center; gap: 10px; color: var(--df-ink-2); font-size: 14px; }
+#panel-summary .judge-running .jr-dim, #panel-summary .jr-dim { color: var(--df-ink-3); font-size: 12.5px; }
+#panel-summary .judge-summary { font-size: 13.5px; color: var(--df-ink-2); padding: 4px 0; }
+#panel-summary .judge-summary b { color: var(--df-ink); }
+#panel-summary .judge-summary .jv-false-t { color: var(--df-red); }
+#panel-summary .judge-meta { font-size: 11.5px; color: var(--df-ink-3); margin-bottom: 6px; }
+#panel-summary .judge-ok { color: var(--df-pos); font-size: 14px; padding: 6px 0; }
+#panel-summary .judge-holds { font-size: 12.5px; color: var(--df-pos); margin-top: 4px; }
+#panel-summary .judge-err { color: var(--df-red); font-size: 14px; }
+
+/* a verdict row */
+#panel-summary .jrow {
+  border: 1px solid var(--df-line); border-left-width: 3px; border-radius: 11px;
+  background: #000; padding: 13px 15px;
+}
+#panel-summary .jrow.jv-false { border-left-color: var(--df-red); }
+#panel-summary .jrow.jv-stale { border-left-color: var(--df-amber); }
+#panel-summary .jrow.jv-unknown { border-left-color: var(--df-ink-3); }
+#panel-summary .jrow.jv-holds { border-left-color: var(--df-pos); }
+#panel-summary .jr-top { display: flex; align-items: center; gap: 10px; }
+#panel-summary .jr-verdict { font-size: 10.5px; font-weight: 800; letter-spacing: .05em; padding: 3px 7px; border-radius: 6px; }
+#panel-summary .jv-false .jr-verdict { color: var(--df-red); background: var(--df-red-dim); }
+#panel-summary .jv-stale .jr-verdict { color: var(--df-amber); background: var(--df-amber-dim); }
+#panel-summary .jv-unknown .jr-verdict { color: var(--df-ink-2); background: var(--df-panel-3); }
+#panel-summary .jv-holds .jr-verdict { color: var(--df-pos); background: color-mix(in oklab, var(--df-pos) 16%, transparent); }
+#panel-summary .jr-sev { font-size: 10px; font-weight: 700; letter-spacing: .04em; color: var(--df-ink-3); }
+#panel-summary .jr-sev.sev-crit { color: var(--df-red); }
+#panel-summary .jr-sev.sev-high { color: var(--df-amber); }
+#panel-summary .jr-loc { font-family: var(--df-mono, ui-monospace, monospace); font-size: 12px; color: var(--df-ink-2); margin-left: auto; }
+#panel-summary .jr-claim { font-size: 13.5px; color: var(--df-ink); margin-top: 8px; line-height: 1.45; }
+#panel-summary .jr-ev { font-size: 12.5px; color: var(--df-ink-3); margin-top: 5px; line-height: 1.45; }
+#panel-summary .jr-fix { font-size: 12.5px; color: var(--df-pos); margin-top: 5px; }
+#panel-summary .judge-how { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+#panel-summary .jh-opt { font-size: 12.5px; color: var(--df-ink-2); }
+#panel-summary .jh-opt b { color: var(--df-ink); display: block; margin-bottom: 4px; }
+#panel-summary .jh-opt code { display: block; font-size: 11.5px; color: var(--df-ink-3); background: #000; border: 1px solid var(--df-line); border-radius: 6px; padding: 4px 8px; margin: 2px 0; }

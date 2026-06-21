@@ -50,6 +50,13 @@ export function buildPayload(model) {
     meta,
     claims,
     docClaims,
+    // Semantic Honesty (model tier) — null unless --judge. The model's verdict
+    // array + tallies; `raw` is dropped (can be large) but `summary` is kept.
+    judge: model.judge
+      ? (model.judge.error
+          ? { agent: model.judge.agent ?? null, error: model.judge.error }
+          : { agent: model.judge.agent ?? null, findings: model.judge.findings, counts: model.judge.counts, summary: model.judge.summary })
+      : null,
   };
 }
 
